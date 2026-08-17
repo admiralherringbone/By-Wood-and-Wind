@@ -588,6 +588,10 @@ public class SheerPlan : MonoBehaviour
         cachedBowP1Ctrl = new Vector3(0, cachedMidshipKeel.y, controlZ);
 
         float targetSternY = Mathf.Lerp(cachedKeelSternPoint.y, cachedSternPostTopPoint.y, sternRisingLineEndPos);
+        
+        float hobSternY = enableCounter ? cachedHobSternIntersect.y : GetHobYAtZ(cachedSternPostTopPoint.z);
+        if (targetSternY > hobSternY) targetSternY = hobSternY;
+        
         float sternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
         float sternT = sternTotalY > 0.0001f ? (targetSternY - cachedKeelSternPoint.y) / sternTotalY : 0f;
         cachedSternRisingEnd = new Vector3(0, targetSternY, Mathf.Lerp(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, sternT));

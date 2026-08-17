@@ -282,10 +282,11 @@ public class FramingModel : MonoBehaviour
 
     protected float GetFashionLineXAtZ(float z)
     {
-        float fashionTimberLowerZ = sheerPlan.GetLowerAftMostZ();
+        Vector3 hobIntersect = GetFashionTimberHobIntersection();
+        float fashionTimberLowerZ = hobIntersect.z;
         float upperAftZ = sheerPlan.cachedTransomTopPoint.z;
 
-        float lowerTransomBreadth = breadthPlan.GetBreadthXAtZ(fashionTimberLowerZ);
+        float lowerTransomBreadth = hobIntersect.x;
         float upperTransomBreadth = breadthPlan.GetTopTimberXAtZ(upperAftZ);
 
         Vector3 p0 = new Vector3(lowerTransomBreadth, 0, fashionTimberLowerZ);
@@ -332,10 +333,20 @@ public class FramingModel : MonoBehaviour
         // Apply Option A: Baseline Relative
         float p1z = p0.z + u1Vector.y * scaleZ;
         float p1x_baseline = p0.x + T0 * (p1z - p0.z);
+        if (Mathf.Abs(deltaZ) > 0.001f)
+        {
+            float straightP1X = Mathf.Lerp(p0.x, p3.x, (p1z - p0.z) / deltaZ);
+            if (p1x_baseline < straightP1X) p1x_baseline = straightP1X;
+        }
         Vector3 p1 = new Vector3(p1x_baseline + (u1Vector.x * scaleX), 0, p1z);
 
         float p2z = p3.z + u2Vector.y * scaleZ;
         float p2x_baseline = p3.x + T3 * (p2z - p3.z);
+        if (Mathf.Abs(deltaZ) > 0.001f)
+        {
+            float straightP2X = Mathf.Lerp(p0.x, p3.x, (p2z - p0.z) / deltaZ);
+            if (p2x_baseline < straightP2X) p2x_baseline = straightP2X;
+        }
         Vector3 p2 = new Vector3(p2x_baseline + (u2Vector.x * scaleX), 0, p2z);
 
         // Find t for given z
@@ -1036,11 +1047,11 @@ public class FramingModel : MonoBehaviour
 
     private Vector3 GetFashionTimberHobIntersection()
     {
-        float startZ = sheerPlan.enableCounter ? sheerPlan.cachedCounterBasePoint.z : sheerPlan.cachedSternRisingEnd.z;
-        float startY = sheerPlan.enableCounter ? sheerPlan.cachedCounterBasePoint.y : sheerPlan.cachedSternRisingEnd.y;
+        float startZ = sheerPlan.cachedSternRisingEnd.z;
+        float startY = sheerPlan.cachedSternRisingEnd.y;
         float startHobY = sheerPlan.GetTheoreticalHobYAtZ(startZ);
         
-        if (startY >= startHobY)
+        if (startY >= startHobY - 0.001f)
         {
             return new Vector3(GetNaturalHullXAtYZ(startY, startZ), startY, startZ);
         }
@@ -1072,7 +1083,7 @@ public class FramingModel : MonoBehaviour
         float fashionBaseZ = intersect.z;
         float fashionBaseY = intersect.y;
         
-        // Pin the base width directly to the true HoB intersection width (where the red spheres are)
+        // Pin the base width directly to the true HoB intersection width
         float lowerTransomBreadth = GetNaturalHullXAtYZ(intersect.y, intersect.z);
         float upperAftZ = sheerPlan.cachedTransomTopPoint.z;
         float upperAftY = sheerPlan.cachedTransomTopPoint.y;
@@ -1082,7 +1093,7 @@ public class FramingModel : MonoBehaviour
         Vector3 p0 = new Vector3(lowerTransomBreadth, fashionBaseY, fashionBaseZ);
         Vector3 p3 = new Vector3(upperTransomBreadth, upperAftY, upperAftZ);
 
-        // Body Plan Bulges (X-Y)
+        // Body Plan Bulges
         float masterHeight = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
         float deltaY = upperAftY - fashionBaseY;
         float scaleY = 1f;
@@ -1096,7 +1107,7 @@ public class FramingModel : MonoBehaviour
         if (breadthPlan.topTimberMaxBeam > 0.01f) scaleX = upperTransomBreadth / breadthPlan.topTimberMaxBeam;
 
         Vector3 u1Vector = bodyPlan.cachedU1 - bodyPlan.cachedU0;
-        Vector3 u2Vector = bodyPlan.cachedU2 - bodyPlan.cachedU3; // Note: u2Vector.y is negative since U2 is below U3
+        Vector3 u2Vector = bodyPlan.cachedU2 - bodyPlan.cachedU3;
 
         // Tangents: Align with the Primary Breadth Plan's aft lines
         float T0 = 0f;
@@ -1109,7 +1120,7 @@ public class FramingModel : MonoBehaviour
             float zForward3 = upperAftZ + 0.01f;
             T3 = (breadthPlan.GetTopTimberXAtZ(zForward3) - upperTransomBreadth) / 0.01f;
 
-            // Extreme Rake Fallback: if the tangent is too aggressive for the distance, fall back to a straight taper to prevent inward caving
+            // Extreme Rake Fallback: if the tangent is too aggressive, fall back to a straight taper
             if (deltaZ < -0.01f)
             {
                 float projectedX = p0.x + T0 * deltaZ;
@@ -1122,7 +1133,7 @@ public class FramingModel : MonoBehaviour
             }
         }
 
-        // Apply Option A: True 3D Relative
+        // Apply: True 3D Relative with breadth plan tangent baseline
         float p1z = p0.z + u1Vector.y * scaleZ;
         float p1x_baseline = p0.x + T0 * (p1z - p0.z);
         Vector3 p1 = new Vector3(p1x_baseline + (u1Vector.x * scaleX), p0.y + (u1Vector.y * scaleY), p1z);
@@ -1132,6 +1143,21 @@ public class FramingModel : MonoBehaviour
         Vector3 p2 = new Vector3(p2x_baseline + (u2Vector.x * scaleX), p3.y + (u2Vector.y * scaleY), p2z);
 
         return (p0, p1, p2, p3);
+    }
+
+    private float GetFashionTimberTAtY(float targetY, (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3) bezier)
+    {
+        float min = 0f;
+        float max = 1f;
+        for (int i = 0; i < 20; i++)
+        {
+            float mid = (min + max) / 2f;
+            float y = CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
+            
+            if (y < targetY) min = mid;
+            else max = mid;
+        }
+        return (min + max) / 2f;
     }
 
     private float GetFashionTimberTAtZ(float targetZ, (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3) bezier)
@@ -1222,6 +1248,13 @@ public class FramingModel : MonoBehaviour
         }
 
         return exactX;
+    }
+
+    private float GetUpperFashionTimberXAtY(float targetY)
+    {
+        var bezier = GetUpperFashionTimberBezier();
+        float t = GetFashionTimberTAtY(targetY, bezier);
+        return CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
     }
 
     private float GetUpperFashionTimberXAtZ(float z)
