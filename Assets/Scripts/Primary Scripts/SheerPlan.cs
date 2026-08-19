@@ -542,20 +542,21 @@ public class SheerPlan : MonoBehaviour
             }
             
             // HoB Stern Intersect
-            if (enableCounter)
+            float searchMinZ = cachedTransomTopPoint.z;
+            float searchMaxZ = cachedKeelSternPoint.z;
+            if (searchMinZ > searchMaxZ) { float temp = searchMinZ; searchMinZ = searchMaxZ; searchMaxZ = temp; }
+            
+            for (int i = 0; i < 25; i++)
             {
-                cachedHobSternIntersect = new Vector3(0, actualHobSternY, cachedBaseDeckSternIntersect.z);
+                float midZ = (searchMinZ + searchMaxZ) / 2f;
+                float fY = GetSternProfileYAtZ(midZ);
+                float hY = GetHobYAtZ(midZ);
+                
+                if (fY < hY) searchMaxZ = midZ;
+                else searchMinZ = midZ;
             }
-            else
-            {
-                if (actualHobSternY <= cachedSternPostTopPoint.y) {
-                    float totalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
-                    float t = totalY > 0.0001f ? (actualHobSternY - cachedKeelSternPoint.y) / totalY : 0f;
-                    cachedHobSternIntersect = new Vector3(0, actualHobSternY, Mathf.Lerp(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, t));
-                } else {
-                    cachedHobSternIntersect = new Vector3(0, actualHobSternY, cachedSternPostTopPoint.z);
-                }
-            }
+            float finalZ = (searchMinZ + searchMaxZ) / 2f;
+            cachedHobSternIntersect = new Vector3(0, GetHobYAtZ(finalZ), finalZ);
             
             float hobControlDist = halfLength * hobCurveControlLength;
             float hobFwdDist = Mathf.Min(hobControlDist, (cachedHobBowIntersect.z - hobDropAft) * 0.95f);
@@ -646,10 +647,7 @@ public class SheerPlan : MonoBehaviour
         return Mathf.Min(baseZ, cachedTransomTopPoint.z);
     }
 
-    public virtual float GetLowerAftMostZ()
-    {
-        return (enableCounter) ? Mathf.Min(cachedCounterTopPoint.z, cachedCounterBasePoint.z) : cachedSternPostTopPoint.z;
-    }
+
 
     public virtual float GetSternProfileYAtZ(float z)
     {

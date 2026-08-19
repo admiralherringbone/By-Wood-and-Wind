@@ -208,38 +208,19 @@ public class FramingModel : MonoBehaviour
         {
             float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
             float fashionY = sheerPlan.GetSternProfileYAtZ(z);
-            float fashionX = GetFashionLineXAtZ(z);
+
+            if (fashionY >= sheerPlan.GetTopTimberYAtZ(z))
+            {
+                fp.isValid = false;
+                return fp;
+            }
             
             if (fashionY > hobY || !fp.hasLower)
             {
-                float originalUpperP1OffsetX = fp.upperP1.x - fp.upperP0.x;
-                float dynamicMiddlePosition = 0f;
-                if (fp.hasLower)
+                fp.hasLower = false;
+                
+                if (fp.hasUpper)
                 {
-                    float targetX = fp.lowerP1.x;
-                    Vector3 masterL1 = bodyPlan.cachedL1;
-                    float ribbandRatio = 0f;
-                    if (masterL1.x > 0.001f) ribbandRatio = Mathf.Clamp01(1f - (targetX / masterL1.x));
-                    dynamicMiddlePosition = Mathf.Lerp(bodyPlan.middleControlPosition, 0.0f, ribbandRatio);
-                }
-
-                float minPhantom = 0f;
-                float maxPhantom = 20f;
-                float finalT = 0f;
-
-                for (int iter = 0; iter < 15; iter++)
-                {
-                    float testPhantom = (minPhantom + maxPhantom) / 2f;
-                    
-                    fp.upperP0.x = testPhantom;
-                    fp.upperP1.x = testPhantom + originalUpperP1OffsetX;
-                    if (fp.hasLower)
-                    {
-                        fp.lowerP3.x = testPhantom;
-                        fp.lowerP2.x = testPhantom;
-                        fp.lowerPMid = Vector3.Lerp(fp.lowerP1, fp.lowerP2, dynamicMiddlePosition);
-                    }
-
                     float fMinT = 0f;
                     float fMaxT = fp.upperTopCutoffT; 
                     for (int i = 0; i < 15; i++)
@@ -249,14 +230,8 @@ public class FramingModel : MonoBehaviour
                         if (py < fashionY) fMinT = midT;
                         else fMaxT = midT;
                     }
-                    finalT = (fMinT + fMaxT) / 2f;
-                    float evalX = CalculateCubicBezierPoint(finalT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
-
-                    if (evalX < fashionX) minPhantom = testPhantom;
-                    else maxPhantom = testPhantom;
+                    fp.upperCutoffT = (fMinT + fMaxT) / 2f;
                 }
-
-                fp.upperCutoffT = finalT;
                 fp.lowerCutoffT = 0f;
             }
             else
@@ -280,96 +255,7 @@ public class FramingModel : MonoBehaviour
         return fp;
     }
 
-    protected float GetFashionLineXAtZ(float z)
-    {
-        Vector3 hobIntersect = GetFashionTimberHobIntersection();
-        float fashionTimberLowerZ = hobIntersect.z;
-        float upperAftZ = sheerPlan.cachedTransomTopPoint.z;
-
-        float lowerTransomBreadth = hobIntersect.x;
-        float upperTransomBreadth = breadthPlan.GetTopTimberXAtZ(upperAftZ);
-
-        Vector3 p0 = new Vector3(lowerTransomBreadth, 0, fashionTimberLowerZ);
-        Vector3 p3 = new Vector3(upperTransomBreadth, 0, upperAftZ);
-
-        // Body Plan Bulges (X-Y mapped to X-Z)
-        float masterHeight = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
-        float deltaZ = upperAftZ - fashionTimberLowerZ;
-        float scaleZ = 1f;
-        if (masterHeight > 0.01f) scaleZ = deltaZ / masterHeight;
-
-        float scaleX = 1f;
-        if (breadthPlan.topTimberMaxBeam > 0.01f) scaleX = upperTransomBreadth / breadthPlan.topTimberMaxBeam;
-
-        Vector3 u1Vector = bodyPlan.cachedU1 - bodyPlan.cachedU0;
-        Vector3 u2Vector = bodyPlan.cachedU2 - bodyPlan.cachedU3;
-
-        // Tangents
-        float T0 = 0f;
-        float T3 = 0f;
-        if (Mathf.Abs(deltaZ) > 0.001f)
-        {
-            float zForward0 = fashionTimberLowerZ + 0.01f;
-            T0 = (breadthPlan.GetBreadthXAtZ(zForward0) - lowerTransomBreadth) / 0.01f;
-            
-            float zForward3 = upperAftZ + 0.01f;
-            T3 = (breadthPlan.GetTopTimberXAtZ(zForward3) - upperTransomBreadth) / 0.01f;
-
-            // Extreme Rake Fallback (Option A):
-            // If raked aft, and the lower tangent projects further inward than the Top Timber breadth,
-            // it will create an inverted hollow. Fallback to a straight baseline.
-            if (deltaZ < -0.01f)
-            {
-                float projectedX = p0.x + T0 * deltaZ;
-                if (projectedX < p3.x)
-                {
-                    float tStraight = (p3.x - p0.x) / deltaZ;
-                    T0 = tStraight;
-                    T3 = tStraight;
-                }
-            }
-        }
-
-        // Apply Option A: Baseline Relative
-        float p1z = p0.z + u1Vector.y * scaleZ;
-        float p1x_baseline = p0.x + T0 * (p1z - p0.z);
-        if (Mathf.Abs(deltaZ) > 0.001f)
-        {
-            float straightP1X = Mathf.Lerp(p0.x, p3.x, (p1z - p0.z) / deltaZ);
-            if (p1x_baseline < straightP1X) p1x_baseline = straightP1X;
-        }
-        Vector3 p1 = new Vector3(p1x_baseline + (u1Vector.x * scaleX), 0, p1z);
-
-        float p2z = p3.z + u2Vector.y * scaleZ;
-        float p2x_baseline = p3.x + T3 * (p2z - p3.z);
-        if (Mathf.Abs(deltaZ) > 0.001f)
-        {
-            float straightP2X = Mathf.Lerp(p0.x, p3.x, (p2z - p0.z) / deltaZ);
-            if (p2x_baseline < straightP2X) p2x_baseline = straightP2X;
-        }
-        Vector3 p2 = new Vector3(p2x_baseline + (u2Vector.x * scaleX), 0, p2z);
-
-        // Find t for given z
-        float minT = 0f;
-        float maxT = 1f;
-        for (int i = 0; i < 20; i++)
-        {
-            float midT = (minT + maxT) / 2f;
-            float pz = CalculateCubicBezierPoint(midT, p0, p1, p2, p3).z;
-            if (deltaZ < 0)
-            {
-                if (pz > z) minT = midT;
-                else maxT = midT;
-            }
-            else
-            {
-                if (pz < z) minT = midT;
-                else maxT = midT;
-            }
-        }
-        float tFashion = (minT + maxT) / 2f;
-        return CalculateCubicBezierPoint(tFashion, p0, p1, p2, p3).x;
-    }
+    // Removed GetFashionLineXAtZ
 
     private Vector3 CalculateQuadraticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2)
     {
@@ -442,22 +328,7 @@ public class FramingModel : MonoBehaviour
                 DrawFrameAtZ(z);
             }
             
-            // Draw Fashion Timbers
-            if (sheerPlan.enableCounter || Mathf.Abs(sheerPlan.cachedSternPostTopPoint.z - sheerPlan.cachedTransomTopPoint.z) > 0.01f)
-            {
-                DrawUpperFashionTimber();
-                
-                if (sheerPlan.enableCounter)
-                {
-                    DrawLowerFashionTimber();
-                    
-                    // Draw Red Dots where the Fashion Timber crosses the HoB line
-                    Vector3 intersect = GetFashionTimberHobIntersection();
-                    float trueHobX = breadthPlan.GetBreadthXAtZ(intersect.z);
-                    
-                    // Remove red spheres for clear view
-                }
-            }
+            // Fashion Timbers extracted to FashionTimberModel.cs
         }
     }
 
@@ -509,7 +380,7 @@ public class FramingModel : MonoBehaviour
         if (sheerPlan == null) return positions;
 
         float bowZ = sheerPlan.cachedStemTopPoint.z;
-        float sternZ = sheerPlan.enableCounter ? sheerPlan.cachedSternRisingEnd.z : sheerPlan.cachedTransomTopPoint.z;
+        float sternZ = sheerPlan.cachedSternPostTopPoint.z;
         float keelSternZ = sheerPlan.cachedKeelSternPoint.z;
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
 
@@ -729,7 +600,7 @@ public class FramingModel : MonoBehaviour
 
     private void DrawSurfaceRibbands()
     {
-        float startZ = sheerPlan.GetLowerAftMostZ();
+        float startZ = sheerPlan.cachedSternPostTopPoint.z;
         float endZ = sheerPlan.cachedStemTopPoint.z;
         int segments = 40; // Reduced density to save Handles rendering performance
         float step = (endZ - startZ) / segments;
@@ -746,6 +617,13 @@ public class FramingModel : MonoBehaviour
         Vector3? prevPortT50 = null;
         Vector3? prevPortT75 = null;
 
+        Vector3? prevUpStbdT25 = null;
+        Vector3? prevUpStbdT50 = null;
+        Vector3? prevUpStbdT75 = null;
+        Vector3? prevUpPortT25 = null;
+        Vector3? prevUpPortT50 = null;
+        Vector3? prevUpPortT75 = null;
+
         for (int i = 0; i <= segments; i++)
         {
             float z = startZ + (i * step);
@@ -754,48 +632,137 @@ public class FramingModel : MonoBehaviour
             FrameProfile fp = GetFrameProfile(z);
             if (!fp.isValid) continue;
 
-            // Evaluate surface points at t=0.25, 0.5, 0.75
-            Vector3 stbd25 = GetSurfacePointAtT(fp, 1f, 0.25f);
-            Vector3 stbd50 = GetSurfacePointAtT(fp, 1f, 0.50f);
-            Vector3 stbd75 = GetSurfacePointAtT(fp, 1f, 0.75f);
-
-            Vector3 port25 = GetSurfacePointAtT(fp, -1f, 0.25f);
-            Vector3 port50 = GetSurfacePointAtT(fp, -1f, 0.50f);
-            Vector3 port75 = GetSurfacePointAtT(fp, -1f, 0.75f);
-
-            if (prevStbdT25.HasValue)
+            // --- LOWER MOULD RIBBANDS ---
+            if (fp.hasLower)
             {
+                if (fp.lowerCutoffT <= 0.25f) 
+                {
+                    Vector3 stbd25 = GetSurfacePointAtT(fp, 1f, 0.25f);
+                    Vector3 port25 = GetSurfacePointAtT(fp, -1f, 0.25f);
+                    if (prevStbdT25.HasValue)
+                    {
 #if UNITY_EDITOR
-                Handles.DrawDottedLine(prevStbdT25.Value, stbd25, 4f);
-                Handles.DrawDottedLine(prevStbdT50.Value, stbd50, 4f);
-                Handles.DrawDottedLine(prevStbdT75.Value, stbd75, 4f);
-
-                Handles.DrawDottedLine(prevPortT25.Value, port25, 4f);
-                Handles.DrawDottedLine(prevPortT50.Value, port50, 4f);
-                Handles.DrawDottedLine(prevPortT75.Value, port75, 4f);
+                        Handles.DrawDottedLine(prevStbdT25.Value, stbd25, 4f);
+                        Handles.DrawDottedLine(prevPortT25.Value, port25, 4f);
 #else
-                Gizmos.DrawLine(prevStbdT25.Value, stbd25);
-                Gizmos.DrawLine(prevStbdT50.Value, stbd50);
-                Gizmos.DrawLine(prevStbdT75.Value, stbd75);
-
-                Gizmos.DrawLine(prevPortT25.Value, port25);
-                Gizmos.DrawLine(prevPortT50.Value, port50);
-                Gizmos.DrawLine(prevPortT75.Value, port75);
+                        Gizmos.DrawLine(prevStbdT25.Value, stbd25);
+                        Gizmos.DrawLine(prevPortT25.Value, port25);
 #endif
+                    }
+                    prevStbdT25 = stbd25;
+                    prevPortT25 = port25;
+                } else { prevStbdT25 = null; prevPortT25 = null; }
+
+                if (fp.lowerCutoffT <= 0.50f)
+                {
+                    Vector3 stbd50 = GetSurfacePointAtT(fp, 1f, 0.50f);
+                    Vector3 port50 = GetSurfacePointAtT(fp, -1f, 0.50f);
+                    if (prevStbdT50.HasValue)
+                    {
+#if UNITY_EDITOR
+                        Handles.DrawDottedLine(prevStbdT50.Value, stbd50, 4f);
+                        Handles.DrawDottedLine(prevPortT50.Value, port50, 4f);
+#else
+                        Gizmos.DrawLine(prevStbdT50.Value, stbd50);
+                        Gizmos.DrawLine(prevPortT50.Value, port50);
+#endif
+                    }
+                    prevStbdT50 = stbd50;
+                    prevPortT50 = port50;
+                } else { prevStbdT50 = null; prevPortT50 = null; }
+
+                if (fp.lowerCutoffT <= 0.75f)
+                {
+                    Vector3 stbd75 = GetSurfacePointAtT(fp, 1f, 0.75f);
+                    Vector3 port75 = GetSurfacePointAtT(fp, -1f, 0.75f);
+                    if (prevStbdT75.HasValue)
+                    {
+#if UNITY_EDITOR
+                        Handles.DrawDottedLine(prevStbdT75.Value, stbd75, 4f);
+                        Handles.DrawDottedLine(prevPortT75.Value, port75, 4f);
+#else
+                        Gizmos.DrawLine(prevStbdT75.Value, stbd75);
+                        Gizmos.DrawLine(prevPortT75.Value, port75);
+#endif
+                    }
+                    prevStbdT75 = stbd75;
+                    prevPortT75 = port75;
+                } else { prevStbdT75 = null; prevPortT75 = null; }
+            }
+            else
+            {
+                prevStbdT25 = null; prevStbdT50 = null; prevStbdT75 = null;
+                prevPortT25 = null; prevPortT50 = null; prevPortT75 = null;
             }
 
-            prevStbdT25 = stbd25;
-            prevStbdT50 = stbd50;
-            prevStbdT75 = stbd75;
-            prevPortT25 = port25;
-            prevPortT50 = port50;
-            prevPortT75 = port75;
+            // --- UPPER MOULD RIBBANDS ---
+            if (fp.hasUpper)
+            {
+                if (fp.upperTopCutoffT >= 0.25f)
+                {
+                    Vector3 stbd25 = GetUpperSurfacePointAtT(fp, 1f, 0.25f);
+                    Vector3 port25 = GetUpperSurfacePointAtT(fp, -1f, 0.25f);
+                    if (prevUpStbdT25.HasValue)
+                    {
+#if UNITY_EDITOR
+                        Handles.DrawDottedLine(prevUpStbdT25.Value, stbd25, 4f);
+                        Handles.DrawDottedLine(prevUpPortT25.Value, port25, 4f);
+#else
+                        Gizmos.DrawLine(prevUpStbdT25.Value, stbd25);
+                        Gizmos.DrawLine(prevUpPortT25.Value, port25);
+#endif
+                    }
+                    prevUpStbdT25 = stbd25;
+                    prevUpPortT25 = port25;
+                } else { prevUpStbdT25 = null; prevUpPortT25 = null; }
+
+                if (fp.upperTopCutoffT >= 0.50f)
+                {
+                    Vector3 stbd50 = GetUpperSurfacePointAtT(fp, 1f, 0.50f);
+                    Vector3 port50 = GetUpperSurfacePointAtT(fp, -1f, 0.50f);
+                    if (prevUpStbdT50.HasValue)
+                    {
+#if UNITY_EDITOR
+                        Handles.DrawDottedLine(prevUpStbdT50.Value, stbd50, 4f);
+                        Handles.DrawDottedLine(prevUpPortT50.Value, port50, 4f);
+#else
+                        Gizmos.DrawLine(prevUpStbdT50.Value, stbd50);
+                        Gizmos.DrawLine(prevUpPortT50.Value, port50);
+#endif
+                    }
+                    prevUpStbdT50 = stbd50;
+                    prevUpPortT50 = port50;
+                } else { prevUpStbdT50 = null; prevUpPortT50 = null; }
+
+                if (fp.upperTopCutoffT >= 0.75f)
+                {
+                    Vector3 stbd75 = GetUpperSurfacePointAtT(fp, 1f, 0.75f);
+                    Vector3 port75 = GetUpperSurfacePointAtT(fp, -1f, 0.75f);
+                    if (prevUpStbdT75.HasValue)
+                    {
+#if UNITY_EDITOR
+                        Handles.DrawDottedLine(prevUpStbdT75.Value, stbd75, 4f);
+                        Handles.DrawDottedLine(prevUpPortT75.Value, port75, 4f);
+#else
+                        Gizmos.DrawLine(prevUpStbdT75.Value, stbd75);
+                        Gizmos.DrawLine(prevUpPortT75.Value, port75);
+#endif
+                    }
+                    prevUpStbdT75 = stbd75;
+                    prevUpPortT75 = port75;
+                } else { prevUpStbdT75 = null; prevUpPortT75 = null; }
+            }
+            else
+            {
+                prevUpStbdT25 = null; prevUpStbdT50 = null; prevUpStbdT75 = null;
+                prevUpPortT25 = null; prevUpPortT50 = null; prevUpPortT75 = null;
+            }
         }
     }
 
     private void DrawWaterlines()
     {
-        float startZ = sheerPlan.GetLowerAftMostZ();
+        float startZ = sheerPlan.cachedSternPostTopPoint.z;
         float endZ = sheerPlan.cachedStemTopPoint.z;
         float minY = Mathf.Min(sheerPlan.cachedMidshipKeel.y, 0f);
         float maxY = sheerPlan.cachedBaseDeckMidshipPoint.y;
@@ -902,28 +869,56 @@ public class FramingModel : MonoBehaviour
 
     public Vector3 GetUpperSurfacePointAtT(FrameProfile fp, float flipX, float t)
     {
-        Vector3 u0 = new Vector3(fp.upperP0.x * flipX, fp.upperP0.y, fp.upperP0.z);
-        Vector3 u1 = new Vector3(fp.upperP1.x * flipX, fp.upperP1.y, fp.upperP1.z);
-        Vector3 u2 = new Vector3(fp.upperP2.x * flipX, fp.upperP2.y, fp.upperP2.z);
-        Vector3 u3 = new Vector3(fp.upperP3.x * flipX, fp.upperP3.y, fp.upperP3.z);
-        return CalculateCubicBezierPoint(t, u0, u1, u2, u3);
+        Vector3 u0 = new Vector3(fp.upperP0.x, fp.upperP0.y, fp.upperP0.z);
+        Vector3 u1 = new Vector3(fp.upperP1.x, fp.upperP1.y, fp.upperP1.z);
+        Vector3 u2 = new Vector3(fp.upperP2.x, fp.upperP2.y, fp.upperP2.z);
+        Vector3 u3 = new Vector3(fp.upperP3.x, fp.upperP3.y, fp.upperP3.z);
+        
+        Vector3 pt = CalculateCubicBezierPoint(t, u0, u1, u2, u3);
+
+        if (fp.upperP0.z <= sheerPlan.cachedSternRisingEnd.z)
+        {
+            FashionTimberModel fModel = GetComponent<FashionTimberModel>();
+            if (fModel != null && fModel.showFashionTimbers)
+            {
+                float exactX = fModel.GetNaturalHullXAtYZ(pt.y, fp.upperP0.z);
+                if (exactX > 0.001f) pt.x = exactX;
+            }
+        }
+
+        pt.x *= flipX;
+        return pt;
     }
 
-    public Vector3 GetSurfacePointAtT(FrameProfile fp, float flipX, float t)
+    public Vector3 GetSurfacePointAtT(FrameProfile fp, float flipX, float t, bool ignoreFashionTimber = false)
     {
-        Vector3 p0 = new Vector3(fp.lowerP0.x * flipX, fp.lowerP0.y, fp.lowerP0.z);
-        Vector3 p1Inner = new Vector3(fp.lowerP1_inner.x * flipX, fp.lowerP1_inner.y, fp.lowerP1_inner.z);
-        Vector3 p1 = new Vector3(fp.lowerP1.x * flipX, fp.lowerP1.y, fp.lowerP1.z);
-        Vector3 pMid = new Vector3(fp.lowerPMid.x * flipX, fp.lowerPMid.y, fp.lowerPMid.z);
-        Vector3 p2 = new Vector3(fp.lowerP2.x * flipX, fp.lowerP2.y, fp.lowerP2.z);
-        Vector3 p3 = new Vector3(fp.lowerP3.x * flipX, fp.lowerP3.y, fp.lowerP3.z);
+        Vector3 p0 = new Vector3(fp.lowerP0.x, fp.lowerP0.y, fp.lowerP0.z);
+        Vector3 p1Inner = new Vector3(fp.lowerP1_inner.x, fp.lowerP1_inner.y, fp.lowerP1_inner.z);
+        Vector3 p1 = new Vector3(fp.lowerP1.x, fp.lowerP1.y, fp.lowerP1.z);
+        Vector3 pMid = new Vector3(fp.lowerPMid.x, fp.lowerPMid.y, fp.lowerPMid.z);
+        Vector3 p2 = new Vector3(fp.lowerP2.x, fp.lowerP2.y, fp.lowerP2.z);
+        Vector3 p3 = new Vector3(fp.lowerP3.x, fp.lowerP3.y, fp.lowerP3.z);
 
+        Vector3 pt;
         if (bodyPlan.useQuinticBezier)
-            return CalculateQuinticBezierPoint(t, p0, p1Inner, p1, pMid, p2, p3);
+            pt = CalculateQuinticBezierPoint(t, p0, p1Inner, p1, pMid, p2, p3);
         else if (bodyPlan.useQuarticBezier)
-            return CalculateQuarticBezierPoint(t, p0, p1, pMid, p2, p3);
+            pt = CalculateQuarticBezierPoint(t, p0, p1, pMid, p2, p3);
         else
-            return CalculateCubicBezierPoint(t, p0, p1, p2, p3);
+            pt = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
+
+        if (!ignoreFashionTimber && fp.lowerP0.z <= sheerPlan.cachedSternRisingEnd.z)
+        {
+            FashionTimberModel fModel = GetComponent<FashionTimberModel>();
+            if (fModel != null && fModel.showFashionTimbers)
+            {
+                float exactX = fModel.GetNaturalHullXAtYZ(pt.y, fp.lowerP0.z);
+                if (exactX > 0.001f) pt.x = exactX;
+            }
+        }
+
+        pt.x *= flipX;
+        return pt;
     }
 
 #if UNITY_EDITOR
@@ -1043,388 +1038,6 @@ public class FramingModel : MonoBehaviour
                 Gizmos.DrawSphere(u2, radius);
             }
         }
-    }
-
-    private Vector3 GetFashionTimberHobIntersection()
-    {
-        float startZ = sheerPlan.cachedSternRisingEnd.z;
-        float startY = sheerPlan.cachedSternRisingEnd.y;
-        float startHobY = sheerPlan.GetTheoreticalHobYAtZ(startZ);
-        
-        if (startY >= startHobY - 0.001f)
-        {
-            return new Vector3(GetNaturalHullXAtYZ(startY, startZ), startY, startZ);
-        }
-        
-        float endZ = sheerPlan.cachedTransomTopPoint.z;
-        
-        float minZ = Mathf.Min(startZ, endZ);
-        float maxZ = Mathf.Max(startZ, endZ);
-        
-        for (int i = 0; i < 25; i++)
-        {
-            float midZ = (minZ + maxZ) / 2f;
-            float fY = sheerPlan.GetSternProfileYAtZ(midZ);
-            float hY = sheerPlan.GetTheoreticalHobYAtZ(midZ);
-            
-            // As we go aft (more negative Z), stern profile rises relative to HoB
-            if (fY < hY) maxZ = midZ;
-            else minZ = midZ;
-        }
-        
-        float intersectZ = (minZ + maxZ) / 2f;
-        float intersectY = sheerPlan.GetSternProfileYAtZ(intersectZ);
-        return new Vector3(GetNaturalHullXAtYZ(intersectY, intersectZ), intersectY, intersectZ);
-    }
-
-    private (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3) GetUpperFashionTimberBezier()
-    {
-        Vector3 intersect = GetFashionTimberHobIntersection();
-        float fashionBaseZ = intersect.z;
-        float fashionBaseY = intersect.y;
-        
-        // Pin the base width directly to the true HoB intersection width
-        float lowerTransomBreadth = GetNaturalHullXAtYZ(intersect.y, intersect.z);
-        float upperAftZ = sheerPlan.cachedTransomTopPoint.z;
-        float upperAftY = sheerPlan.cachedTransomTopPoint.y;
-
-        float upperTransomBreadth = breadthPlan.GetTopTimberXAtZ(upperAftZ);
-
-        Vector3 p0 = new Vector3(lowerTransomBreadth, fashionBaseY, fashionBaseZ);
-        Vector3 p3 = new Vector3(upperTransomBreadth, upperAftY, upperAftZ);
-
-        // Body Plan Bulges
-        float masterHeight = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
-        float deltaY = upperAftY - fashionBaseY;
-        float scaleY = 1f;
-        if (masterHeight > 0.01f) scaleY = deltaY / masterHeight;
-        
-        float deltaZ = upperAftZ - fashionBaseZ;
-        float scaleZ = 1f;
-        if (masterHeight > 0.01f) scaleZ = deltaZ / masterHeight;
-
-        float scaleX = 1f;
-        if (breadthPlan.topTimberMaxBeam > 0.01f) scaleX = upperTransomBreadth / breadthPlan.topTimberMaxBeam;
-
-        Vector3 u1Vector = bodyPlan.cachedU1 - bodyPlan.cachedU0;
-        Vector3 u2Vector = bodyPlan.cachedU2 - bodyPlan.cachedU3;
-
-        // Tangents: Align with the Primary Breadth Plan's aft lines
-        float T0 = 0f;
-        float T3 = 0f;
-        if (Mathf.Abs(deltaZ) > 0.001f)
-        {
-            float zForward0 = fashionBaseZ + 0.01f;
-            T0 = (breadthPlan.GetBreadthXAtZ(zForward0) - lowerTransomBreadth) / 0.01f;
-            
-            float zForward3 = upperAftZ + 0.01f;
-            T3 = (breadthPlan.GetTopTimberXAtZ(zForward3) - upperTransomBreadth) / 0.01f;
-
-            // Extreme Rake Fallback: if the tangent is too aggressive, fall back to a straight taper
-            if (deltaZ < -0.01f)
-            {
-                float projectedX = p0.x + T0 * deltaZ;
-                if (projectedX < p3.x)
-                {
-                    float tStraight = (p3.x - p0.x) / deltaZ;
-                    T0 = tStraight;
-                    T3 = tStraight;
-                }
-            }
-        }
-
-        // Apply: True 3D Relative with breadth plan tangent baseline
-        float p1z = p0.z + u1Vector.y * scaleZ;
-        float p1x_baseline = p0.x + T0 * (p1z - p0.z);
-        Vector3 p1 = new Vector3(p1x_baseline + (u1Vector.x * scaleX), p0.y + (u1Vector.y * scaleY), p1z);
-
-        float p2z = p3.z + u2Vector.y * scaleZ;
-        float p2x_baseline = p3.x + T3 * (p2z - p3.z);
-        Vector3 p2 = new Vector3(p2x_baseline + (u2Vector.x * scaleX), p3.y + (u2Vector.y * scaleY), p2z);
-
-        return (p0, p1, p2, p3);
-    }
-
-    private float GetFashionTimberTAtY(float targetY, (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3) bezier)
-    {
-        float min = 0f;
-        float max = 1f;
-        for (int i = 0; i < 20; i++)
-        {
-            float mid = (min + max) / 2f;
-            float y = CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
-            
-            if (y < targetY) min = mid;
-            else max = mid;
-        }
-        return (min + max) / 2f;
-    }
-
-    private float GetFashionTimberTAtZ(float targetZ, (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3) bezier)
-    {
-        float min = 0f;
-        float max = 1f;
-        for (int i = 0; i < 20; i++)
-        {
-            float mid = (min + max) / 2f;
-            float z = CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
-            
-            if (bezier.p3.z < bezier.p0.z)
-            {
-                if (z > targetZ) min = mid;
-                else max = mid;
-            }
-            else
-            {
-                if (z < targetZ) min = mid;
-                else max = mid;
-            }
-        }
-        return (min + max) / 2f;
-    }
-
-    public float GetNaturalHullXAtYZ(float targetY, float originalZ)
-    {
-        float lowerAftZ = sheerPlan.cachedSternRisingEnd.z;
-        float z = originalZ;
-        
-        // Clamp to Stern Post to prevent the Rising Line and lower moulds from collapsing to the centerline
-        if (z < lowerAftZ) z = lowerAftZ;
-
-        // Re-generate the raw frame
-        FrameProfile fp = GetRawFrameProfile(z);
-        if (!fp.isValid) return 0f;
-
-        float mappedTargetY = targetY;
-        
-        // Remap Y by shifting it down by the HoB difference, so that the Stern Post frame perfectly aligns with the 3D HoB line!
-        if (originalZ < lowerAftZ)
-        {
-            float origHobY = sheerPlan.GetTheoreticalHobYAtZ(originalZ);
-            float sternHobY = sheerPlan.GetTheoreticalHobYAtZ(lowerAftZ);
-            
-            float hobDifference = origHobY - sternHobY;
-            mappedTargetY = targetY - hobDifference;
-        }
-
-        float exactX = 0f;
-
-        if (fp.hasUpper && mappedTargetY > fp.upperP0.y)
-        {
-            float fMinT = 0f;
-            float fMaxT = 1f; 
-            for (int i = 0; i < 20; i++)
-            {
-                float midT = (fMinT + fMaxT) / 2f;
-                float py = CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
-                if (py < mappedTargetY) fMinT = midT;
-                else fMaxT = midT;
-            }
-            exactX = CalculateCubicBezierPoint((fMinT + fMaxT) / 2f, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
-        }
-        else if (fp.hasLower)
-        {
-            float fMinT = 0f;
-            float fMaxT = 1f;
-            for (int i = 0; i < 20; i++)
-            {
-                float midT = (fMinT + fMaxT) / 2f;
-                float py = GetSurfacePointAtT(fp, 1f, midT).y;
-                if (py < mappedTargetY) fMinT = midT;
-                else fMaxT = midT;
-            }
-            exactX = GetSurfacePointAtT(fp, 1f, (fMinT + fMaxT) / 2f).x;
-        }
-
-        // Linearly scale the width to match the tapering 3D HoB curve!
-        if (originalZ < lowerAftZ)
-        {
-            float sternHobX = breadthPlan.GetBreadthXAtZ(lowerAftZ);
-            float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
-            if (sternHobX > 0.001f)
-            {
-                exactX *= (currHobX / sternHobX);
-            }
-        }
-
-        return exactX;
-    }
-
-    private float GetUpperFashionTimberXAtY(float targetY)
-    {
-        var bezier = GetUpperFashionTimberBezier();
-        float t = GetFashionTimberTAtY(targetY, bezier);
-        return CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
-    }
-
-    private float GetUpperFashionTimberXAtZ(float z)
-    {
-        var bezier = GetUpperFashionTimberBezier();
-        float t = GetFashionTimberTAtZ(z, bezier);
-        return CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
-    }
-
-    private void DrawUpperFashionTimber()
-    {
-        float lowerAftZ = sheerPlan.GetLowerAftMostZ();
-        float upperAftZ = sheerPlan.cachedTransomTopPoint.z;
-        if (Mathf.Abs(lowerAftZ - upperAftZ) < 0.01f && sheerPlan.cachedTransomTopPoint.y < sheerPlan.cachedBaseDeckSternIntersect.y + 0.01f) return;
-
-        float startZ = sheerPlan.enableCounter ? sheerPlan.cachedCounterTopPoint.z : sheerPlan.cachedSternPostTopPoint.z;
-        float endZ = sheerPlan.cachedTransomTopPoint.z;
-        bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
-        
-        float startY = sheerPlan.enableCounter ? sheerPlan.cachedCounterTopPoint.y : sheerPlan.cachedSternPostTopPoint.y;
-        float endY = sheerPlan.cachedTransomTopPoint.y;
-        
-        Vector3 prevStbd = new Vector3(-1, -1, 1);
-        Vector3 prevPort = new Vector3(-1, -1, 1);
-        bool first = true;
-        
-        for (int i = 0; i <= 50; i++)
-        {
-            float fraction = i / 50f;
-            float currZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float exactY = isVertical ? Mathf.Lerp(startY, endY, fraction) : sheerPlan.GetSternProfileYAtZ(currZ);
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(currZ);
-            
-            float exactX = exactY <= hobY ? GetNaturalHullXAtYZ(exactY, currZ) : GetUpperFashionTimberXAtZ(currZ);
-            
-            Vector3 currStbd = new Vector3(exactX, exactY, currZ);
-            Vector3 currPort = new Vector3(-exactX, exactY, currZ);
-            
-            Gizmos.color = exactY <= hobY ? Color.red : Color.green;
-            
-            if (!first)
-            {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
-            }
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
-        }
-        
-#if UNITY_EDITOR
-        if (showFrameLabels)
-        {
-            if (_labelStyle == null)
-            {
-                _labelStyle = new GUIStyle();
-                _labelStyle.alignment = TextAnchor.MiddleCenter;
-            }
-            _labelStyle.normal.textColor = frameColor;
-            
-            float upperTransomY = sheerPlan.cachedTransomTopPoint.y;
-            Vector3 labelPos = new Vector3(0, upperTransomY + 0.5f, upperAftZ);
-            Handles.Label(labelPos, "Upper Fashion Timber", _labelStyle);
-        }
-#endif
-    }
-
-    private void DrawLowerFashionTimber()
-    {
-        float startZ = sheerPlan.cachedSternRisingEnd.z;
-        float endZ = sheerPlan.cachedCounterTopPoint.z;
-        bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
-        
-        float startY = sheerPlan.cachedSternRisingEnd.y;
-        float endY = sheerPlan.cachedCounterTopPoint.y;
-        
-        Vector3 prevStbd = new Vector3(-1, -1, 1);
-        Vector3 prevPort = new Vector3(-1, -1, 1);
-        bool first = true;
-        
-        for (int i = 0; i <= 50; i++)
-        {
-            float fraction = i / 50f;
-            float currZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float exactY = isVertical ? Mathf.Lerp(startY, endY, fraction) : sheerPlan.GetSternProfileYAtZ(currZ);
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(currZ);
-            
-            float exactX = exactY <= hobY ? GetNaturalHullXAtYZ(exactY, currZ) : GetUpperFashionTimberXAtZ(currZ);
-            
-            Vector3 currStbd = new Vector3(exactX, exactY, currZ);
-            Vector3 currPort = new Vector3(-exactX, exactY, currZ);
-            
-            Gizmos.color = exactY <= hobY ? Color.red : Color.green;
-            
-            if (!first)
-            {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
-            }
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
-        }
-        
-#if UNITY_EDITOR
-        if (showFrameLabels)
-        {
-            float lowerTransomY = sheerPlan.cachedCounterTopPoint.y;
-            Vector3 labelPos = new Vector3(0, lowerTransomY - 0.5f, sheerPlan.cachedCounterTopPoint.z);
-            Handles.Label(labelPos, "Lower Fashion Timber", _labelStyle);
-        }
-#endif
-    }
-
-    /// <summary>
-    /// Returns the true 3D outer points of the sweeping Fashion Timber.
-    /// Used by the mesh generator to build the thick 3D structural rib.
-    /// </summary>
-    public List<Vector3> GetUpperFashionTimberPoints(bool isStbd, int segments = 20)
-    {
-        List<Vector3> pts = new List<Vector3>();
-        
-        float startZ = sheerPlan.enableCounter ? sheerPlan.cachedCounterTopPoint.z : sheerPlan.cachedSternPostTopPoint.z;
-        float endZ = sheerPlan.cachedTransomTopPoint.z;
-        bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
-        
-        float startY = sheerPlan.enableCounter ? sheerPlan.cachedCounterTopPoint.y : sheerPlan.cachedSternPostTopPoint.y;
-        float endY = sheerPlan.cachedTransomTopPoint.y;
-        
-        for (int i = 0; i <= segments; i++)
-        {
-            float fraction = i / (float)segments;
-            float currZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float exactY = isVertical ? Mathf.Lerp(startY, endY, fraction) : sheerPlan.GetSternProfileYAtZ(currZ);
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(currZ);
-            
-            float exactX = exactY <= hobY ? GetNaturalHullXAtYZ(exactY, currZ) : GetUpperFashionTimberXAtZ(currZ);
-            
-            if (isStbd) pts.Add(new Vector3(exactX, exactY, currZ));
-            else pts.Add(new Vector3(-exactX, exactY, currZ));
-        }
-        return pts;
-    }
-
-    public List<Vector3> GetLowerFashionTimberPoints(bool isStbd, int segments = 50)
-    {
-        List<Vector3> pts = new List<Vector3>();
-        
-        float startZ = sheerPlan.cachedSternRisingEnd.z;
-        float endZ = sheerPlan.cachedCounterTopPoint.z;
-        bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
-        
-        float startY = sheerPlan.cachedSternRisingEnd.y;
-        float endY = sheerPlan.cachedCounterTopPoint.y;
-        
-        for (int i = 0; i <= segments; i++)
-        {
-            float fraction = i / (float)segments;
-            float currZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float exactY = isVertical ? Mathf.Lerp(startY, endY, fraction) : sheerPlan.GetSternProfileYAtZ(currZ);
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(currZ);
-            
-            float exactX = exactY <= hobY ? GetNaturalHullXAtYZ(exactY, currZ) : GetUpperFashionTimberXAtZ(currZ);
-            
-            if (isStbd) pts.Add(new Vector3(exactX, exactY, currZ));
-            else pts.Add(new Vector3(-exactX, exactY, currZ));
-        }
-        return pts;
     }
 
     // --- BEZIER UTILITIES ---

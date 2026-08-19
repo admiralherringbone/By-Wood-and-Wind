@@ -103,9 +103,9 @@ public class BreadthPlan : MonoBehaviour
         float midshipZ = 0f;
         
         // Fetch boundaries from the ModularSheerPlan
-        float bowZ = sheerPlan.cachedBaseDeckBowIntersect.z;
-        float sternZ = sheerPlan.cachedBaseDeckSternIntersect.z;
-        float baseY = sheerPlan.cachedBaseDeckMidshipPoint.y; // Draw breadth curves at the flat Base Deck height for Gizmos
+        float bowZ = sheerPlan.cachedHobBowIntersect.z;
+        float sternZ = sheerPlan.cachedHobSternIntersect.z;
+        float baseY = sheerPlan.cachedHobMidshipPoint.y; // Draw breadth curves at the flat HoB height for Gizmos
 
         float hw = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0f;
 
