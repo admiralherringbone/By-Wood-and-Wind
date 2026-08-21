@@ -47,7 +47,7 @@ public class FramingModel : MonoBehaviour
         public Vector3 upperP0, upperP1, upperP2, upperP3;
     }
 
-    public virtual FrameProfile GetRawFrameProfile(float z)
+    public virtual FrameProfile GetRawFrameProfile(float z, bool ignoreFashionTimber = false)
     {
         FrameProfile fp = new FrameProfile();
         fp.isValid = false;
@@ -56,6 +56,11 @@ public class FramingModel : MonoBehaviour
         fp.lowerCutoffT = 0f;
 
         if (sheerPlan == null || breadthPlan == null || bodyPlan == null) return fp;
+
+        if (z < sheerPlan.cachedHobSternIntersect.z)
+        {
+            fp.hasLower = false;
+        }
 
         // We no longer arbitrarily disable the lower mould aft of the Stern Post.
         // The Counter sliding system now handles clipping the lower moulds dynamically in GetFrameProfile.
@@ -161,7 +166,18 @@ public class FramingModel : MonoBehaviour
             float localTtY = sheerPlan.GetTopTimberYAtZ(z);
             float theoreticalHobY = sheerPlan.GetTheoreticalHobYAtZ(z);
             
-            fp.upperP0 = fp.hasLower ? fp.lowerP3 : new Vector3(hobBreadth, theoreticalHobY, z);
+            float baseX = breadthPlan.GetTheoreticalBreadthXAtZ(z);
+            
+            if (z < sheerPlan.cachedHobSternIntersect.z)
+            {
+                FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
+                if (fModel != null)
+                {
+                    baseX = fModel.GetNaturalHullXAtYZ(sheerPlan.GetSternProfileYAtZ(z), z);
+                }
+            }
+
+            fp.upperP0 = fp.hasLower ? fp.lowerP3 : new Vector3(baseX, theoreticalHobY, z);
             
             // upperP3 mathematically reaches the max sheer height, preserving sheer curve scaling
             fp.upperP3 = new Vector3(topTimberBreadth, maxSheerYAtZ, z);
@@ -208,6 +224,8 @@ public class FramingModel : MonoBehaviour
         {
             float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
             float fashionY = sheerPlan.GetSternProfileYAtZ(z);
+            
+            // Removed Fashion Timber boundary override
 
             if (fashionY >= sheerPlan.GetTopTimberYAtZ(z))
             {
@@ -231,6 +249,34 @@ public class FramingModel : MonoBehaviour
                         else fMaxT = midT;
                     }
                     fp.upperCutoffT = (fMinT + fMaxT) / 2f;
+                    
+                    if (z < sheerPlan.cachedHobSternIntersect.z)
+                    {
+                        FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
+                        if (fModel != null)
+                        {
+                            float exactX = fModel.GetNaturalHullXAtYZ(fashionY, z);
+                            if (exactX > 0.001f)
+                            {
+                                float t = fp.upperCutoffT;
+                                float u = 1 - t;
+                                float w0 = (u * u * u) + (3 * u * u * t);
+                                
+                                float p2x = fp.upperP2.x;
+                                float p3x = fp.upperP3.x;
+                                float u1Offset = fp.upperP1.x - fp.upperP0.x;
+                                
+                                float constantX = (3 * u * u * t * u1Offset) + (3 * u * t * t * p2x) + (t * t * t * p3x);
+                                
+                                if (w0 > 0.0001f)
+                                {
+                                    float newBaseX = (exactX - constantX) / w0;
+                                    fp.upperP0.x = newBaseX;
+                                    fp.upperP1.x = newBaseX + u1Offset;
+                                }
+                            }
+                        }
+                    }
                 }
                 fp.lowerCutoffT = 0f;
             }
@@ -380,7 +426,7 @@ public class FramingModel : MonoBehaviour
         if (sheerPlan == null) return positions;
 
         float bowZ = sheerPlan.cachedStemTopPoint.z;
-        float sternZ = sheerPlan.cachedSternPostTopPoint.z;
+        float sternBoundaryZ = sheerPlan.cachedTransomTopPoint.z; // Extend transverse frames to the Transom
         float keelSternZ = sheerPlan.cachedKeelSternPoint.z;
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
 
@@ -392,17 +438,21 @@ public class FramingModel : MonoBehaviour
         }
         positions.Add(bowZ);
 
-        for (float z = -1f; z > sternZ;)
+        for (float z = -1f; z >= sternBoundaryZ;)
         {
             positions.Add(z);
             if (z <= keelSternZ) z -= 0.25f;
             else z -= 1f;
         }
-        positions.Add(sternZ);
+        
+        // Ensure the exact boundary frame is added if the loop missed it
+        if (!positions.Contains(sternBoundaryZ))
+        {
+            positions.Add(sternBoundaryZ);
+        }
         
         // Explicitly inject the structural keel corners so the mesh doesn't cut them off
         if (!positions.Contains(keelBowZ)) positions.Add(keelBowZ);
-        if (!positions.Contains(keelSternZ)) positions.Add(keelSternZ);
         
         positions.Sort();
 
@@ -415,12 +465,12 @@ public class FramingModel : MonoBehaviour
                 float aftZ = startZ + (deck.globalAftExtent * totalLength);
                 float foreZ = startZ + (deck.globalForeExtent * totalLength);
                 
-                if (aftZ > sternZ && aftZ < bowZ)
+                if (aftZ > sternBoundaryZ && aftZ < bowZ)
                 {
                     positions.Add(aftZ - 0.001f);
                     positions.Add(aftZ + 0.001f);
                 }
-                if (foreZ > sternZ && foreZ < bowZ)
+                if (foreZ > sternBoundaryZ && foreZ < bowZ)
                 {
                     positions.Add(foreZ - 0.001f);
                     positions.Add(foreZ + 0.001f);
@@ -469,6 +519,41 @@ public class FramingModel : MonoBehaviour
 
             prevStbd = currStbd;
             prevPort = currPort;
+        }
+
+        // Draw Phantom HoB Projection for Fashion Timber region (Dashed Light Grey)
+        float phantomStartZ = sheerPlan.cachedHobSternIntersect.z;
+        float phantomEndZ = sheerPlan.cachedTransomTopPoint.z;
+        
+        Gizmos.color = new Color(0.7f, 0.7f, 0.7f, 1f); // Light Grey
+        
+        FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
+        
+        if (phantomEndZ < phantomStartZ && fModel != null && fModel.showFashionTimbers)
+        {
+            int dashSegments = Mathf.CeilToInt(Mathf.Abs(phantomStartZ - phantomEndZ) / 0.1f);
+            float dashStep = (phantomEndZ - phantomStartZ) / dashSegments;
+            
+            for (int i = 0; i < dashSegments; i++)
+            {
+                if (i % 2 != 0) continue; // Dashed effect
+                
+                float z1 = phantomStartZ + (i * dashStep);
+                float z2 = phantomStartZ + ((i + 1) * dashStep);
+                
+                float y1 = sheerPlan.GetTheoreticalHobYAtZ(z1);
+                float y2 = sheerPlan.GetTheoreticalHobYAtZ(z2);
+                
+                // Mirror the exact X-evaluation method used by the solid magenta Fashion Timbers
+                float exactY1 = sheerPlan.GetSternProfileYAtZ(z1);
+                float exactY2 = sheerPlan.GetSternProfileYAtZ(z2);
+                
+                float x1 = fModel.GetNaturalHullXAtYZ(exactY1, z1);
+                float x2 = fModel.GetNaturalHullXAtYZ(exactY2, z2);
+
+                Gizmos.DrawLine(new Vector3(x1, y1, z1), new Vector3(x2, y2, z2));
+                Gizmos.DrawLine(new Vector3(-x1, y1, z1), new Vector3(-x2, y2, z2));
+            }
         }
     }
 
@@ -876,15 +961,6 @@ public class FramingModel : MonoBehaviour
         
         Vector3 pt = CalculateCubicBezierPoint(t, u0, u1, u2, u3);
 
-        if (fp.upperP0.z <= sheerPlan.cachedSternRisingEnd.z)
-        {
-            FashionTimberModel fModel = GetComponent<FashionTimberModel>();
-            if (fModel != null && fModel.showFashionTimbers)
-            {
-                float exactX = fModel.GetNaturalHullXAtYZ(pt.y, fp.upperP0.z);
-                if (exactX > 0.001f) pt.x = exactX;
-            }
-        }
 
         pt.x *= flipX;
         return pt;
@@ -1009,19 +1085,19 @@ public class FramingModel : MonoBehaviour
             float startT = fp.upperCutoffT;
             float endT = fp.upperTopCutoffT;
             
-            Vector3 prev = CalculateCubicBezierPoint(startT, u0, u1, u2, u3);
+            Vector3 prev = GetUpperSurfacePointAtT(fp, flipX, startT);
             int segments = 20;
             for (int i = 1; i <= segments; i++)
             {
                 float t = startT + (endT - startT) * (i / (float)segments);
-                Vector3 curr = CalculateCubicBezierPoint(t, u0, u1, u2, u3);
+                Vector3 curr = GetUpperSurfacePointAtT(fp, flipX, t);
                 Gizmos.DrawLine(prev, curr);
                 prev = curr;
             }
             
             if (startT > 0.001f && flipX > 0)
             {
-                Vector3 stbdCutoff = CalculateCubicBezierPoint(startT, u0, u1, u2, u3);
+                Vector3 stbdCutoff = GetUpperSurfacePointAtT(fp, 1f, startT);
                 Vector3 portCutoff = new Vector3(-stbdCutoff.x, stbdCutoff.y, stbdCutoff.z);
                 Gizmos.DrawLine(stbdCutoff, portCutoff);
             }

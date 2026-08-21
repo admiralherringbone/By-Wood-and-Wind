@@ -271,6 +271,32 @@ public class BreadthPlan : MonoBehaviour
         }
     }
 
+    public float GetTheoreticalBreadthXAtZ(float z)
+    {
+        if (z >= 0) return GetBreadthXAtZ(z);
+
+        if (cachedIsAftCubic)
+        {
+            if (z > cachedAftP3.z) return GetBreadthXAtZ(z);
+            
+            float dz = cachedAftP3.z - cachedAftP2.z;
+            float dx = cachedAftP3.x - cachedAftP2.x;
+            if (Mathf.Abs(dz) < 0.001f) return cachedAftP3.x;
+            
+            return cachedAftP3.x + (dx / dz) * (z - cachedAftP3.z);
+        }
+        else
+        {
+            if (z > cachedAftP2.z) return GetBreadthXAtZ(z);
+            
+            float dz = cachedAftP2.z - cachedAftP1.z;
+            float dx = cachedAftP2.x - cachedAftP1.x;
+            if (Mathf.Abs(dz) < 0.001f) return cachedAftP2.x;
+            
+            return cachedAftP2.x + (dx / dz) * (z - cachedAftP2.z);
+        }
+    }
+
     public float GetTopTimberXAtZ(float z)
     {
         if (z >= 0)

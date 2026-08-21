@@ -87,6 +87,21 @@ public class FashionTimberModel : MonoBehaviour
         // ----------------------------------------------
 
 #if UNITY_EDITOR
+        // Draw the actual Master Bezier Curve in dashed scarlet
+        Handles.color = new Color(1f, 0.2f, 0.2f); // Scarlet
+        Vector3 prevStbdBez = bezier.p0;
+        Vector3 prevPortBez = p0_port;
+        for (int i = 1; i <= 20; i++)
+        {
+            float t = i / 20f;
+            Vector3 currStbdBez = FramingModel.CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3);
+            Vector3 currPortBez = new Vector3(-currStbdBez.x, currStbdBez.y, currStbdBez.z);
+            Handles.DrawDottedLine(prevStbdBez, currStbdBez, 2f);
+            Handles.DrawDottedLine(prevPortBez, currPortBez, 2f);
+            prevStbdBez = currStbdBez;
+            prevPortBez = currPortBez;
+        }
+
         if (showLabels)
         {
             GUIStyle labelStyle = new GUIStyle();
@@ -178,19 +193,28 @@ public class FashionTimberModel : MonoBehaviour
             float mid = (min + max) / 2f;
             float z = FramingModel.CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
             
-            if (bezier.p3.z < bezier.p0.z)
-            {
-                if (z > targetZ) min = mid;
-                else max = mid;
-            }
-            else
-            {
-                if (z < targetZ) min = mid;
-                else max = mid;
-            }
+            // Note: The Bezier starts at HoB (forward) and ends at Transom Top (aft).
+            // Z decreases as you move aft.
+            if (z > targetZ) min = mid;
+            else max = mid;
         }
         return (min + max) / 2f;
     }
+
+    public float GetFashionTimberYAtZ(float targetZ)
+    {
+        var bezier = GetUpperFashionTimberBezier();
+        float t = GetFashionTimberTAtZ(targetZ, bezier);
+        return FramingModel.CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
+    }
+
+    public float GetFashionTimberXAtZ(float targetZ)
+    {
+        var bezier = GetUpperFashionTimberBezier();
+        float t = GetFashionTimberTAtZ(targetZ, bezier);
+        return FramingModel.CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
+    }
+
 
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
@@ -199,7 +223,7 @@ public class FashionTimberModel : MonoBehaviour
         
         if (z < lowerAftZ) z = lowerAftZ;
 
-        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(z);
+        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(z, true);
         if (!fp.isValid) return 0f;
 
         float exactX = 0f;
@@ -223,6 +247,43 @@ public class FashionTimberModel : MonoBehaviour
                 else fMaxT = midT;
             }
             exactX = FramingModel.CalculateCubicBezierPoint((fMinT + fMaxT) / 2f, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
+            
+            // --- OUTER LIMIT LOGIC ---
+            // Reconstruct the pure Master Bezier Curve from the Body Plan for this Z-slice
+            float theoreticalHobY = sheerPlan.GetTheoreticalHobYAtZ(originalZ);
+            float topTimberY = sheerPlan.GetTopTimberYAtZ(originalZ);
+            float theoreticalBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(originalZ);
+            float topTimberBreadth = breadthPlan.GetTopTimberXAtZ(originalZ);
+            
+            float scaleY = (topTimberY - theoreticalHobY) / (bodyPlan.cachedU3.y - bodyPlan.cachedU0.y);
+            float scaleX = theoreticalBreadth / bodyPlan.cachedU0.x;
+            
+            Vector3 mP0 = new Vector3(theoreticalBreadth, theoreticalHobY, originalZ);
+            Vector3 mP3 = new Vector3(topTimberBreadth, topTimberY, originalZ);
+            
+            Vector3 u1Vector = bodyPlan.cachedU1 - bodyPlan.cachedU0;
+            Vector3 u2Vector = bodyPlan.cachedU2 - bodyPlan.cachedU3;
+            
+            Vector3 mP1 = mP0 + new Vector3(u1Vector.x * scaleX, u1Vector.y * scaleY, 0);
+            Vector3 mP2 = mP3 + new Vector3(u2Vector.x * scaleX, u2Vector.y * scaleY, 0);
+            
+            // Find the Master Curve's X-limit at this targetY
+            float mMinT = 0f;
+            float mMaxT = 1f;
+            for (int j = 0; j < 20; j++)
+            {
+                float midT = (mMinT + mMaxT) / 2f;
+                float py = FramingModel.CalculateCubicBezierPoint(midT, mP0, mP1, mP2, mP3).y;
+                if (py < targetY) mMinT = midT;
+                else mMaxT = midT;
+            }
+            float masterLimitX = FramingModel.CalculateCubicBezierPoint((mMinT + mMaxT) / 2f, mP0, mP1, mP2, mP3).x;
+            
+            // Enforce outer limit: The Fashion Timber cannot move further away from the centerline than the Master Curve allows
+            if (exactX > masterLimitX)
+            {
+                exactX = masterLimitX;
+            }
         }
         else if (fp.hasLower)
         {

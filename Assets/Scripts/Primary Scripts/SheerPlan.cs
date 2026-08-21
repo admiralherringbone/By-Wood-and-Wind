@@ -1046,8 +1046,9 @@ public class SheerPlan : MonoBehaviour
         {
             if (z <= cachedHobSternIntersect.z)
             {
-                float dz = cachedHobSternIntersect.z - cachedHobMidCpAft.z;
-                float dy = cachedHobSternIntersect.y - cachedHobMidCpAft.y;
+                // Mathematically extrapolate the terminal tangent of the HoB cubic bezier
+                float dz = cachedHobSternIntersect.z - cachedHobSternCp.z;
+                float dy = cachedHobSternIntersect.y - cachedHobSternCp.y;
                 if (Mathf.Abs(dz) < 0.001f) return cachedHobSternIntersect.y;
                 return cachedHobSternIntersect.y + (dy / dz) * (z - cachedHobSternIntersect.z);
             }

@@ -119,6 +119,57 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &263335041
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 263335043}
+  - component: {fileID: 263335042}
+  m_Layer: 0
+  m_Name: Fashion Timbers Model (Test1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &263335042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 263335041}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 296928bd6404c48a2a921dcc68e4c3bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FashionTimberModel_Test1
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  bodyPlan: {fileID: 722911565}
+  framingModel: {fileID: 287447048}
+  showFashionTimbers: 1
+  showLabels: 1
+  fashionColor: {r: 1, g: 0, b: 1, a: 1}
+--- !u!4 &263335043
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 263335041}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.56246, y: 0, z: -18.98018}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &287447047
 GameObject:
   m_ObjectHideFlags: 0
@@ -155,11 +206,11 @@ MonoBehaviour:
   frameDepth: 0.5
   frameColor: {r: 0, g: 1, b: 1, a: 1}
   showFrames: 1
-  showFrameLabels: 0
+  showFrameLabels: 1
   showFloorSweepsGuide: 1
   showSurfaceRibbands: 1
   showWaterlines: 0
-  showFrameControlArms: 0
+  showFrameControlArms: 1
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -494,7 +545,7 @@ MonoBehaviour:
   useQuinticBezier: 0
   innerKeelPosition: 0.5
   enforceConvexHull: 1
-  flareTumblehomePercentage: 1
+  flareTumblehomePercentage: 0.8
   upperHobArmAngle: 0
   upperHobArmLength: 0.5
   topTimberArmAngle: 0
@@ -511,9 +562,9 @@ MonoBehaviour:
   cachedL2: {x: 4, y: 2.5, z: 0}
   cachedL3: {x: 4, y: 5, z: 0}
   cachedU0: {x: 4, y: 5, z: 0}
-  cachedU1: {x: 4, y: 6.5, z: 0}
-  cachedU2: {x: 4, y: 6.5, z: 0}
-  cachedU3: {x: 4, y: 8, z: 0}
+  cachedU1: {x: 4, y: 7.5, z: 0}
+  cachedU2: {x: 3.2, y: 7.5, z: 0}
+  cachedU3: {x: 3.2, y: 10, z: 0}
   cachedUseQuartic: 0
   cachedUseQuintic: 0
 --- !u!1 &832575517
@@ -671,8 +722,8 @@ MonoBehaviour:
   midshipAftArmLength: 0.5
   sternArmAngle: 0
   sternArmLength: 1
-  topTimberMaxBeam: 4
-  topTimberTransomWidth: 0.4
+  topTimberMaxBeam: 3.2
+  topTimberTransomWidth: 0.456
   topTimberBowArmAngle: 0
   topTimberBowArmLength: 1
   topTimberMidshipFwdArmLength: 0.5
@@ -685,18 +736,68 @@ MonoBehaviour:
   cachedFwdP3: {x: 4, y: 5, z: 0}
   cachedAftP0: {x: 4, y: 5, z: 0}
   cachedAftP1: {x: 4, y: 5, z: -5}
-  cachedAftP2: {x: 2.4, y: 5, z: -10.705025}
+  cachedAftP2: {x: 2.4, y: 5, z: -10.896734}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
-  cachedTTFwdP0: {x: 0.25, y: 8, z: 10}
-  cachedTTFwdP1: {x: 4.25, y: 8, z: 10}
-  cachedTTFwdP2: {x: 4, y: 8, z: 5}
-  cachedTTFwdP3: {x: 4, y: 8, z: 0}
-  cachedTTAftP0: {x: 4, y: 8, z: 0}
-  cachedTTAftP1: {x: 4, y: 8, z: -5}
-  cachedTTAftP2: {x: 1.6, y: 8, z: -11.237244}
+  cachedTTFwdP0: {x: 0.25, y: 10, z: 10}
+  cachedTTFwdP1: {x: 3.45, y: 10, z: 10}
+  cachedTTFwdP2: {x: 3.2, y: 10, z: 5}
+  cachedTTFwdP3: {x: 3.2, y: 10, z: 0}
+  cachedTTAftP0: {x: 3.2, y: 10, z: 0}
+  cachedTTAftP1: {x: 3.2, y: 10, z: -5}
+  cachedTTAftP2: {x: 1.4592, y: 10, z: -11.236654}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
+--- !u!1 &1378026211
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1378026213}
+  - component: {fileID: 1378026212}
+  m_Layer: 0
+  m_Name: Fashion Timbers Model (Test2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1378026212
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378026211}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3a52a8c92fe724cf7a80c6c6322c88dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FashionTimberModel_Test2
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  bodyPlan: {fileID: 722911565}
+  showFashionTimbers: 1
+  showLabels: 1
+  fashionColor: {r: 1, g: 0, b: 1, a: 1}
+--- !u!4 &1378026213
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378026211}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.64018, y: 7.43414, z: -10.22378}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -761,9 +862,9 @@ MonoBehaviour:
   stemTopControlY: 0.5
   sternPostRakePercentage: 0.05
   enableCounter: 1
-  counterVerticalSlide: -0.07
+  counterVerticalSlide: 0.2
   counterLength: 1
-  counterHeightRatio: 0.172
+  counterHeightRatio: 0.106
   counterCurveAngle: 0.214
   counterCurveLength: 0.547
   bulwarkHeight: 1.5
@@ -778,15 +879,25 @@ MonoBehaviour:
   beakheadBulwarkCurveLength: 0.5
   upperDecks:
   - height: 2
-    aftExtent: 0
-    foreExtent: 1
+    aftExtent: 0.28
+    foreExtent: 0.53
     parentDeckID: 0
     bulwarkHeight: 1
     name: '1st Upper Deck Tier 1 [ID: 1]'
     deckID: 1
     tierLevel: 1
-    globalAftExtent: 0
-    globalForeExtent: 1
+    globalAftExtent: 0.28
+    globalForeExtent: 0.53
+  - height: 2
+    aftExtent: 0
+    foreExtent: 1
+    parentDeckID: 1
+    bulwarkHeight: 1
+    name: '1st Upper Deck Tier 2 [ID: 2]'
+    deckID: 2
+    tierLevel: 2
+    globalAftExtent: 0.28
+    globalForeExtent: 0.53
   lowerDecks: []
   transomAftRake: 0.5
   baseDeckSheerFwd: 0.5
@@ -800,39 +911,39 @@ MonoBehaviour:
   hobCurveControlLength: 0.5
   bowRisingLineEndPos: 1
   bowRisingLineControl: 0.5
-  sternRisingLineEndPos: 1
+  sternRisingLineEndPos: 0.692
   sternRisingLineControl: 0.5
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
   cachedBowRisingEnd: {x: 0, y: 5.499996, z: 10}
   cachedBowP1Ctrl: {x: 0, y: -0, z: 4.9999986}
-  cachedSternRisingEnd: {x: 0, y: 4.05484, z: -9.737244}
+  cachedSternRisingEnd: {x: 0, y: 2.8037071, z: -9.509765}
   cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
   cachedStemTopPoint: {x: 0, y: 5.5, z: 10}
-  cachedSternPostTopPoint: {x: 0, y: 4.05484, z: -9.737244}
-  cachedCounterBasePoint: {x: 0, y: 4.05484, z: -9.737244}
-  cachedCounterTopPoint: {x: 0, y: 5.51684, z: -10.737244}
-  cachedCounterCp1: {x: 0, y: 4.8097954, z: -9.917675}
-  cachedCounterCp2: {x: 0, y: 5.25305, z: -10.220859}
-  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10.705025}
-  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10.705025}
+  cachedSternPostTopPoint: {x: 0, y: 4.0516, z: -9.736654}
+  cachedCounterBasePoint: {x: 0, y: 4.0516, z: -9.736654}
+  cachedCounterTopPoint: {x: 0, y: 4.7936, z: -10.736654}
+  cachedCounterCp1: {x: 0, y: 4.4347577, z: -9.917086}
+  cachedCounterCp2: {x: 0, y: 4.6597204, z: -10.220269}
+  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10.896734}
+  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10.896734}
   cachedBaseDeckMidCpAft: {x: 0, y: 5, z: -6}
   cachedBaseDeckMidshipPoint: {x: 0, y: 5, z: 0}
   cachedBaseDeckMidCpFwd: {x: 0, y: 5, z: 6}
   cachedBaseDeckBowCp: {x: 0, y: 5.5, z: 10}
   cachedBaseDeckBowIntersect: {x: 0, y: 5.5, z: 10}
-  cachedUpperStemTopPoint: {x: 0, y: 8.5, z: 10}
-  cachedTransomTopPoint: {x: 0, y: 8.5, z: -11.237244}
-  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.237244}
-  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.237244}
+  cachedUpperStemTopPoint: {x: 0, y: 10.5, z: 10}
+  cachedTransomTopPoint: {x: 0, y: 7, z: -11.236654}
+  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.236654}
+  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.236654}
   cachedTopTimberMidCpAft: {x: 0, y: 6.5, z: -6}
   cachedTopTimberMidshipPoint: {x: 0, y: 6.5, z: 0}
   cachedTopTimberMidCpFwd: {x: 0, y: 6.5, z: 6}
   cachedTopTimberBowCp: {x: 0, y: 7, z: 10}
   cachedTopTimberBowIntersect: {x: 0, y: 7, z: 10}
-  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10.705025}
-  cachedHobSternCp: {x: 0, y: 5.5, z: -10.705025}
+  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10.896734}
+  cachedHobSternCp: {x: 0, y: 5.5, z: -10.896734}
   cachedHobMidCpAft: {x: 0, y: 5, z: -6}
   cachedHobMidshipPoint: {x: 0, y: 5, z: 0}
   cachedHobMidCpFwd: {x: 0, y: 5, z: 6}
@@ -852,3 +963,5 @@ SceneRoots:
   - {fileID: 722911564}
   - {fileID: 287447049}
   - {fileID: 900456904}
+  - {fileID: 263335043}
+  - {fileID: 1378026213}
