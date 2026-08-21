@@ -562,9 +562,9 @@ MonoBehaviour:
   cachedL2: {x: 4, y: 2.5, z: 0}
   cachedL3: {x: 4, y: 5, z: 0}
   cachedU0: {x: 4, y: 5, z: 0}
-  cachedU1: {x: 4, y: 7.5, z: 0}
-  cachedU2: {x: 3.2, y: 7.5, z: 0}
-  cachedU3: {x: 3.2, y: 10, z: 0}
+  cachedU1: {x: 4, y: 6.5, z: 0}
+  cachedU2: {x: 3.2, y: 6.5, z: 0}
+  cachedU3: {x: 3.2, y: 8, z: 0}
   cachedUseQuartic: 0
   cachedUseQuintic: 0
 --- !u!1 &832575517
@@ -739,13 +739,13 @@ MonoBehaviour:
   cachedAftP2: {x: 2.4, y: 5, z: -10.896734}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
-  cachedTTFwdP0: {x: 0.25, y: 10, z: 10}
-  cachedTTFwdP1: {x: 3.45, y: 10, z: 10}
-  cachedTTFwdP2: {x: 3.2, y: 10, z: 5}
-  cachedTTFwdP3: {x: 3.2, y: 10, z: 0}
-  cachedTTAftP0: {x: 3.2, y: 10, z: 0}
-  cachedTTAftP1: {x: 3.2, y: 10, z: -5}
-  cachedTTAftP2: {x: 1.4592, y: 10, z: -11.236654}
+  cachedTTFwdP0: {x: 0.25, y: 8, z: 10}
+  cachedTTFwdP1: {x: 3.45, y: 8, z: 10}
+  cachedTTFwdP2: {x: 3.2, y: 8, z: 5}
+  cachedTTFwdP3: {x: 3.2, y: 8, z: 0}
+  cachedTTAftP0: {x: 3.2, y: 8, z: 0}
+  cachedTTAftP1: {x: 3.2, y: 8, z: -5}
+  cachedTTAftP2: {x: 1.4592, y: 8, z: -11.236654}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
 --- !u!1 &1378026211
@@ -879,25 +879,15 @@ MonoBehaviour:
   beakheadBulwarkCurveLength: 0.5
   upperDecks:
   - height: 2
-    aftExtent: 0.28
-    foreExtent: 0.53
+    aftExtent: 0.25
+    foreExtent: 0.5
     parentDeckID: 0
     bulwarkHeight: 1
     name: '1st Upper Deck Tier 1 [ID: 1]'
     deckID: 1
     tierLevel: 1
-    globalAftExtent: 0.28
-    globalForeExtent: 0.53
-  - height: 2
-    aftExtent: 0
-    foreExtent: 1
-    parentDeckID: 1
-    bulwarkHeight: 1
-    name: '1st Upper Deck Tier 2 [ID: 2]'
-    deckID: 2
-    tierLevel: 2
-    globalAftExtent: 0.28
-    globalForeExtent: 0.53
+    globalAftExtent: 0.25
+    globalForeExtent: 0.5
   lowerDecks: []
   transomAftRake: 0.5
   baseDeckSheerFwd: 0.5
@@ -933,7 +923,7 @@ MonoBehaviour:
   cachedBaseDeckMidCpFwd: {x: 0, y: 5, z: 6}
   cachedBaseDeckBowCp: {x: 0, y: 5.5, z: 10}
   cachedBaseDeckBowIntersect: {x: 0, y: 5.5, z: 10}
-  cachedUpperStemTopPoint: {x: 0, y: 10.5, z: 10}
+  cachedUpperStemTopPoint: {x: 0, y: 7, z: 10}
   cachedTransomTopPoint: {x: 0, y: 7, z: -11.236654}
   cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.236654}
   cachedTopTimberSternCp: {x: 0, y: 7, z: -11.236654}
