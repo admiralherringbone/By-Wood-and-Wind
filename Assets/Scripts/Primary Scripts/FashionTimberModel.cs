@@ -37,19 +37,19 @@ public class FashionTimberModel : MonoBehaviour
         Gizmos.color = fashionColor;
 
         Vector3 risingEnd = sheerPlan.cachedSternRisingEnd;
-        Vector3 postTop = sheerPlan.cachedSternPostTopPoint;
+        Vector3 hobIntersect = sheerPlan.cachedHobSternIntersect;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
-        // 1. Lower Fashion Timber (Rising Line End -> Stern Post Top)
-        if (Mathf.Abs(risingEnd.z - postTop.z) > 0.001f || Mathf.Abs(risingEnd.y - postTop.y) > 0.001f)
+        // 1. Lower Fashion Timber (Rising Line End -> HoB Intersection)
+        if (Mathf.Abs(risingEnd.z - hobIntersect.z) > 0.001f || Mathf.Abs(risingEnd.y - hobIntersect.y) > 0.001f)
         {
-            DrawFashionTimberSegment(risingEnd, postTop);
+            DrawFashionTimberSegment(risingEnd, hobIntersect);
         }
         
-        // 2. Upper Fashion Timber (Stern Post Top -> Transom Top)
-        if (Mathf.Abs(postTop.z - transomTop.z) > 0.001f || Mathf.Abs(postTop.y - transomTop.y) > 0.001f)
+        // 2. Upper Fashion Timber (HoB Intersection -> Transom Top)
+        if (Mathf.Abs(hobIntersect.z - transomTop.z) > 0.001f || Mathf.Abs(hobIntersect.y - transomTop.y) > 0.001f)
         {
-            DrawFashionTimberSegment(postTop, transomTop);
+            DrawFashionTimberSegment(hobIntersect, transomTop);
         }
 
         // ----------------------------------------------
