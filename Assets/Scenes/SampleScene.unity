@@ -210,7 +210,7 @@ MonoBehaviour:
   showFloorSweepsGuide: 1
   showSurfaceRibbands: 1
   showWaterlines: 0
-  showFrameControlArms: 1
+  showFrameControlArms: 0
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -550,13 +550,13 @@ MonoBehaviour:
   upperHobArmLength: 0.5
   topTimberArmAngle: 0
   topTimberArmLength: 0.5
-  keelWidth: 0.5
+  keelWidth: 0.25
   lastKeelArmLength: 1
   lastKeelArmAngle: 0
   lastHobLowerArmLength: 0.5
   lastMiddleControlPosition: 0.5
-  cachedL0: {x: 0.25, y: 0, z: 0}
-  cachedL1Inner: {x: 2.125, y: 0, z: 0}
+  cachedL0: {x: 0.125, y: 0, z: 0}
+  cachedL1Inner: {x: 2.0625, y: 0, z: 0}
   cachedL1: {x: 4, y: 0, z: 0}
   cachedLMid: {x: 4, y: 1.25, z: 0}
   cachedL2: {x: 4, y: 2.5, z: 0}
@@ -730,24 +730,41 @@ MonoBehaviour:
   topTimberMidshipAftArmLength: 0.5
   topTimberSternArmAngle: 0
   topTimberSternArmLength: 1
-  cachedFwdP0: {x: 0.25, y: 5, z: 10}
-  cachedFwdP1: {x: 4.25, y: 5, z: 10}
+  cutMaxBeam: 3.2
+  cutTransomWidth: 0.45672435
+  cutBowArmAngle: 0
+  cutBowArmLength: 1
+  cutMidshipFwdArmLength: 0.5
+  cutMidshipAftArmLength: 0.5
+  cutSternArmAngle: 0
+  cutSternArmLength: 1
+  cachedFwdP0: {x: 0.125, y: 5, z: 10}
+  cachedFwdP1: {x: 4.125, y: 5, z: 10}
   cachedFwdP2: {x: 4, y: 5, z: 5}
   cachedFwdP3: {x: 4, y: 5, z: 0}
   cachedAftP0: {x: 4, y: 5, z: 0}
   cachedAftP1: {x: 4, y: 5, z: -5}
-  cachedAftP2: {x: 2.4, y: 5, z: -10.896734}
+  cachedAftP2: {x: 2.4, y: 5, z: -10}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
-  cachedTTFwdP0: {x: 0.25, y: 8, z: 10}
-  cachedTTFwdP1: {x: 3.45, y: 8, z: 10}
+  cachedTTFwdP0: {x: 0.125, y: 8, z: 10}
+  cachedTTFwdP1: {x: 3.325, y: 8, z: 10}
   cachedTTFwdP2: {x: 3.2, y: 8, z: 5}
   cachedTTFwdP3: {x: 3.2, y: 8, z: 0}
   cachedTTAftP0: {x: 3.2, y: 8, z: 0}
   cachedTTAftP1: {x: 3.2, y: 8, z: -5}
-  cachedTTAftP2: {x: 1.4592, y: 8, z: -11.236654}
+  cachedTTAftP2: {x: 1.4592, y: 8, z: -11.381637}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
+  cachedCutFwdP0: {x: 0.125, y: 8.5, z: 10}
+  cachedCutFwdP1: {x: 3.325, y: 8.5, z: 10}
+  cachedCutFwdP2: {x: 3.2, y: 8.5, z: 5}
+  cachedCutFwdP3: {x: 3.2, y: 8.5, z: 0}
+  cachedCutAftP0: {x: 3.2, y: 8.5, z: 0}
+  cachedCutAftP1: {x: 3.2, y: 8.5, z: -5}
+  cachedCutAftP2: {x: 1.4615179, y: 8.5, z: -11.381637}
+  cachedCutAftP3: {x: 0, y: 0, z: 0}
+  cachedIsCutAftCubic: 0
 --- !u!1 &1378026211
 GameObject:
   m_ObjectHideFlags: 0
@@ -862,7 +879,7 @@ MonoBehaviour:
   stemTopControlY: 0.5
   sternPostRakePercentage: 0.05
   enableCounter: 1
-  counterVerticalSlide: 0.2
+  counterVerticalSlide: 1
   counterLength: 1
   counterHeightRatio: 0.106
   counterCurveAngle: 0.214
@@ -879,14 +896,14 @@ MonoBehaviour:
   beakheadBulwarkCurveLength: 0.5
   upperDecks:
   - height: 2
-    aftExtent: 0.25
+    aftExtent: 0
     foreExtent: 0.5
     parentDeckID: 0
     bulwarkHeight: 1
     name: '1st Upper Deck Tier 1 [ID: 1]'
     deckID: 1
     tierLevel: 1
-    globalAftExtent: 0.25
+    globalAftExtent: 0
     globalForeExtent: 0.5
   lowerDecks: []
   transomAftRake: 0.5
@@ -908,32 +925,32 @@ MonoBehaviour:
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
   cachedBowRisingEnd: {x: 0, y: 5.499996, z: 10}
   cachedBowP1Ctrl: {x: 0, y: -0, z: 4.9999986}
-  cachedSternRisingEnd: {x: 0, y: 2.8037071, z: -9.509765}
+  cachedSternRisingEnd: {x: 0, y: 5.2585077, z: -9.956093}
   cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
   cachedStemTopPoint: {x: 0, y: 5.5, z: 10}
-  cachedSternPostTopPoint: {x: 0, y: 4.0516, z: -9.736654}
-  cachedCounterBasePoint: {x: 0, y: 4.0516, z: -9.736654}
-  cachedCounterTopPoint: {x: 0, y: 4.7936, z: -10.736654}
-  cachedCounterCp1: {x: 0, y: 4.4347577, z: -9.917086}
-  cachedCounterCp2: {x: 0, y: 4.6597204, z: -10.220269}
-  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10.896734}
-  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10.896734}
+  cachedSternPostTopPoint: {x: 0, y: 7.599, z: -10.381637}
+  cachedCounterBasePoint: {x: 0, y: 7.599, z: -10.381637}
+  cachedCounterTopPoint: {x: 0, y: 8.5, z: -11.381637}
+  cachedCounterCp1: {x: 0, y: 8.064263, z: -10.562067}
+  cachedCounterCp2: {x: 0, y: 8.337432, z: -10.865252}
+  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10}
+  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10}
   cachedBaseDeckMidCpAft: {x: 0, y: 5, z: -6}
   cachedBaseDeckMidshipPoint: {x: 0, y: 5, z: 0}
   cachedBaseDeckMidCpFwd: {x: 0, y: 5, z: 6}
   cachedBaseDeckBowCp: {x: 0, y: 5.5, z: 10}
   cachedBaseDeckBowIntersect: {x: 0, y: 5.5, z: 10}
   cachedUpperStemTopPoint: {x: 0, y: 7, z: 10}
-  cachedTransomTopPoint: {x: 0, y: 7, z: -11.236654}
-  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.236654}
-  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.236654}
+  cachedTransomTopPoint: {x: 0, y: 8.5, z: -11.381637}
+  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.381637}
+  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.381637}
   cachedTopTimberMidCpAft: {x: 0, y: 6.5, z: -6}
   cachedTopTimberMidshipPoint: {x: 0, y: 6.5, z: 0}
   cachedTopTimberMidCpFwd: {x: 0, y: 6.5, z: 6}
   cachedTopTimberBowCp: {x: 0, y: 7, z: 10}
   cachedTopTimberBowIntersect: {x: 0, y: 7, z: 10}
-  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10.896734}
-  cachedHobSternCp: {x: 0, y: 5.5, z: -10.896734}
+  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10}
+  cachedHobSternCp: {x: 0, y: 5.5, z: -10}
   cachedHobMidCpAft: {x: 0, y: 5, z: -6}
   cachedHobMidshipPoint: {x: 0, y: 5, z: 0}
   cachedHobMidCpFwd: {x: 0, y: 5, z: 6}

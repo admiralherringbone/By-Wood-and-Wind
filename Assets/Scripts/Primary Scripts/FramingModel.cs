@@ -143,7 +143,7 @@ public class FramingModel : MonoBehaviour
         float topTimberY = sheerPlan.GetTopTimberYAtZ(z);
         float topTimberBreadth = breadthPlan.GetTopTimberXAtZ(z);
         
-        float minZ = sheerPlan.cachedTopTimberSternIntersect.z;
+        float minZ = sheerPlan.cachedTransomTopPoint.z;
         float maxZ = sheerPlan.cachedTopTimberBowIntersect.z;
 
         // Added 0.005f tolerance to ensure exact bow/stern slices aren't skipped by floating point drift
@@ -167,15 +167,6 @@ public class FramingModel : MonoBehaviour
             float theoreticalHobY = sheerPlan.GetTheoreticalHobYAtZ(z);
             
             float baseX = breadthPlan.GetTheoreticalBreadthXAtZ(z);
-            
-            if (z < sheerPlan.cachedHobSternIntersect.z)
-            {
-                FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
-                if (fModel != null)
-                {
-                    baseX = fModel.GetNaturalHullXAtYZ(sheerPlan.GetSternProfileYAtZ(z), z);
-                }
-            }
 
             fp.upperP0 = fp.hasLower ? fp.lowerP3 : new Vector3(baseX, theoreticalHobY, z);
             
@@ -183,7 +174,7 @@ public class FramingModel : MonoBehaviour
             fp.upperP3 = new Vector3(topTimberBreadth, maxSheerYAtZ, z);
 
             float scaleX = 1f;
-            if (breadthPlan.topTimberMaxBeam > 0.01f) scaleX = topTimberBreadth / breadthPlan.topTimberMaxBeam;
+            if (bodyPlan.cachedU0.x > 0.01f) scaleX = baseX / bodyPlan.cachedU0.x;
             
             float masterHeight = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
             float scaleY = 1f;
@@ -206,6 +197,24 @@ public class FramingModel : MonoBehaviour
                 else maxT = midT;
             }
             fp.upperTopCutoffT = (minT + maxT) / 2f;
+
+            // ALIGN PHYSICAL CUT WITH TOP TIMBER BREADTH
+            // Since the frame is built to virtual maxSheerYAtZ and then cut at localTtY, the width at the cut is naturally wider than topTimberBreadth.
+            // We scale the X-control points relative to P0 so that the actual cut point perfectly matches topTimberBreadth.
+            if (fp.upperTopCutoffT < 0.999f && fp.upperTopCutoffT > 0.001f)
+            {
+                float actualCutX = CalculateCubicBezierPoint(fp.upperTopCutoffT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
+                float currentDx = actualCutX - fp.upperP0.x;
+                float targetDx = topTimberBreadth - fp.upperP0.x;
+                
+                if (Mathf.Abs(currentDx) > 0.001f)
+                {
+                    float correctionScale = targetDx / currentDx;
+                    fp.upperP1.x = fp.upperP0.x + ((fp.upperP1.x - fp.upperP0.x) * correctionScale);
+                    fp.upperP2.x = fp.upperP0.x + ((fp.upperP2.x - fp.upperP0.x) * correctionScale);
+                    fp.upperP3.x = fp.upperP0.x + ((fp.upperP3.x - fp.upperP0.x) * correctionScale);
+                }
+            }
         }
 
         fp.isValid = true;
@@ -236,48 +245,6 @@ public class FramingModel : MonoBehaviour
             if (fashionY > hobY || !fp.hasLower)
             {
                 fp.hasLower = false;
-                
-                if (fp.hasUpper)
-                {
-                    float fMinT = 0f;
-                    float fMaxT = fp.upperTopCutoffT; 
-                    for (int i = 0; i < 15; i++)
-                    {
-                        float midT = (fMinT + fMaxT) / 2f;
-                        float py = CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
-                        if (py < fashionY) fMinT = midT;
-                        else fMaxT = midT;
-                    }
-                    fp.upperCutoffT = (fMinT + fMaxT) / 2f;
-                    
-                    if (z < sheerPlan.cachedHobSternIntersect.z)
-                    {
-                        FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
-                        if (fModel != null)
-                        {
-                            float exactX = fModel.GetNaturalHullXAtYZ(fashionY, z);
-                            if (exactX > 0.001f)
-                            {
-                                float t = fp.upperCutoffT;
-                                float u = 1 - t;
-                                float w0 = (u * u * u) + (3 * u * u * t);
-                                
-                                float p2x = fp.upperP2.x;
-                                float p3x = fp.upperP3.x;
-                                float u1Offset = fp.upperP1.x - fp.upperP0.x;
-                                
-                                float constantX = (3 * u * u * t * u1Offset) + (3 * u * t * t * p2x) + (t * t * t * p3x);
-                                
-                                if (w0 > 0.0001f)
-                                {
-                                    float newBaseX = (exactX - constantX) / w0;
-                                    fp.upperP0.x = newBaseX;
-                                    fp.upperP1.x = newBaseX + u1Offset;
-                                }
-                            }
-                        }
-                    }
-                }
                 fp.lowerCutoffT = 0f;
             }
             else
@@ -544,12 +511,9 @@ public class FramingModel : MonoBehaviour
                 float y1 = sheerPlan.GetTheoreticalHobYAtZ(z1);
                 float y2 = sheerPlan.GetTheoreticalHobYAtZ(z2);
                 
-                // Mirror the exact X-evaluation method used by the solid magenta Fashion Timbers
-                float exactY1 = sheerPlan.GetSternProfileYAtZ(z1);
-                float exactY2 = sheerPlan.GetSternProfileYAtZ(z2);
-                
-                float x1 = fModel.GetNaturalHullXAtYZ(exactY1, z1);
-                float x2 = fModel.GetNaturalHullXAtYZ(exactY2, z2);
+                // Accurately project the mathematically extrapolated Primary Breadth Plan curve
+                float x1 = breadthPlan.GetTheoreticalBreadthXAtZ(z1);
+                float x2 = breadthPlan.GetTheoreticalBreadthXAtZ(z2);
 
                 Gizmos.DrawLine(new Vector3(x1, y1, z1), new Vector3(x2, y2, z2));
                 Gizmos.DrawLine(new Vector3(-x1, y1, z1), new Vector3(-x2, y2, z2));
@@ -559,7 +523,8 @@ public class FramingModel : MonoBehaviour
 
     private void DrawTopTimberRibband()
     {
-        float startZ = sheerPlan.cachedTopTimberSternIntersect.z;
+        float deckStartZ = sheerPlan.cachedTopTimberSternIntersect.z;
+        float startZ = sheerPlan.cachedTransomTopPoint.z;
         float endZ = sheerPlan.cachedUpperStemTopPoint.z;
         int segments = 80; // Increased for better vertical resolution
         float step = (endZ - startZ) / segments;
@@ -578,10 +543,7 @@ public class FramingModel : MonoBehaviour
 
         if (sheerPlan.upperDecks != null)
         {
-            float totalLength = sheerPlan.cachedTopTimberBowIntersect.z - startZ;
-            float deckStartZ = startZ;
-
-            // Removed inner plan check for Counter Test
+            float totalLength = sheerPlan.cachedTopTimberBowIntersect.z - deckStartZ;
 
             foreach (var deck in sheerPlan.upperDecks)
             {
@@ -619,7 +581,7 @@ public class FramingModel : MonoBehaviour
         for (int i = 0; i < zSlices.Count; i++)
         {
             float z = zSlices[i];
-            FrameProfile fp = GetFrameProfile(z);
+            FrameProfile fp = GetRawFrameProfile(z);
             Vector3 currStbd;
             Vector3 currPort;
 
@@ -653,14 +615,14 @@ public class FramingModel : MonoBehaviour
                 else
                 {
                     // Complete fallback
-                    float x = breadthPlan.GetTopTimberXAtZ(z);
+                    float x = breadthPlan.GetCutBreadthXAtZ(z);
                     currStbd = new Vector3(x, localTtY, z);
                     currPort = new Vector3(-x, localTtY, z);
                 }
             }
             else
             {
-                float x = breadthPlan.GetTopTimberXAtZ(z);
+                float x = breadthPlan.GetCutBreadthXAtZ(z);
                 float y = sheerPlan.GetTopTimberYAtZ(z);
                 currStbd = new Vector3(x, y, z);
                 currPort = new Vector3(-x, y, z);
