@@ -246,6 +246,20 @@ public class FramingModel : MonoBehaviour
             {
                 fp.hasLower = false;
                 fp.lowerCutoffT = 0f;
+                
+                if (fp.hasUpper && fashionY > hobY)
+                {
+                    float fMinT = 0f;
+                    float fMaxT = 1f;
+                    for (int i = 0; i < 20; i++)
+                    {
+                        float midT = (fMinT + fMaxT) / 2f;
+                        float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
+                        if (py < fashionY) fMinT = midT;
+                        else fMaxT = midT;
+                    }
+                    fp.upperCutoffT = (fMinT + fMaxT) / 2f;
+                }
             }
             else
             {
