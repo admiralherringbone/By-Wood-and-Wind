@@ -63,7 +63,7 @@ public class FashionTimberModel : MonoBehaviour
 
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
-        bool isUpper = targetY > sheerPlan.GetHobYAtZ(originalZ);
+        bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
         
         float lowerAftZ = sheerPlan.cachedSternRisingEnd.z;
         float evalZ = originalZ;
