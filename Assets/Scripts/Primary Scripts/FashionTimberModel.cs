@@ -57,6 +57,23 @@ public class FashionTimberModel : MonoBehaviour
             DrawFashionTimberSegment(hobIntersect, transomTop);
         }
 
+        // 3. Transverse Counter Lines
+        if (sheerPlan.enableCounter)
+        {
+            Vector3 counterBase = sheerPlan.cachedCounterBasePoint;
+            Vector3 counterTop = sheerPlan.cachedCounterTopPoint;
+
+            float baseX = GetNaturalHullXAtYZ(counterBase.y, counterBase.z);
+            Vector3 baseStbd = new Vector3(baseX, counterBase.y, counterBase.z);
+            Vector3 basePort = new Vector3(-baseX, counterBase.y, counterBase.z);
+            Gizmos.DrawLine(baseStbd, basePort);
+            
+            float topX = GetNaturalHullXAtYZ(counterTop.y, counterTop.z);
+            Vector3 topStbd = new Vector3(topX, counterTop.y, counterTop.z);
+            Vector3 topPort = new Vector3(-topX, counterTop.y, counterTop.z);
+            Gizmos.DrawLine(topStbd, topPort);
+        }
+
         // ----------------------------------------------
     }
     public Vector3 GetFashionTimberHobIntersection()
