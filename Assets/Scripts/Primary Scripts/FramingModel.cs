@@ -403,7 +403,40 @@ public class FramingModel : MonoBehaviour
             Gizmos.DrawLine(inStbd, outStbd);
         }
 
-
+        // Draw Deadwood Rake (Top Surface)
+        if (sheerPlan.showDeadwoodRake)
+        {
+            Gizmos.color = new Color(0.6f, 0.2f, 0.8f, 1f); // Purple to match Sheer Plan 2D line
+            
+            float dForeZ = sheerPlan.cachedDeadwoodForePoint.z;
+            float dAftZ = sheerPlan.cachedDeadwoodAftPoint.z;
+            
+            int dSegments = 20;
+            Vector3 prevPort = Vector3.zero;
+            Vector3 prevStbd = Vector3.zero;
+            
+            for (int i = 0; i <= dSegments; i++)
+            {
+                float t = i / (float)dSegments;
+                float z = Mathf.Lerp(dForeZ, dAftZ, t);
+                float y = sheerPlan.GetDeadwoodYAtZ(z);
+                
+                Vector3 currPort = new Vector3(-hw, y, z);
+                Vector3 currStbd = new Vector3(hw, y, z);
+                
+                // Draw cross-section at each segment
+                Gizmos.DrawLine(currPort, currStbd);
+                
+                if (i > 0)
+                {
+                    Gizmos.DrawLine(prevPort, currPort);
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                }
+                
+                prevPort = currPort;
+                prevStbd = currStbd;
+            }
+        }
     }
 
     public virtual List<float> GetFrameZPositions()
