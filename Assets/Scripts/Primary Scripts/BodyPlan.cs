@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -69,6 +70,14 @@ public class BodyPlan : MonoBehaviour
     [Header("Keel & Stem Width")]
     [Tooltip("The width of the physical Keel (P/S distance). The mould will start at keelWidth / 2.")]
     public float keelWidth = 0.5f;
+
+    [Header("Inner Frame")]
+    [Tooltip("Perpendicular thickness of the inner frame spline at the Keel.")]
+    public float baseFrameThickness = 0.3f;
+    [Tooltip("Perpendicular thickness of the inner frame spline at the Top Timber.")]
+    public float topFrameThickness = 0.15f;
+    public bool showInnerFrame = true;
+    public Color innerFrameColor = Color.magenta;
 
     [HideInInspector, SerializeField] private float lastKeelArmLength = -1f;
     [HideInInspector] [SerializeField] private float lastKeelArmAngle = -1f;
@@ -354,9 +363,11 @@ public class BodyPlan : MonoBehaviour
 
         // Draw Starboard (Green)
         DrawMirroredMould(1f, Color.green);
+        if (showInnerFrame) DrawInnerMirroredMould(1f, innerFrameColor);
 
         // Draw Port (Red)
         DrawMirroredMould(-1f, Color.red);
+        if (showInnerFrame) DrawInnerMirroredMould(-1f, innerFrameColor);
     }
 
     protected void DrawMirroredMould(float flipX, Color curveColor)
@@ -472,5 +483,130 @@ public class BodyPlan : MonoBehaviour
             Gizmos.DrawLine(previousPoint, point);
             previousPoint = point;
         }
+    }
+
+    protected void DrawInnerMirroredMould(float flipX, Color curveColor)
+    {
+        Gizmos.color = curveColor;
+
+        List<Vector2> rawPoints = new List<Vector2>();
+        int segments = 100;
+
+        float topTimberY = cachedU3.y;
+
+        for (int i = 0; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            
+            // Re-parameterize t across both Lower (0-0.5) and Upper (0.5-1.0) curves
+            Vector2 outerPt;
+            Vector2 nextPt;
+            
+            float rawT = t * 2f;
+            if (rawT <= 1f)
+            {
+                outerPt = GetLowerMouldPoint(rawT, flipX);
+                nextPt = GetLowerMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
+            }
+            else
+            {
+                rawT -= 1f;
+                outerPt = GetUpperMouldPoint(rawT, flipX);
+                nextPt = GetUpperMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
+            }
+
+            Vector2 tangent = (nextPt - outerPt).normalized;
+            if (tangent == Vector2.zero) tangent = Vector2.up; // Fallback
+            
+            // Calculate normal pointing inwards. 
+            // If flipX > 0 (Starboard), tangent goes up/right. Normal should point Up/Left (-y, x).
+            // Actually, we want it to point towards centerline (x=0). 
+            Vector2 normal = new Vector2(-tangent.y, tangent.x);
+            
+            // Ensure normal always points towards the centerline
+            if (flipX > 0 && normal.x > 0) normal = -normal;
+            if (flipX < 0 && normal.x < 0) normal = -normal;
+
+            float currentThickness = Mathf.Lerp(baseFrameThickness, topFrameThickness, t);
+            Vector2 innerPt = outerPt + normal * currentThickness;
+            rawPoints.Add(innerPt);
+        }
+
+        // Remove self-intersections (swallowtail loops)
+        bool intersectionFound = true;
+        while (intersectionFound)
+        {
+            intersectionFound = false;
+            for (int i = 0; i < rawPoints.Count - 3; i++)
+            {
+                for (int j = i + 2; j < rawPoints.Count - 1; j++)
+                {
+                    if (LineIntersection(rawPoints[i], rawPoints[i+1], rawPoints[j], rawPoints[j+1], out Vector2 intersect))
+                    {
+                        int removeCount = j - i;
+                        rawPoints.RemoveRange(i + 1, removeCount);
+                        rawPoints.Insert(i + 1, intersect);
+                        intersectionFound = true;
+                        break;
+                    }
+                }
+                if (intersectionFound) break;
+            }
+        }
+
+        Vector3 previousPoint = Vector3.zero;
+        bool first = true;
+
+        for (int i = 0; i < rawPoints.Count; i++)
+        {
+            Vector3 point = new Vector3(rawPoints[i].x, rawPoints[i].y, 0f);
+
+            // Clamp to Top Timber
+            if (point.y >= topTimberY)
+            {
+                point.y = topTimberY;
+                if (!first) Gizmos.DrawLine(previousPoint, point);
+                break;
+            }
+
+            if (!first)
+            {
+                Gizmos.DrawLine(previousPoint, point);
+            }
+            
+            previousPoint = point;
+            first = false;
+        }
+    }
+    
+    private Vector2 GetLowerMouldPoint(float t, float flipX)
+    {
+        Vector3 pt;
+        if (cachedUseQuintic) pt = CalculateQuinticBezierPoint(t, cachedL0, cachedL1Inner, cachedL1, cachedLMid, cachedL2, cachedL3);
+        else if (cachedUseQuartic) pt = CalculateQuarticBezierPoint(t, cachedL0, cachedL1, cachedLMid, cachedL2, cachedL3);
+        else pt = CalculateCubicBezierPoint(t, cachedL0, cachedL1, cachedL2, cachedL3);
+        return new Vector2(pt.x * flipX, pt.y);
+    }
+    
+    private Vector2 GetUpperMouldPoint(float t, float flipX)
+    {
+        Vector3 pt = CalculateCubicBezierPoint(t, cachedU0, cachedU1, cachedU2, cachedU3);
+        return new Vector2(pt.x * flipX, pt.y);
+    }
+
+    private bool LineIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection)
+    {
+        intersection = Vector2.zero;
+        float d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+        if (d == 0f) return false;
+        
+        float u = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+        float v = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+        
+        if (u < 0f || u > 1f || v < 0f || v > 1f) return false;
+        
+        intersection.x = p1.x + u * (p2.x - p1.x);
+        intersection.y = p1.y + u * (p2.y - p1.y);
+        return true;
     }
 }
