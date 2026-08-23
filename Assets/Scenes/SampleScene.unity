@@ -600,6 +600,10 @@ MonoBehaviour:
   topTimberArmAngle: 0
   topTimberArmLength: 0.5
   keelWidth: 0.25
+  baseFrameThickness: 0.3
+  topFrameThickness: 0.15
+  showInnerFrame: 1
+  innerFrameColor: {r: 1, g: 0, b: 1, a: 1}
   lastKeelArmLength: 1
   lastKeelArmAngle: 0
   lastHobLowerArmLength: 0.5
@@ -864,6 +868,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1471959869
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1471959871}
+  - component: {fileID: 1471959870}
+  m_Layer: 0
+  m_Name: Inner Framing Model
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1471959870
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1471959869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ac04265b5ede49d493cd83a96a4c0c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InnerFramingModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  framingModel: {fileID: 287447048}
+  showInnerFrames: 1
+  innerFrameColor: {r: 1, g: 1, b: 1, a: 1}
+  resolution: 50
+--- !u!4 &1471959871
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1471959869}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.98789, y: -0, z: -81.94173}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -1034,3 +1088,4 @@ SceneRoots:
   - {fileID: 263335043}
   - {fileID: 1378026213}
   - {fileID: 67384314}
+  - {fileID: 1471959871}
