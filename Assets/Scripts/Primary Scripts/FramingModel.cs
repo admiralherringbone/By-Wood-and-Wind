@@ -73,14 +73,25 @@ public class FramingModel : MonoBehaviour
         if (fp.hasLower)
         {
             float keelY = sheerPlan.GetKeelYAtZ(z);
+            if (sheerPlan.showDeadwoodRake && z < sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedDeadwoodAftPoint.z)
+            {
+                keelY = sheerPlan.GetDeadwoodYAtZ(z);
+            }
+            
         float risingY = sheerPlan.GetRisingLineYAtZ(z);
         
-        // If we are aft of the Rising Line End, the frame must extend down to the virtual Fashion Projection line
-        // rather than stopping at the physical Stern Post/Counter backbone.
-        if (z < sheerPlan.cachedSternRisingEnd.z)
+        Vector3 fashionLowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
         {
-            float startHobY = sheerPlan.GetTheoreticalHobYAtZ(sheerPlan.cachedSternRisingEnd.z);
-            float yOffset = startHobY - sheerPlan.cachedSternRisingEnd.y;
+            fashionLowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+
+        // If we are aft of the Fashion Lower Bound, the frame must extend down to the virtual Fashion Projection line
+        // rather than stopping at the physical Stern Post/Counter backbone.
+        if (z < fashionLowerBound.z)
+        {
+            float startHobY = sheerPlan.GetTheoreticalHobYAtZ(fashionLowerBound.z);
+            float yOffset = startHobY - fashionLowerBound.y;
             keelY = sheerPlan.GetTheoreticalHobYAtZ(z) - yOffset;
         }
         
@@ -535,7 +546,13 @@ public class FramingModel : MonoBehaviour
             }
 
             // Draw Lower Phantom HoB Projection (Dashed Light Grey)
-            float lowerStartZ = sheerPlan.cachedSternRisingEnd.z;
+            Vector3 fashionLowerBound = sheerPlan.cachedSternRisingEnd;
+            if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+            {
+                fashionLowerBound = sheerPlan.cachedDeadwoodAftPoint;
+            }
+            
+            float lowerStartZ = fashionLowerBound.z;
             float lowerEndZ = sheerPlan.cachedHobSternIntersect.z;
 
             if (lowerEndZ < lowerStartZ)
@@ -545,7 +562,7 @@ public class FramingModel : MonoBehaviour
                 float dashStep = (lowerEndZ - lowerStartZ) / dashSegments;
                 
                 float startHobY = sheerPlan.GetTheoreticalHobYAtZ(lowerStartZ);
-                float yOffset = startHobY - sheerPlan.cachedSternRisingEnd.y;
+                float yOffset = startHobY - fashionLowerBound.y;
                 float hw = bodyPlan.keelWidth / 2f;
 
                 for (int i = 0; i < dashSegments; i++)

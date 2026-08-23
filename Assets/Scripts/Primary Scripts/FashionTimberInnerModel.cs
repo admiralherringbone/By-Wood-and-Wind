@@ -28,7 +28,12 @@ public class FashionTimberInnerModel : MonoBehaviour
 
         Gizmos.color = innerColor;
 
-        Vector3 risingEnd = sheerPlan.cachedSternRisingEnd;
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
         float startZ = risingEnd.z;
@@ -95,6 +100,7 @@ public class FashionTimberInnerModel : MonoBehaviour
             float innerY = rawPoints[i].y;
 
             if (innerZ > risingEnd.z) continue;
+
 
             float topTimberY = sheerPlan.GetTopTimberYAtZ(innerZ);
             bool reachedTop = false;

@@ -36,7 +36,12 @@ public class FashionTimberModel : MonoBehaviour
 
         Gizmos.color = fashionColor;
 
-        Vector3 risingEnd = sheerPlan.cachedSternRisingEnd;
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
         Vector3 hobIntersect = sheerPlan.cachedHobSternIntersect;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
@@ -65,7 +70,12 @@ public class FashionTimberModel : MonoBehaviour
     {
         bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
         
-        float lowerAftZ = sheerPlan.cachedSternRisingEnd.z;
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        float lowerAftZ = lowerBound.z;
         float evalZ = originalZ;
 
         // Lower frames do not mathematically exist aft of the Stern Post, so we must clamp Z for lower hull evaluations.
@@ -169,7 +179,12 @@ public class FashionTimberModel : MonoBehaviour
     {
         List<Vector3> pts = new List<Vector3>();
         
-        Vector3 risingEnd = sheerPlan.cachedSternRisingEnd;
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
         float startZ = risingEnd.z;
         float endZ = sheerPlan.cachedTransomTopPoint.z;
         bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;

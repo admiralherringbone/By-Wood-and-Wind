@@ -9,6 +9,7 @@ public class SheerPlan : MonoBehaviour
 {
     [Header("Gizmo Settings")]
     public bool showLabels = true;
+    public bool showControlArms = true;
 
     [Header("Basic Dimensions")]
     [Tooltip("The basic length of the model between the Stem Rake and the Stern Post Rake.")]
@@ -35,11 +36,9 @@ public class SheerPlan : MonoBehaviour
     public float holdDepth = 5f;
     [HideInInspector, SerializeField] private float lastHoldDepth = 5f;
 
-    [Header("Keel Line")]
-    [Tooltip("How much the keel sags/hogs in the middle. Positive values bow downwards (sag), negative upwards (hog).")]
-    [Range(-2f, 2f)]
+    // TODO: Investigate if a curved keel is mathematically necessary. Hidden from inspector for now to prevent structural conflicts.
+    [HideInInspector]
     public float keelMidshipDrop = 0f;
-
     [Header("Stem Rake")]
     [Tooltip("Percentage of the length for the Stem Rake.")]
     [Range(0f, 0.5f)] public float stemRakePercentage = 0.15f;
@@ -53,6 +52,15 @@ public class SheerPlan : MonoBehaviour
     [Header("Stern Post Rake")]
     [Tooltip("Percentage of the length for the Stern Post Rake.")]
     [Range(0f, 0.5f)] public float sternPostRakePercentage = 0.05f;
+
+    [Header("Deadwood Rake")]
+    public bool showDeadwoodRake = true;
+    [Range(0f, 1f)] public float deadwoodRakeForeSlider = 0.8f;
+    [Range(0f, 1f)] public float deadwoodRakeAftSlider = 0.2f;
+    [Range(0f, 1f)] public float deadwoodBottomControlZ = 0.5f;
+    [Range(0f, 1f)] public float deadwoodBottomControlY = 0f;
+    [Range(0f, 1f)] public float deadwoodTopControlZ = 1f;
+    [Range(0f, 1f)] public float deadwoodTopControlY = 0.5f;
 
     [Header("Counter")]
     [Tooltip("Enable or disable the optional Counter overhang at the stern.")]
@@ -197,6 +205,11 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedCounterTopPoint;
     [HideInInspector] public Vector3 cachedCounterCp1;
     [HideInInspector] public Vector3 cachedCounterCp2;
+    
+    [HideInInspector] public Vector3 cachedDeadwoodForePoint;
+    [HideInInspector] public Vector3 cachedDeadwoodAftPoint;
+    [HideInInspector] public Vector3 cachedDeadwoodP1;
+    [HideInInspector] public Vector3 cachedDeadwoodP2;
     
     [HideInInspector] public Vector3 cachedBaseDeckSternIntersect;
     [HideInInspector] public Vector3 cachedBaseDeckSternCp;
@@ -419,6 +432,34 @@ public class SheerPlan : MonoBehaviour
             cachedCounterCp2 = cachedSternPostTopPoint;
         }
 
+        // Deadwood Rake
+        float deadwoodForeZ = Mathf.Lerp(cachedMidshipKeel.z, cachedKeelSternPoint.z, deadwoodRakeForeSlider);
+        cachedDeadwoodForePoint = new Vector3(0, GetKeelYAtZ(deadwoodForeZ), deadwoodForeZ);
+        cachedDeadwoodAftPoint = Vector3.Lerp(cachedKeelSternPoint, cachedSternPostTopPoint, deadwoodRakeAftSlider);
+        
+        float deadwoodHobSternY = enableCounter ? cachedHobSternIntersect.y : GetHobYAtZ(cachedSternPostTopPoint.z);
+        if (cachedDeadwoodAftPoint.y > deadwoodHobSternY)
+        {
+            float tempSternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+            float deadwoodSternT = tempSternTotalY > 0.0001f ? (deadwoodHobSternY - cachedKeelSternPoint.y) / tempSternTotalY : 0f;
+            cachedDeadwoodAftPoint = new Vector3(0, deadwoodHobSternY, Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, deadwoodSternT));
+        }
+        
+        float dMinZ = cachedDeadwoodForePoint.z;
+        float dMaxZ = cachedDeadwoodAftPoint.z;
+        float dMinY = cachedDeadwoodForePoint.y;
+        float dMaxY = cachedDeadwoodAftPoint.y;
+        
+        float p1Y = Mathf.Lerp(dMinY, dMaxY, deadwoodBottomControlY);
+        float p2Y = Mathf.Lerp(dMinY, dMaxY, deadwoodTopControlY);
+        
+        float deadwoodSternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+        float p1MaxZ = (Mathf.Abs(deadwoodSternTotalY) > 0.001f) ? Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, (p1Y - cachedKeelSternPoint.y) / deadwoodSternTotalY) : cachedKeelSternPoint.z;
+        float p2MaxZ = (Mathf.Abs(deadwoodSternTotalY) > 0.001f) ? Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, (p2Y - cachedKeelSternPoint.y) / deadwoodSternTotalY) : cachedKeelSternPoint.z;
+
+        cachedDeadwoodP1 = new Vector3(0, p1Y, Mathf.Lerp(dMinZ, p1MaxZ, deadwoodBottomControlZ));
+        cachedDeadwoodP2 = new Vector3(0, p2Y, Mathf.Lerp(dMinZ, p2MaxZ, deadwoodTopControlZ));
+
         // Stem
         cachedStemTopPoint = new Vector3(0, baseDeckBowY, halfLength);
         
@@ -593,11 +634,35 @@ public class SheerPlan : MonoBehaviour
         float hobSternY = enableCounter ? cachedHobSternIntersect.y : GetHobYAtZ(cachedSternPostTopPoint.z);
         if (targetSternY > hobSternY) targetSternY = hobSternY;
         
-        float sternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
-        float sternT = sternTotalY > 0.0001f ? (targetSternY - cachedKeelSternPoint.y) / sternTotalY : 0f;
-        cachedSternRisingEnd = new Vector3(0, targetSternY, Mathf.Lerp(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, sternT));
+        if (showDeadwoodRake && targetSternY <= cachedDeadwoodAftPoint.y && targetSternY >= cachedDeadwoodForePoint.y)
+        {
+            cachedSternRisingEnd = GetBezierPointAtY(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, targetSternY);
+        }
+        else if (showDeadwoodRake && targetSternY < cachedDeadwoodForePoint.y)
+        {
+            cachedSternRisingEnd = new Vector3(0, targetSternY, cachedDeadwoodForePoint.z);
+        }
+        else
+        {
+            float sternT = deadwoodSternTotalY > 0.0001f ? (targetSternY - cachedKeelSternPoint.y) / deadwoodSternTotalY : 0f;
+            cachedSternRisingEnd = new Vector3(0, targetSternY, Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, sternT));
+        }
         
-        float sternControlZ = Mathf.Lerp(0f, cachedKeelSternPoint.z, sternRisingLineControl);
+        float maxSternControlZ = cachedKeelSternPoint.z;
+        if (showDeadwoodRake && targetSternY <= cachedDeadwoodAftPoint.y && targetSternY >= cachedDeadwoodForePoint.y)
+        {
+            float sternCurveT = GetBezierTAtY(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, targetSternY);
+            Vector3 sternTangent = CalculateBezierTangent(sternCurveT, cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint);
+            if (Mathf.Abs(sternTangent.y) > 0.0001f) maxSternControlZ = cachedSternRisingEnd.z - cachedSternRisingEnd.y * (sternTangent.z / sternTangent.y);
+        }
+        else if (showDeadwoodRake && targetSternY > cachedDeadwoodAftPoint.y) 
+        {
+            Vector3 sternTangent = cachedSternPostTopPoint - cachedKeelSternPoint;
+            if (Mathf.Abs(sternTangent.y) > 0.0001f) maxSternControlZ = cachedSternRisingEnd.z - cachedSternRisingEnd.y * (sternTangent.z / sternTangent.y);
+        }
+        else maxSternControlZ = cachedSternRisingEnd.z;
+        
+        float sternControlZ = Mathf.Lerp(0f, maxSternControlZ, sternRisingLineControl);
         cachedSternP1Ctrl = new Vector3(0, cachedMidshipKeel.y, sternControlZ);
     }
 
@@ -619,6 +684,16 @@ public class SheerPlan : MonoBehaviour
             float t = z / cachedKeelSternPoint.z;
             return CalculateQuadraticBezierPoint(t, cachedMidshipKeel, new Vector3(0, 0, cachedKeelSternPoint.z / 2f), cachedKeelSternPoint).y;
         }
+    }
+
+    public virtual float GetDeadwoodYAtZ(float z)
+    {
+        if (!showDeadwoodRake) return GetKeelYAtZ(z);
+        if (z >= cachedDeadwoodForePoint.z) return GetKeelYAtZ(z);
+        if (z <= cachedDeadwoodAftPoint.z) return GetSternProfileYAtZ(z);
+        
+        float t = GetBezierTAtZ(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, z, false);
+        return CalculateCubicBezierPoint(t, cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint).y;
     }
 
     public virtual float GetStemProfileYAtZ(float z)
@@ -1206,6 +1281,16 @@ public class SheerPlan : MonoBehaviour
         Gizmos.DrawLine(cachedKeelSternPoint, cachedSternPostTopPoint);
         Gizmos.color = Color.red; Gizmos.DrawSphere(cachedSternPostTopPoint, 0.2f);
         
+        // Deadwood Rake
+        if (showDeadwoodRake)
+        {
+            Color purple = new Color(0.6f, 0.2f, 0.8f, 1f);
+            DrawCubicBezierCurve(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, purple);
+            Gizmos.color = purple;
+            Gizmos.DrawSphere(cachedDeadwoodForePoint, 0.15f);
+            Gizmos.DrawSphere(cachedDeadwoodAftPoint, 0.15f);
+        }
+        
         // Counter
         if (enableCounter)
         {
@@ -1483,6 +1568,16 @@ public class SheerPlan : MonoBehaviour
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
         }
+        
+        if (showControlArms)
+        {
+            Color faintColor = color;
+            faintColor.a = 0.4f;
+            Gizmos.color = faintColor;
+            Gizmos.DrawLine(p0, p1);
+            Gizmos.DrawLine(p2, p1);
+            Gizmos.DrawWireSphere(p1, 0.1f);
+        }
     }
 
     private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 20)
@@ -1495,6 +1590,17 @@ public class SheerPlan : MonoBehaviour
             Vector3 currentPoint = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
+        }
+        
+        if (showControlArms)
+        {
+            Color faintColor = color;
+            faintColor.a = 0.4f;
+            Gizmos.color = faintColor;
+            Gizmos.DrawLine(p0, p1);
+            Gizmos.DrawLine(p3, p2);
+            Gizmos.DrawWireSphere(p1, 0.1f);
+            Gizmos.DrawWireSphere(p2, 0.1f);
         }
     }
 
