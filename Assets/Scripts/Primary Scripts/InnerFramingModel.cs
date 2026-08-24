@@ -71,29 +71,37 @@ public class InnerFramingModel : MonoBehaviour
 
         if (fp.hasLower)
         {
-            int lSegments = Mathf.CeilToInt(resolution * (fp.lowerTopCutoffT - fp.lowerCutoffT));
+            float fashionY = 0f;
+            if (framingModel.fashionTimberInnerModel != null)
+            {
+                float sternMaxZ = framingModel.fashionTimberInnerModel.GetMaxZ();
+                if (zPos < sternMaxZ) fashionY = framingModel.fashionTimberInnerModel.GetInnerYAtZ(zPos);
+            }
+
+            float innerLowerCutoffT = 0f;
+            if (fashionY > 0f)
+            {
+                float tMin = 0f;
+                float tMax = 1f;
+                for (int i = 0; i < 20; i++)
+                {
+                    float midT = (tMin + tMax) / 2f;
+                    Vector3 pt = GetInnerPointAtT(fp, false, midT, zPos, origin, framePlaneNormal, keelY, totalHeight);
+                    if (pt.y < fashionY) tMin = midT;
+                    else tMax = midT;
+                }
+                innerLowerCutoffT = (tMin + tMax) / 2f;
+            }
+
+            int lSegments = Mathf.CeilToInt(resolution * (fp.lowerTopCutoffT - innerLowerCutoffT));
             if (lSegments < 1) lSegments = 1;
             
             for (int i = 0; i <= lSegments; i++)
             {
                 float t = i / (float)lSegments;
-                float actualT = Mathf.Lerp(fp.lowerCutoffT, fp.lowerTopCutoffT, t);
+                float actualT = Mathf.Lerp(innerLowerCutoffT, fp.lowerTopCutoffT, t);
                 
-                Vector3 outerPt = framingModel.GetSurfacePointAtT(fp, 1f, actualT, true);
-                Vector3 nextPt = framingModel.GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, actualT + 0.01f), true);
-
-                Vector3 tangent = (nextPt - outerPt).normalized;
-                if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
-
-                Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
-                
-                Vector3 toCenter = new Vector3(-outerPt.x, 0, zPos - outerPt.z);
-                if (Vector3.Dot(normal, toCenter) < 0) normal = -normal;
-
-                float overallT = Mathf.Clamp01((outerPt.y - keelY) / totalHeight);
-                float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, overallT);
-                
-                Vector3 innerPtStbd = outerPt + normal * currentThickness;
+                Vector3 innerPtStbd = GetInnerPointAtT(fp, false, actualT, zPos, origin, framePlaneNormal, keelY, totalHeight);
                 
                 Vector3 localOffset = innerPtStbd - origin;
                 float localX = Vector3.Dot(localOffset, uAxis);
@@ -105,12 +113,49 @@ public class InnerFramingModel : MonoBehaviour
 
         if (fp.hasUpper)
         {
-            int uSegments = Mathf.CeilToInt(resolution * (fp.upperTopCutoffT - fp.upperCutoffT));
+            float fashionY = 0f;
+            if (framingModel.fashionTimberInnerModel != null)
+            {
+                float sternMaxZ = framingModel.fashionTimberInnerModel.GetMaxZ();
+                if (zPos < sternMaxZ) fashionY = framingModel.fashionTimberInnerModel.GetInnerYAtZ(zPos);
+            }
+
+            float innerUpperCutoffT = 0f;
+            if (fashionY > 0f)
+            {
+                float tMin = 0f;
+                float tMax = 1f;
+                for (int i = 0; i < 20; i++)
+                {
+                    float midT = (tMin + tMax) / 2f;
+                    Vector3 pt = GetInnerPointAtT(fp, true, midT, zPos, origin, framePlaneNormal, keelY, totalHeight);
+                    if (pt.y < fashionY) tMin = midT;
+                    else tMax = midT;
+                }
+                innerUpperCutoffT = (tMin + tMax) / 2f;
+            }
+            
+            // Also find the correct top cutoff for the inner frame
+            float localTtY = sheerPlan.GetTopTimberYAtZ(zPos);
+            float innerUpperTopCutoffT = 1f;
+            {
+                float tMin = 0f;
+                float tMax = 1f;
+                for (int i = 0; i < 20; i++)
+                {
+                    float midT = (tMin + tMax) / 2f;
+                    Vector3 pt = GetInnerPointAtT(fp, true, midT, zPos, origin, framePlaneNormal, keelY, totalHeight);
+                    if (pt.y < localTtY) tMin = midT;
+                    else tMax = midT;
+                }
+                innerUpperTopCutoffT = (tMin + tMax) / 2f;
+            }
+
+            int uSegments = Mathf.CeilToInt(resolution * (innerUpperTopCutoffT - innerUpperCutoffT));
             if (uSegments < 1) uSegments = 1;
             
-            // Start from i=1 if lower mould exists and there is no gap in cutoffs
             int startI = 0;
-            if (fp.hasLower && Mathf.Abs(fp.lowerTopCutoffT - 1f) < 0.001f && Mathf.Abs(fp.upperCutoffT - 0f) < 0.001f)
+            if (fp.hasLower && Mathf.Abs(fp.lowerTopCutoffT - 1f) < 0.001f && Mathf.Abs(innerUpperCutoffT - 0f) < 0.001f)
             {
                 startI = 1;
             }
@@ -118,23 +163,9 @@ public class InnerFramingModel : MonoBehaviour
             for (int i = startI; i <= uSegments; i++)
             {
                 float t = i / (float)uSegments;
-                float actualT = Mathf.Lerp(fp.upperCutoffT, fp.upperTopCutoffT, t);
+                float actualT = Mathf.Lerp(innerUpperCutoffT, innerUpperTopCutoffT, t);
                 
-                Vector3 outerPt = framingModel.GetUpperSurfacePointAtT(fp, 1f, actualT);
-                Vector3 nextPt = framingModel.GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, actualT + 0.01f));
-
-                Vector3 tangent = (nextPt - outerPt).normalized;
-                if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
-
-                Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
-                
-                Vector3 toCenter = new Vector3(-outerPt.x, 0, zPos - outerPt.z);
-                if (Vector3.Dot(normal, toCenter) < 0) normal = -normal;
-
-                float overallT = Mathf.Clamp01((outerPt.y - keelY) / totalHeight);
-                float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, overallT);
-                
-                Vector3 innerPtStbd = outerPt + normal * currentThickness;
+                Vector3 innerPtStbd = GetInnerPointAtT(fp, true, actualT, zPos, origin, framePlaneNormal, keelY, totalHeight);
                 
                 Vector3 localOffset = innerPtStbd - origin;
                 float localX = Vector3.Dot(localOffset, uAxis);
@@ -215,5 +246,24 @@ public class InnerFramingModel : MonoBehaviour
         intersection.x = p1.x + u * (p2.x - p1.x);
         intersection.y = p1.y + u * (p2.y - p1.y);
         return true;
+    }
+
+    private Vector3 GetInnerPointAtT(FramingModel.FrameProfile fp, bool isUpper, float t, float zPos, Vector3 origin, Vector3 framePlaneNormal, float keelY, float totalHeight)
+    {
+        Vector3 outerPt = isUpper ? framingModel.GetUpperSurfacePointAtT(fp, 1f, t) : framingModel.GetSurfacePointAtT(fp, 1f, t, true);
+        Vector3 nextPt = isUpper ? framingModel.GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f)) : framingModel.GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f), true);
+
+        Vector3 tangent = (nextPt - outerPt).normalized;
+        if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
+
+        Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
+        
+        Vector3 toCenter = new Vector3(-outerPt.x, 0, zPos - outerPt.z);
+        if (Vector3.Dot(normal, toCenter) < 0) normal = -normal;
+
+        float overallT = Mathf.Clamp01((outerPt.y - keelY) / totalHeight);
+        float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, overallT);
+        
+        return outerPt + normal * currentThickness;
     }
 }

@@ -16,17 +16,12 @@ public class FashionTimberInnerModel : MonoBehaviour
     public bool showInnerFashionTimber = true;
     public Color innerColor = Color.magenta;
 
-    private void OnDrawGizmos()
+    [HideInInspector] public List<Vector2> cachedInnerPoints = new List<Vector2>();
+
+    public void UpdateCachedPoints()
     {
+        cachedInnerPoints.Clear();
         if (sheerPlan == null || fashionTimberModel == null) return;
-        DrawInnerFashionTimbers();
-    }
-
-    public void DrawInnerFashionTimbers()
-    {
-        if (!showInnerFashionTimber) return;
-
-        Gizmos.color = innerColor;
 
         Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
         if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
@@ -50,7 +45,6 @@ public class FashionTimberInnerModel : MonoBehaviour
             float outerZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
             float outerY = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
             
-            // Calculate Tangent in Z/Y plane
             float delta = 0.01f;
             float zPlus = outerZ + delta;
             float yPlus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
@@ -65,10 +59,15 @@ public class FashionTimberInnerModel : MonoBehaviour
             float innerZ = outerZ + normal.x * thickness;
             float innerY = outerY + normal.y * thickness;
 
+            // Strictly clamp the inner Z so it never extends forward of the lowest point of the fashion timber
+            if (innerZ > risingEnd.z)
+            {
+                innerZ = risingEnd.z;
+            }
+
             rawPoints.Add(new Vector2(innerZ, innerY));
         }
 
-        // Remove self-intersections (swallowtail loops)
         bool intersectionFound = true;
         while (intersectionFound)
         {
@@ -89,24 +88,108 @@ public class FashionTimberInnerModel : MonoBehaviour
                 if (intersectionFound) break;
             }
         }
+        
+        cachedInnerPoints = rawPoints;
+    }
+
+    public float GetMinZ()
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return sheerPlan != null ? sheerPlan.cachedTransomTopPoint.z : 0;
+        float minZ = float.MaxValue;
+        foreach (var p in cachedInnerPoints)
+        {
+            if (p.x < minZ) minZ = p.x;
+        }
+        return minZ;
+    }
+
+    public float GetMaxZ()
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return sheerPlan != null ? sheerPlan.cachedSternRisingEnd.z : 0;
+        float maxZ = float.MinValue;
+        foreach (var p in cachedInnerPoints)
+        {
+            if (p.x > maxZ) maxZ = p.x;
+        }
+        return maxZ;
+    }
+
+    public float GetInnerYAtZ(float z)
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0f;
+        
+        for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
+        {
+            Vector2 p1 = cachedInnerPoints[i];
+            Vector2 p2 = cachedInnerPoints[i+1];
+            
+            if ((z >= p1.x && z <= p2.x) || (z <= p1.x && z >= p2.x))
+            {
+                if (Mathf.Abs(p2.x - p1.x) < 0.0001f) return Mathf.Min(p1.y, p2.y);
+                float t = (z - p1.x) / (p2.x - p1.x);
+                return Mathf.Lerp(p1.y, p2.y, t);
+            }
+        }
+        
+        if (z < GetMinZ()) return cachedInnerPoints[0].y;
+        return cachedInnerPoints[cachedInnerPoints.Count - 1].y;
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (sheerPlan == null || fashionTimberModel == null) return;
+        DrawInnerFashionTimbers();
+    }
+
+    public void DrawInnerFashionTimbers()
+    {
+        if (!showInnerFashionTimber) return;
+
+        Gizmos.color = innerColor;
+
+        UpdateCachedPoints();
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return;
+
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
 
         Vector3 prevStbd = new Vector3(-1, -1, 1);
         Vector3 prevPort = new Vector3(-1, -1, 1);
         bool first = true;
 
-        for (int i = 0; i < rawPoints.Count; i++)
+        for (int i = 0; i < cachedInnerPoints.Count; i++)
         {
-            float innerZ = rawPoints[i].x;
-            float innerY = rawPoints[i].y;
-
-            if (innerZ > risingEnd.z) continue;
+            float innerZ = cachedInnerPoints[i].x;
+            float innerY = cachedInnerPoints[i].y;
 
 
             float topTimberY = sheerPlan.GetTopTimberYAtZ(innerZ);
             bool reachedTop = false;
             if (innerY >= topTimberY)
             {
-                innerY = topTimberY;
+                if (i > 0)
+                {
+                    float prevZ = cachedInnerPoints[i - 1].x;
+                    float prevY = cachedInnerPoints[i - 1].y;
+                    float prevTop = sheerPlan.GetTopTimberYAtZ(prevZ);
+                    
+                    // Find t where: lerp(prevY, innerY, t) == lerp(prevTop, topTimberY, t)
+                    float denom = (innerY - prevY) - (topTimberY - prevTop);
+                    if (Mathf.Abs(denom) > 0.0001f)
+                    {
+                        float t = (prevTop - prevY) / denom;
+                        innerZ = Mathf.Lerp(prevZ, innerZ, t);
+                        innerY = Mathf.Lerp(prevY, innerY, t);
+                    }
+                }
+                else
+                {
+                    innerY = topTimberY;
+                }
                 reachedTop = true;
             }
 
