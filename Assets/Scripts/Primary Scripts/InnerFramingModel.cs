@@ -32,16 +32,26 @@ public class InnerFramingModel : MonoBehaviour
         Gizmos.color = innerFrameColor;
         List<float> zPositions = framingModel.GetFrameZPositions();
 
+        float thickness = framingModel.frameSpacing * framingModel.GetFrameThicknessRatioValue();
+
         foreach (float z in zPositions)
         {
-            FramingModel.FrameProfile fp = framingModel.GetFrameProfile(z);
-            if (!fp.isValid) continue;
+            FramingModel.FrameProfile fpCenter = framingModel.GetFrameProfile(z);
+            if (!fpCenter.isValid) continue;
 
-            DrawSingleInnerFrame(fp, z);
+            float aftZ = z - (thickness / 2f);
+            float foreZ = z + (thickness / 2f);
+
+            FramingModel.FrameProfile fpAft = framingModel.GetFrameProfile(aftZ);
+            FramingModel.FrameProfile fpFore = framingModel.GetFrameProfile(foreZ);
+
+            if (fpAft.isValid) DrawSingleInnerFrame(fpAft, aftZ, false);
+            DrawSingleInnerFrame(fpCenter, z, true);
+            if (fpFore.isValid) DrawSingleInnerFrame(fpFore, foreZ, false);
         }
     }
 
-    private void DrawSingleInnerFrame(FramingModel.FrameProfile fp, float zPos)
+    private void DrawSingleInnerFrame(FramingModel.FrameProfile fp, float zPos, bool isDashed = false)
     {
         int totalSegments = resolution;
         
@@ -53,7 +63,8 @@ public class InnerFramingModel : MonoBehaviour
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
         Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
         
-        Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(pStart.x, 0, pStart.z);
+        // Define the outward horizontal axis by pointing from the origin to the maximum breadth of the frame
+        Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
         if (uAxis.sqrMagnitude < 0.0001f) uAxis = Vector3.right; // Fallback for perfectly straight vertical frames
         else uAxis.Normalize();
         
@@ -179,6 +190,10 @@ public class InnerFramingModel : MonoBehaviour
         RemoveSwallowtails(rawLocalStbdPointsLower);
         RemoveSwallowtails(rawLocalStbdPointsUpper);
 
+        // Prevent port and starboard from crossing each other
+        ClampToCenterline(rawLocalStbdPointsLower);
+        ClampToCenterline(rawLocalStbdPointsUpper);
+
         List<Vector2> rawLocalStbdPoints = new List<Vector2>();
         rawLocalStbdPoints.AddRange(rawLocalStbdPointsLower);
         rawLocalStbdPoints.AddRange(rawLocalStbdPointsUpper);
@@ -198,8 +213,11 @@ public class InnerFramingModel : MonoBehaviour
 
             if (!first)
             {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
+                if (!isDashed || i % 2 != 0)
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
             }
             
             prevStbd = currStbd;
@@ -246,6 +264,43 @@ public class InnerFramingModel : MonoBehaviour
         intersection.x = p1.x + u * (p2.x - p1.x);
         intersection.y = p1.y + u * (p2.y - p1.y);
         return true;
+    }
+
+    private void ClampToCenterline(List<Vector2> points)
+    {
+        if (points.Count < 2) return;
+
+        // Find where the line crosses from negative X to positive X
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            Vector2 p1 = points[i];
+            Vector2 p2 = points[i + 1];
+
+            if (p1.x < 0 && p2.x >= 0)
+            {
+                // Find exact intersection with X = 0
+                float t = -p1.x / (p2.x - p1.x);
+                float intersectY = p1.y + t * (p2.y - p1.y);
+                
+                Vector2 intersection = new Vector2(0f, intersectY);
+                
+                // Replace the last negative point with the exact intersection
+                points[i] = intersection;
+                
+                // Remove all points before this one
+                if (i > 0)
+                {
+                    points.RemoveRange(0, i);
+                }
+                break;
+            }
+        }
+        
+        // Edge case: If the entire array is negative, clear it
+        if (points.Count > 0 && points[points.Count - 1].x < 0)
+        {
+            points.Clear();
+        }
     }
 
     private Vector3 GetInnerPointAtT(FramingModel.FrameProfile fp, bool isUpper, float t, float zPos, Vector3 origin, Vector3 framePlaneNormal, float keelY, float totalHeight)

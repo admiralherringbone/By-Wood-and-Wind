@@ -17,9 +17,19 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Reference to the ModularBodyPlan.")]
     public BodyPlan bodyPlan;
 
+    public enum FrameThicknessRatio
+    {
+        Full,
+        Half,
+        Quarter,
+        Eighth
+    }
+
     [Header("Frame Dimensions")]
-    [Tooltip("The longitudinal width of each timber frame (Z-axis).")]
-    public float frameThickness = 0.3f;
+    [Tooltip("The longitudinal distance between the centers of each frame (Z-axis).")]
+    public float frameSpacing = 1.0f;
+    [Tooltip("The thickness of each frame relative to the frame spacing.")]
+    public FrameThicknessRatio frameThicknessRatio = FrameThicknessRatio.Half;
     [Tooltip("The inward depth of the frame from the moulded line (structural thickness).")]
     public float frameDepth = 0.5f;
 
@@ -481,19 +491,16 @@ public class FramingModel : MonoBehaviour
         float keelSternZ = sheerPlan.cachedKeelSternPoint.z;
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
 
-        for (float z = 0; z < bowZ;)
+        for (float z = 0; z <= bowZ;)
         {
-            positions.Add(z);
-            if (z >= keelBowZ) z += 0.25f;
-            else z += 1f;
+            if (!positions.Contains(z)) positions.Add(z);
+            z += frameSpacing;
         }
-        positions.Add(bowZ);
 
-        for (float z = -1f; z >= sternBoundaryZ;)
+        for (float z = 0; z >= sternBoundaryZ;)
         {
-            positions.Add(z);
-            if (z <= keelSternZ) z -= 0.25f;
-            else z -= 1f;
+            if (!positions.Contains(z)) positions.Add(z);
+            z -= frameSpacing;
         }
         
         // Ensure the exact boundary frame is added if the loop missed it
@@ -1089,18 +1096,41 @@ public class FramingModel : MonoBehaviour
     private static GUIStyle _labelStyle;
 #endif
 
+    public float GetFrameThicknessRatioValue()
+    {
+        switch (frameThicknessRatio)
+        {
+            case FrameThicknessRatio.Full: return 1.0f;
+            case FrameThicknessRatio.Half: return 0.5f;
+            case FrameThicknessRatio.Quarter: return 0.25f;
+            case FrameThicknessRatio.Eighth: return 0.125f;
+            default: return 0.5f;
+        }
+    }
+
     private void DrawFrameAtZ(float z)
     {
-        FrameProfile fp = GetFrameProfile(z);
-        if (!fp.isValid) return;
+        FrameProfile fpCenter = GetFrameProfile(z);
+        if (!fpCenter.isValid) return;
 
         Gizmos.color = frameColor;
 
+        float thickness = frameSpacing * GetFrameThicknessRatioValue();
+        float aftZ = z - (thickness / 2f);
+        float foreZ = z + (thickness / 2f);
+        
+        FrameProfile fpAft = GetFrameProfile(aftZ);
+        FrameProfile fpFore = GetFrameProfile(foreZ);
+
         // Draw Starboard
-        DrawMould(fp, 1f);
+        if (fpAft.isValid) DrawMould(fpAft, 1f, false);
+        DrawMould(fpCenter, 1f, true);
+        if (fpFore.isValid) DrawMould(fpFore, 1f, false);
 
         // Draw Port (Mirrored)
-        DrawMould(fp, -1f);
+        if (fpAft.isValid) DrawMould(fpAft, -1f, false);
+        DrawMould(fpCenter, -1f, true);
+        if (fpFore.isValid) DrawMould(fpFore, -1f, false);
         
 #if UNITY_EDITOR
         if (showFrameLabels)
@@ -1112,7 +1142,7 @@ public class FramingModel : MonoBehaviour
             }
             _labelStyle.normal.textColor = frameColor;
             
-            float labelY = fp.hasUpper ? fp.upperP3.y : fp.lowerP3.y;
+            float labelY = fpCenter.hasUpper ? fpCenter.upperP3.y : fpCenter.lowerP3.y;
             Vector3 labelPos = new Vector3(0, labelY + 0.5f, z);
             string labelText = z == 0 ? "Master" : z > 0 ? $"F{z}" : $"A{Mathf.Abs(z)}";
             Handles.Label(labelPos, labelText, _labelStyle);
@@ -1120,7 +1150,7 @@ public class FramingModel : MonoBehaviour
 #endif
     }
 
-    private void DrawMould(FrameProfile fp, float flipX)
+    private void DrawMould(FrameProfile fp, float flipX, bool isDashed = false)
     {
         if (fp.hasLower)
         {
@@ -1133,7 +1163,7 @@ public class FramingModel : MonoBehaviour
             {
                 float t = startT + (endT - startT) * (i / (float)segments);
                 Vector3 curr = GetSurfacePointAtT(fp, flipX, t);
-                Gizmos.DrawLine(prev, curr);
+                if (!isDashed || i % 2 != 0) Gizmos.DrawLine(prev, curr);
                 prev = curr;
             }
 
@@ -1179,7 +1209,7 @@ public class FramingModel : MonoBehaviour
             {
                 float t = startT + (endT - startT) * (i / (float)segments);
                 Vector3 curr = GetUpperSurfacePointAtT(fp, flipX, t);
-                Gizmos.DrawLine(prev, curr);
+                if (!isDashed || i % 2 != 0) Gizmos.DrawLine(prev, curr);
                 prev = curr;
             }
             
