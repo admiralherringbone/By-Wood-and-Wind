@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 [ExecuteInEditMode]
-public class FashionTimberInnerModel : MonoBehaviour
+public class ForeFaceFashionTimberModel : MonoBehaviour
 {
     [Tooltip("Reference to the ModularSheerPlan.")]
     public SheerPlan sheerPlan;

@@ -35,8 +35,8 @@ public class FramingModel : MonoBehaviour
 
     [Header("Gizmo Settings")]
     public Color frameColor = Color.cyan;
-    [Tooltip("Reference to the FashionTimberInnerModel.")]
-    public FashionTimberInnerModel fashionTimberInnerModel;
+    [Tooltip("Reference to the ForeFaceFashionTimberModel.")]
+    public ForeFaceFashionTimberModel foreFaceFashionTimberModel;
 
     [Header("Frame Visualization Settings")]
     public bool showFrames = true;
@@ -243,12 +243,12 @@ public class FramingModel : MonoBehaviour
         FrameProfile fp = GetRawFrameProfile(z);
         if (!fp.isValid) return fp;
 
-        if (fashionTimberInnerModel == null)
+        if (foreFaceFashionTimberModel == null)
         {
-            fashionTimberInnerModel = Object.FindObjectOfType<FashionTimberInnerModel>();
+            foreFaceFashionTimberModel = Object.FindObjectOfType<ForeFaceFashionTimberModel>();
         }
 
-        float sternBoundaryZ = fashionTimberInnerModel != null ? fashionTimberInnerModel.GetMinZ() : sheerPlan.cachedSternRisingEnd.z;
+        float sternBoundaryZ = foreFaceFashionTimberModel != null ? foreFaceFashionTimberModel.GetMinZ() : sheerPlan.cachedSternRisingEnd.z;
         
         // Remove any frames that are past the stern boundary
         if (z < sternBoundaryZ - 0.001f)
@@ -257,13 +257,13 @@ public class FramingModel : MonoBehaviour
             return fp;
         }
 
-        float sternMaxZ = fashionTimberInnerModel != null ? fashionTimberInnerModel.GetMaxZ() : sheerPlan.cachedSternRisingEnd.z;
+        float sternMaxZ = foreFaceFashionTimberModel != null ? foreFaceFashionTimberModel.GetMaxZ() : sheerPlan.cachedSternRisingEnd.z;
         bool hitsSternProfile = z < sternMaxZ;
         
         if (hitsSternProfile)
         {
             float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
-            float fashionY = fashionTimberInnerModel != null ? fashionTimberInnerModel.GetInnerYAtZ(z) : sheerPlan.GetSternProfileYAtZ(z);
+            float fashionY = foreFaceFashionTimberModel != null ? foreFaceFashionTimberModel.GetInnerYAtZ(z) : sheerPlan.GetSternProfileYAtZ(z);
             
             // Removed Fashion Timber boundary override
 
@@ -330,9 +330,9 @@ public class FramingModel : MonoBehaviour
         breadthPlan.UpdateCachedCurves();
         bodyPlan.UpdateCachedCurves();
 
-        if (fashionTimberInnerModel == null)
+        if (foreFaceFashionTimberModel == null)
         {
-            fashionTimberInnerModel = Object.FindObjectOfType<FashionTimberInnerModel>();
+            foreFaceFashionTimberModel = Object.FindObjectOfType<ForeFaceFashionTimberModel>();
         }
 
         if (!showFrames && !showFloorSweepsGuide && !showSurfaceRibbands && !showWaterlines) return;
@@ -476,18 +476,18 @@ public class FramingModel : MonoBehaviour
         List<float> positions = new List<float>();
         if (sheerPlan == null) return positions;
 
-        if (fashionTimberInnerModel == null)
+        if (foreFaceFashionTimberModel == null)
         {
-            fashionTimberInnerModel = Object.FindObjectOfType<FashionTimberInnerModel>();
+            foreFaceFashionTimberModel = Object.FindObjectOfType<ForeFaceFashionTimberModel>();
         }
 
-        if (fashionTimberInnerModel != null)
+        if (foreFaceFashionTimberModel != null)
         {
-            fashionTimberInnerModel.UpdateCachedPoints();
+            foreFaceFashionTimberModel.UpdateCachedPoints();
         }
 
         float bowZ = sheerPlan.cachedStemTopPoint.z;
-        float sternBoundaryZ = fashionTimberInnerModel != null ? fashionTimberInnerModel.GetMinZ() : sheerPlan.cachedTransomTopPoint.z; // Extend transverse frames to the inner timber
+        float sternBoundaryZ = foreFaceFashionTimberModel != null ? foreFaceFashionTimberModel.GetMinZ() : sheerPlan.cachedTransomTopPoint.z; // Extend transverse frames to the inner timber
         float keelSternZ = sheerPlan.cachedKeelSternPoint.z;
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
 
