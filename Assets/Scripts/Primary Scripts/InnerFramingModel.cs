@@ -270,17 +270,15 @@ public class InnerFramingModel : MonoBehaviour
             }
         }
 
-        // Apply swallowtail removal on the 2D projected points separately to prevent cross-mould deletion
-        RemoveSwallowtails(rawLocalStbdPointsLower);
-        RemoveSwallowtails(rawLocalStbdPointsUpper);
-
-        // Prevent port and starboard from crossing each other
-        ClampToCenterline(rawLocalStbdPointsLower);
-        ClampToCenterline(rawLocalStbdPointsUpper);
-
         List<Vector2> rawLocalStbdPoints = new List<Vector2>();
         rawLocalStbdPoints.AddRange(rawLocalStbdPointsLower);
         rawLocalStbdPoints.AddRange(rawLocalStbdPointsUpper);
+
+        // Apply swallowtail removal on the combined 2D projected points to catch cross-mould swallowtails
+        RemoveSwallowtails(rawLocalStbdPoints);
+
+        // Prevent port and starboard from crossing each other
+        ClampToCenterline(rawLocalStbdPoints);
 
         // Convert cleaned 2D points back to 3D and draw them
         Vector3 prevStbd = Vector3.zero;

@@ -547,18 +547,18 @@ public class FramingModel : MonoBehaviour
     {
         float startZ = sheerPlan.cachedHobSternIntersect.z;
         float endZ = sheerPlan.cachedStemTopPoint.z;
-        int segments = 40;
-        float step = (endZ - startZ) / segments;
+        int totalPoints = 60;
 
         Gizmos.color = Color.white;
         Vector3? prevStbd = null;
         Vector3? prevPort = null;
 
-        for (int i = 0; i <= segments; i++)
+        for (int i = 0; i < totalPoints; i++)
         {
-            float z = startZ + (i * step);
-            // Cap to exact extents to prevent precision overshoot
-            if (i == segments) z = endZ;
+            float t = i / (float)(totalPoints - 1);
+            float angle = Mathf.Lerp(-Mathf.PI / 2f, Mathf.PI / 2f, t);
+            float mappedT = (Mathf.Sin(angle) + 1f) / 2f;
+            float z = Mathf.Lerp(startZ, endZ, mappedT);
             
             float x = breadthPlan.GetBreadthXAtZ(z);
             float y = sheerPlan.GetHobYAtZ(z);
@@ -659,19 +659,19 @@ public class FramingModel : MonoBehaviour
         float deckStartZ = sheerPlan.cachedTopTimberSternIntersect.z;
         float startZ = sheerPlan.cachedTransomTopPoint.z;
         float endZ = sheerPlan.cachedUpperStemTopPoint.z;
-        int segments = 80; // Increased for better vertical resolution
-        float step = (endZ - startZ) / segments;
+        int totalPoints = 100; // Increased for better vertical resolution
 
         Gizmos.color = Color.cyan;
         Vector3? prevStbd = null;
         Vector3? prevPort = null;
         
         List<float> zSlices = new List<float>();
-        for (int i = 0; i <= segments; i++)
+        for (int i = 0; i < totalPoints; i++)
         {
-            float z = startZ + (i * step);
-            if (i == segments) z = endZ;
-            zSlices.Add(z);
+            float t = i / (float)(totalPoints - 1);
+            float angle = Mathf.Lerp(-Mathf.PI / 2f, Mathf.PI / 2f, t);
+            float mappedT = (Mathf.Sin(angle) + 1f) / 2f;
+            zSlices.Add(Mathf.Lerp(startZ, endZ, mappedT));
         }
 
         if (sheerPlan.upperDecks != null)
@@ -782,8 +782,7 @@ public class FramingModel : MonoBehaviour
     {
         float startZ = sheerPlan.cachedSternPostTopPoint.z;
         float endZ = sheerPlan.cachedStemTopPoint.z;
-        int segments = 40; // Reduced density to save Handles rendering performance
-        float step = (endZ - startZ) / segments;
+        int totalPoints = 50; // Keeps performance high while drastically improving bow/stern resolution
 
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.8f); // Orange for surface ribbands
 #if UNITY_EDITOR
@@ -804,10 +803,12 @@ public class FramingModel : MonoBehaviour
         Vector3? prevUpPortT50 = null;
         Vector3? prevUpPortT75 = null;
 
-        for (int i = 0; i <= segments; i++)
+        for (int i = 0; i < totalPoints; i++)
         {
-            float z = startZ + (i * step);
-            if (i == segments) z = endZ;
+            float t = i / (float)(totalPoints - 1);
+            float angle = Mathf.Lerp(-Mathf.PI / 2f, Mathf.PI / 2f, t);
+            float mappedT = (Mathf.Sin(angle) + 1f) / 2f;
+            float z = Mathf.Lerp(startZ, endZ, mappedT);
 
             FrameProfile fp = GetFrameProfile(z);
             if (!fp.isValid) continue;
@@ -947,16 +948,26 @@ public class FramingModel : MonoBehaviour
         float minY = Mathf.Min(sheerPlan.cachedMidshipKeel.y, 0f);
         float maxY = sheerPlan.cachedBaseDeckMidshipPoint.y;
         
-        int segments = 40; // Reduced from 80 for performance
-        float step = (endZ - startZ) / segments;
+        int totalPoints = 50; // Keeps performance high while drastically improving bow/stern resolution
+        
+        List<float> zPositions = new List<float>();
+        for (int i = 0; i < totalPoints; i++)
+        {
+            float t = i / (float)(totalPoints - 1);
+            
+            // Use a sine wave to non-linearly map 't'. 
+            // This natively clusters points densely at the 0 (stern) and 1 (bow) extremes.
+            float angle = Mathf.Lerp(-Mathf.PI / 2f, Mathf.PI / 2f, t);
+            float mappedT = (Mathf.Sin(angle) + 1f) / 2f;
+            
+            zPositions.Add(Mathf.Lerp(startZ, endZ, mappedT));
+        }
 
         // Precompute slices to save binary search operations
-        FrameProfile[] profiles = new FrameProfile[segments + 1];
-        for (int i = 0; i <= segments; i++)
+        FrameProfile[] profiles = new FrameProfile[totalPoints];
+        for (int i = 0; i < totalPoints; i++)
         {
-            float z = startZ + (i * step);
-            if (i == segments) z = endZ;
-            profiles[i] = GetFrameProfile(z);
+            profiles[i] = GetFrameProfile(zPositions[i]);
         }
 
         Gizmos.color = Color.blue;
@@ -972,7 +983,7 @@ public class FramingModel : MonoBehaviour
             prevStbd = new Vector3(hw, y, exactSternZ);
             prevPort = new Vector3(-hw, y, exactSternZ);
 
-            for (int i = 0; i <= segments; i++)
+            for (int i = 0; i < totalPoints; i++)
             {
                 if (!profiles[i].isValid) continue;
 
