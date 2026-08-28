@@ -121,24 +121,58 @@ public class InnerFramingModel : MonoBehaviour
 
     private void DrawSingleInnerFrame(FramingModel.FrameProfile fp, float zPos, bool isDashed = false)
     {
-        int totalSegments = resolution;
-        
         // Define the local 2D coordinate system for this specific frame
         Vector3 origin = new Vector3(0, 0, zPos);
         
-        // Calculate the horizontal direction of the frame (U-axis)
-        // We use the lowest and highest X/Z points to define the frame's angle
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
         Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
         
-        // Define the outward horizontal axis by pointing from the origin to the maximum breadth of the frame
         Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
         if (uAxis.sqrMagnitude < 0.0001f) uAxis = Vector3.right; // Fallback for perfectly straight vertical frames
         else uAxis.Normalize();
         
         Vector3 vAxis = Vector3.up;
         
-        // The normal to the plane of the frame
+        List<Vector2> rawLocalStbdPoints = GetCleanedLocalInnerCurve(fp, zPos);
+        
+        // Convert cleaned 2D points back to 3D and draw them
+        Vector3 prevStbd = Vector3.zero;
+        Vector3 prevPort = Vector3.zero;
+        bool first = true;
+
+        for (int i = 0; i < rawLocalStbdPoints.Count; i++)
+        {
+            float localX = rawLocalStbdPoints[i].x;
+            float localY = rawLocalStbdPoints[i].y;
+
+            Vector3 currStbd = origin + uAxis * localX + vAxis * localY;
+            Vector3 currPort = new Vector3(-currStbd.x, currStbd.y, currStbd.z); // Port is just mirrored across X
+
+            if (!first)
+            {
+                if (!isDashed || i % 2 != 0)
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
+            }
+            
+            prevStbd = currStbd;
+            prevPort = currPort;
+            first = false;
+        }
+    }
+
+    private List<Vector2> GetCleanedLocalInnerCurve(FramingModel.FrameProfile fp, float zPos)
+    {
+        Vector3 origin = new Vector3(0, 0, zPos);
+        Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
+        Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
+        
+        Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
+        if (uAxis.sqrMagnitude < 0.0001f) uAxis = Vector3.right;
+        else uAxis.Normalize();
+        Vector3 vAxis = Vector3.up;
         Vector3 framePlaneNormal = Vector3.Cross(uAxis, vAxis).normalized;
 
         List<Vector2> rawLocalStbdPointsLower = new List<Vector2>();
@@ -280,34 +314,33 @@ public class InnerFramingModel : MonoBehaviour
         // Prevent port and starboard from crossing each other
         ClampToCenterline(rawLocalStbdPoints);
 
-        // Convert cleaned 2D points back to 3D and draw them
-        Vector3 prevStbd = Vector3.zero;
-        Vector3 prevPort = Vector3.zero;
-        bool first = true;
-
-        for (int i = 0; i < rawLocalStbdPoints.Count; i++)
-        {
-            float localX = rawLocalStbdPoints[i].x;
-            float localY = rawLocalStbdPoints[i].y;
-
-            Vector3 currStbd = origin + uAxis * localX + vAxis * localY;
-            Vector3 currPort = new Vector3(-currStbd.x, currStbd.y, currStbd.z); // Port is just mirrored across X
-
-            if (!first)
-            {
-                if (!isDashed || i % 2 != 0)
-                {
-                    Gizmos.DrawLine(prevStbd, currStbd);
-                    Gizmos.DrawLine(prevPort, currPort);
-                }
-            }
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
-        }
+        return rawLocalStbdPoints;
     }
 
+    public List<Vector3> GetCleanedInnerCurve(float zPos)
+    {
+        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(zPos, true);
+        List<Vector2> localPoints = GetCleanedLocalInnerCurve(fp, zPos);
+        
+        Vector3 origin = new Vector3(0, 0, zPos);
+        Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
+        Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
+        
+        Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
+        if (uAxis.sqrMagnitude < 0.0001f) uAxis = Vector3.right;
+        else uAxis.Normalize();
+        
+        Vector3 vAxis = Vector3.up;
+        
+        List<Vector3> curve3D = new List<Vector3>();
+        foreach(var pt in localPoints)
+        {
+            curve3D.Add(origin + uAxis * pt.x + vAxis * pt.y);
+        }
+        return curve3D;
+    }
+
+    // Ensure the method closed successfully in previous chunk
     private void RemoveSwallowtails(List<Vector2> rawPoints)
     {
         bool intersectionFound = true;
@@ -350,38 +383,12 @@ public class InnerFramingModel : MonoBehaviour
 
     private void ClampToCenterline(List<Vector2> points)
     {
-        if (points.Count < 2) return;
-
-        // Find where the line crosses from negative X to positive X
-        for (int i = 0; i < points.Count - 1; i++)
+        for (int i = 0; i < points.Count; i++)
         {
-            Vector2 p1 = points[i];
-            Vector2 p2 = points[i + 1];
-
-            if (p1.x < 0 && p2.x >= 0)
+            if (points[i].x < 0.001f)
             {
-                // Find exact intersection with X = 0
-                float t = -p1.x / (p2.x - p1.x);
-                float intersectY = p1.y + t * (p2.y - p1.y);
-                
-                Vector2 intersection = new Vector2(0f, intersectY);
-                
-                // Replace the last negative point with the exact intersection
-                points[i] = intersection;
-                
-                // Remove all points before this one
-                if (i > 0)
-                {
-                    points.RemoveRange(0, i);
-                }
-                break;
+                points[i] = new Vector2(0.001f, points[i].y);
             }
-        }
-        
-        // Edge case: If the entire array is negative, clear it
-        if (points.Count > 0 && points[points.Count - 1].x < 0)
-        {
-            points.Clear();
         }
     }
 

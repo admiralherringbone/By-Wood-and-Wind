@@ -157,8 +157,37 @@ public class InnerFashionTimberModel : MonoBehaviour
         return exactX;
     }
 
-    private void DrawInnerFashionTimberSegment(Vector3 startPoint, Vector3 endPoint)
+    public List<Vector3> GetFashionTimberPoints(bool isStbd, int segments = 50)
     {
+        List<Vector3> pts = new List<Vector3>();
+
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
+        Vector3 hobIntersect = fashionTimberModel.GetFashionTimberHobIntersection();
+        Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
+
+        // 1. Lower Segment
+        if (Mathf.Abs(risingEnd.z - hobIntersect.z) > 0.001f || Mathf.Abs(risingEnd.y - hobIntersect.y) > 0.001f)
+        {
+            pts.AddRange(GetInnerFashionTimberSegmentPoints(risingEnd, hobIntersect, isStbd, segments / 2));
+        }
+
+        // 2. Upper Segment
+        if (Mathf.Abs(hobIntersect.z - transomTop.z) > 0.001f || Mathf.Abs(hobIntersect.y - transomTop.y) > 0.001f)
+        {
+            pts.AddRange(GetInnerFashionTimberSegmentPoints(hobIntersect, transomTop, isStbd, segments / 2));
+        }
+
+        return pts;
+    }
+
+    private List<Vector3> GetInnerFashionTimberSegmentPoints(Vector3 startPoint, Vector3 endPoint, bool isStbd, int segments)
+    {
+        List<Vector3> pts = new List<Vector3>();
         float startZ = startPoint.z;
         float endZ = endPoint.z;
         float startY = startPoint.y;
@@ -166,52 +195,43 @@ public class InnerFashionTimberModel : MonoBehaviour
         
         bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
         
-        List<Vector3> outerPoints = new List<Vector3>();
-        List<float> normalXs = new List<float>();
-        for (int i = 0; i <= 50; i++)
+        for (int i = 0; i <= segments; i++)
         {
-            float fraction = i / 50f;
+            float fraction = i / (float)segments;
             float currZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
             float exactY = isVertical ? Mathf.Lerp(startY, endY, fraction) : sheerPlan.GetSternProfileYAtZ(currZ);
             
             float outerX = GetOuterHullXAndNormalAtYZ(exactY, currZ, out float nx);
-            outerPoints.Add(new Vector3(outerX, exactY, currZ));
-            normalXs.Add(nx);
-        }
-
-        Vector3 prevStbd = new Vector3(-1, -1, 1);
-        Vector3 prevPort = new Vector3(-1, -1, 1);
-        bool first = true;
-        
-        for (int i = 0; i < outerPoints.Count; i++)
-        {
-            Vector3 pt = outerPoints[i];
-            float nx = normalXs[i];
             
-            float tKeel = Mathf.Clamp01(pt.z / sheerPlan.cachedKeelSternPoint.z);
+            float tKeel = Mathf.Clamp01(currZ / sheerPlan.cachedKeelSternPoint.z);
             float theoreticalKeelY = Mathf.Lerp(sheerPlan.cachedMidshipKeel.y, sheerPlan.cachedKeelSternPoint.y, tKeel);
-            float theoreticalPeakY = sheerPlan.GetTopTimberYAtZ(pt.z);
+            float theoreticalPeakY = sheerPlan.GetTopTimberYAtZ(currZ);
             float theoreticalTotalHeight = Mathf.Max(0.01f, theoreticalPeakY - theoreticalKeelY);
             
-            float unifiedOverallT = Mathf.Clamp01((pt.y - theoreticalKeelY) / theoreticalTotalHeight);
+            float unifiedOverallT = Mathf.Clamp01((exactY - theoreticalKeelY) / theoreticalTotalHeight);
             float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, unifiedOverallT);
             
-            float exactX = pt.x - (currentThickness / nx);
+            float exactX = outerX - (currentThickness / nx);
             
             if (exactX <= 0f) continue;
             
-            Vector3 currStbd = new Vector3(exactX, pt.y, pt.z);
-            Vector3 currPort = new Vector3(-exactX, pt.y, pt.z);
-            
-            if (!first)
-            {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
-            }
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
+            if (!isStbd) exactX = -exactX;
+            pts.Add(new Vector3(exactX, exactY, currZ));
+        }
+        return pts;
+    }
+
+    private void DrawInnerFashionTimberSegment(Vector3 startPoint, Vector3 endPoint)
+    {
+        List<Vector3> stbdPts = GetInnerFashionTimberSegmentPoints(startPoint, endPoint, true, 50);
+        List<Vector3> portPts = GetInnerFashionTimberSegmentPoints(startPoint, endPoint, false, 50);
+        
+        if (stbdPts.Count < 2) return;
+        
+        for (int i = 0; i < stbdPts.Count - 1; i++)
+        {
+            Gizmos.DrawLine(stbdPts[i], stbdPts[i+1]);
+            Gizmos.DrawLine(portPts[i], portPts[i+1]);
         }
     }
 }

@@ -147,25 +147,28 @@ public class ForeFaceFashionTimberModel : MonoBehaviour
 
         Gizmos.color = innerColor;
 
-        UpdateCachedPoints();
-        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return;
+        List<Vector3> stbdPoints = GetFashionTimberPoints(true);
+        List<Vector3> portPoints = GetFashionTimberPoints(false);
 
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        if (stbdPoints.Count < 2) return;
+
+        for (int i = 0; i < stbdPoints.Count - 1; i++)
         {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+            Gizmos.DrawLine(stbdPoints[i], stbdPoints[i+1]);
+            Gizmos.DrawLine(portPoints[i], portPoints[i+1]);
         }
-        Vector3 risingEnd = lowerBound;
+    }
 
-        Vector3 prevStbd = new Vector3(-1, -1, 1);
-        Vector3 prevPort = new Vector3(-1, -1, 1);
-        bool first = true;
+    public List<Vector3> GetFashionTimberPoints(bool isStbd)
+    {
+        List<Vector3> pts = new List<Vector3>();
+        UpdateCachedPoints();
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return pts;
 
         for (int i = 0; i < cachedInnerPoints.Count; i++)
         {
             float innerZ = cachedInnerPoints[i].x;
             float innerY = cachedInnerPoints[i].y;
-
 
             float topTimberY = sheerPlan.GetTopTimberYAtZ(innerZ);
             bool reachedTop = false;
@@ -177,7 +180,6 @@ public class ForeFaceFashionTimberModel : MonoBehaviour
                     float prevY = cachedInnerPoints[i - 1].y;
                     float prevTop = sheerPlan.GetTopTimberYAtZ(prevZ);
                     
-                    // Find t where: lerp(prevY, innerY, t) == lerp(prevTop, topTimberY, t)
                     float denom = (innerY - prevY) - (topTimberY - prevTop);
                     if (Mathf.Abs(denom) > 0.0001f)
                     {
@@ -194,22 +196,13 @@ public class ForeFaceFashionTimberModel : MonoBehaviour
             }
 
             float exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
+            if (!isStbd) exactX = -exactX;
             
-            Vector3 currStbd = new Vector3(exactX, innerY, innerZ);
-            Vector3 currPort = new Vector3(-exactX, innerY, innerZ);
-            
-            if (!first)
-            {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
-            }
+            pts.Add(new Vector3(exactX, innerY, innerZ));
             
             if (reachedTop) break;
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
         }
+        return pts;
     }
 
     private bool LineIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection)

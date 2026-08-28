@@ -136,12 +136,24 @@ public class InnerForeFaceFashionTimberModel : MonoBehaviour
 
         Gizmos.color = innerForeFaceColor;
 
-        foreFaceFashionTimberModel.UpdateCachedPoints();
-        if (foreFaceFashionTimberModel.cachedInnerPoints == null || foreFaceFashionTimberModel.cachedInnerPoints.Count == 0) return;
+        List<Vector3> stbdPts = GetFashionTimberPoints(true);
+        List<Vector3> portPts = GetFashionTimberPoints(false);
 
-        Vector3 prevStbd = new Vector3(-1, -1, 1);
-        Vector3 prevPort = new Vector3(-1, -1, 1);
-        bool first = true;
+        if (stbdPts.Count < 2) return;
+
+        for (int i = 0; i < stbdPts.Count - 1; i++)
+        {
+            Gizmos.DrawLine(stbdPts[i], stbdPts[i+1]);
+            Gizmos.DrawLine(portPts[i], portPts[i+1]);
+        }
+    }
+
+    public List<Vector3> GetFashionTimberPoints(bool isStbd)
+    {
+        List<Vector3> pts = new List<Vector3>();
+
+        foreFaceFashionTimberModel.UpdateCachedPoints();
+        if (foreFaceFashionTimberModel.cachedInnerPoints == null || foreFaceFashionTimberModel.cachedInnerPoints.Count == 0) return pts;
 
         List<Vector3> outerPoints = new List<Vector3>();
         List<float> normalXs = new List<float>();
@@ -184,8 +196,6 @@ public class InnerForeFaceFashionTimberModel : MonoBehaviour
                 normalXs.Add(nx);
             }
         }
-        
-
 
         for (int i = 0; i < outerPoints.Count; i++)
         {
@@ -204,18 +214,9 @@ public class InnerForeFaceFashionTimberModel : MonoBehaviour
             
             if (exactX <= 0f) continue;
             
-            Vector3 currStbd = new Vector3(exactX, pt.y, pt.z);
-            Vector3 currPort = new Vector3(-exactX, pt.y, pt.z);
-            
-            if (!first)
-            {
-                Gizmos.DrawLine(prevStbd, currStbd);
-                Gizmos.DrawLine(prevPort, currPort);
-            }
-            
-            prevStbd = currStbd;
-            prevPort = currPort;
-            first = false;
+            if (!isStbd) exactX = -exactX;
+            pts.Add(new Vector3(exactX, pt.y, pt.z));
         }
+        return pts;
     }
 }

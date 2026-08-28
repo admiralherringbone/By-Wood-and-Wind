@@ -30,8 +30,6 @@ public class FramingModel : MonoBehaviour
     public float frameSpacing = 1.0f;
     [Tooltip("The thickness of each frame relative to the frame spacing.")]
     public FrameThicknessRatio frameThicknessRatio = FrameThicknessRatio.Half;
-    [Tooltip("The inward depth of the frame from the moulded line (structural thickness).")]
-    public float frameDepth = 0.5f;
 
     [Header("Gizmo Settings")]
     public Color frameColor = Color.cyan;
@@ -1023,9 +1021,12 @@ public class FramingModel : MonoBehaviour
         return (uuu * y0) + (3 * uu * t * y1) + (3 * u * tt * y2) + (ttt * y3);
     }
 
-    public Vector3? GetSurfacePointAtY(FrameProfile fp, float flipX, float targetY)
+    public bool GetTAtY(FrameProfile fp, float targetY, out float t, out bool isUpper)
     {
-        if (targetY < fp.lowerP0.y) return null;
+        t = 0f;
+        isUpper = false;
+        
+        if (targetY < fp.lowerP0.y) return false;
 
         if (fp.hasUpper && targetY > fp.lowerP3.y && targetY <= fp.upperP3.y)
         {
@@ -1038,25 +1039,36 @@ public class FramingModel : MonoBehaviour
                 if (py < targetY) min = mid;
                 else max = mid;
             }
-            return GetUpperSurfacePointAtT(fp, flipX, (min + max) / 2f);
+            t = (min + max) / 2f;
+            isUpper = true;
+            return true;
         }
 
-        if (targetY > fp.lowerP3.y) return null;
+        if (targetY > fp.lowerP3.y) return false;
 
         float minL = 0f;
         float maxL = 1f;
         for (int i = 0; i < 20; i++)
         {
             float mid = (minL + maxL) / 2f;
-            // Full evaluation still required for lower mould if quintic/quartic are used
-            Vector3 pt = GetSurfacePointAtT(fp, flipX, mid);
-            if (pt.y < targetY) minL = mid;
+            float py = GetSurfacePointAtT(fp, 1f, mid, true).y;
+            if (py < targetY) minL = mid;
             else maxL = mid;
         }
-        return GetSurfacePointAtT(fp, flipX, (minL + maxL) / 2f);
+        t = (minL + maxL) / 2f;
+        isUpper = false;
+        return true;
     }
 
-
+    public Vector3? GetSurfacePointAtY(FrameProfile fp, float flipX, float targetY)
+    {
+        if (GetTAtY(fp, targetY, out float t, out bool isUpper))
+        {
+            if (isUpper) return GetUpperSurfacePointAtT(fp, flipX, t);
+            else return GetSurfacePointAtT(fp, flipX, t, true);
+        }
+        return null;
+    }
 
     public Vector3 GetUpperSurfacePointAtT(FrameProfile fp, float flipX, float t)
     {
@@ -1070,6 +1082,118 @@ public class FramingModel : MonoBehaviour
 
         pt.x *= flipX;
         return pt;
+    }
+
+    public float GetOverhangOuterXAndNormalAtYZ(float targetY, float originalZ, out float nx)
+    {
+        nx = 1f;
+        bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
+        
+        bool isStern = originalZ < 0;
+        
+        Vector3 lowerBound = isStern ? sheerPlan.cachedSternRisingEnd : sheerPlan.cachedBowRisingEnd;
+        if (isStern && sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        float lowerBoundaryZ = lowerBound.z;
+        float evalZ = originalZ;
+
+        if (!isUpper)
+        {
+            if (isStern && evalZ < lowerBoundaryZ) evalZ = lowerBoundaryZ;
+            else if (!isStern && evalZ > lowerBoundaryZ) evalZ = lowerBoundaryZ;
+        }
+
+        FrameProfile fp = GetRawFrameProfile(evalZ, true);
+        if (!fp.isValid) return 0f;
+
+        float exactX = 0f;
+
+        float keelY = sheerPlan.GetKeelYAtZ(evalZ);
+        if (isStern && sheerPlan.showDeadwoodRake && evalZ < sheerPlan.cachedDeadwoodForePoint.z && evalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
+        {
+            keelY = sheerPlan.GetDeadwoodYAtZ(evalZ);
+        }
+        
+        float peakY = fp.hasUpper ? fp.upperP3.y : fp.lowerP3.y;
+        float totalHeight = Mathf.Max(0.01f, peakY - keelY);
+
+        Vector3 origin = new Vector3(0, 0, evalZ);
+        Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
+        Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
+        if (uAxis.sqrMagnitude < 0.0001f) uAxis = Vector3.right;
+        else uAxis.Normalize();
+        Vector3 vAxis = Vector3.up;
+        Vector3 framePlaneNormal = Vector3.Cross(uAxis, vAxis).normalized;
+
+        if (isUpper && fp.hasUpper)
+        {
+            float tMinT = 0f;
+            float tMaxT = 1f;
+            for (int i = 0; i < 20; i++)
+            {
+                float midT = (tMinT + tMaxT) / 2f;
+                float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
+                if (py < targetY) tMinT = midT;
+                else tMaxT = midT;
+            }
+            float tVal = (tMinT + tMaxT) / 2f;
+            Vector3 outerPt = GetUpperSurfacePointAtT(fp, 1f, tVal);
+            exactX = outerPt.x;
+            
+            Vector3 normal = GetInnerNormalAtT(fp, true, tVal, evalZ, framePlaneNormal);
+            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+        }
+        else if (!isUpper && fp.hasLower)
+        {
+            float mappedTargetY = targetY;
+            if (isStern && originalZ < lowerBoundaryZ)
+            {
+                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
+                float sternHobY = sheerPlan.GetHobYAtZ(lowerBoundaryZ);
+                float hobDifference = origHobY - sternHobY;
+                mappedTargetY = targetY - hobDifference;
+            }
+            else if (!isStern && originalZ > lowerBoundaryZ)
+            {
+                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
+                float bowHobY = sheerPlan.GetHobYAtZ(lowerBoundaryZ);
+                float hobDifference = origHobY - bowHobY;
+                mappedTargetY = targetY - hobDifference;
+            }
+
+            float fMinT = 0f;
+            float fMaxT = 1f;
+            for (int i = 0; i < 20; i++)
+            {
+                float midT = (fMinT + fMaxT) / 2f;
+                float py = GetSurfacePointAtT(fp, 1f, midT, true).y;
+                if (py < mappedTargetY) fMinT = midT;
+                else fMaxT = midT;
+            }
+            float tVal = (fMinT + fMaxT) / 2f;
+            Vector3 outerPt = GetSurfacePointAtT(fp, 1f, tVal, true);
+            exactX = outerPt.x;
+
+            if (isStern && originalZ < lowerBoundaryZ)
+            {
+                float sternHobX = breadthPlan.GetBreadthXAtZ(lowerBoundaryZ);
+                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
+                if (sternHobX > 0.001f) exactX *= (currHobX / sternHobX);
+            }
+            else if (!isStern && originalZ > lowerBoundaryZ)
+            {
+                float bowHobX = breadthPlan.GetBreadthXAtZ(lowerBoundaryZ);
+                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
+                if (bowHobX > 0.001f) exactX *= (currHobX / bowHobX);
+            }
+            
+            Vector3 normal = GetInnerNormalAtT(fp, false, tVal, evalZ, framePlaneNormal);
+            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+        }
+
+        return exactX;
     }
 
     public Vector3 GetSurfacePointAtT(FrameProfile fp, float flipX, float t, bool ignoreFashionTimber = false)
