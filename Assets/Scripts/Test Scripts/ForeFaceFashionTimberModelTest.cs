@@ -7,8 +7,8 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
     [Tooltip("Reference to the ModularSheerPlan.")]
     public SheerPlan sheerPlan;
 
-    [Tooltip("Reference to the FashionTimberModel.")]
-    public FashionTimberModel fashionTimberModel;
+    [Tooltip("Reference to the FashionTimberModelTest.")]
+    public FashionTimberModelTest fashionTimberModel;
 
     [Header("Inner Timber Settings")]
     [Tooltip("Thickness of the Fashion Timber (offset inwards).")]
@@ -17,9 +17,6 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
     public Color innerColor = Color.magenta;
 
     [HideInInspector] public List<Vector2> cachedInnerPoints = new List<Vector2>();
-    
-    [Header("Debug Visualizer")]
-    public float debugDropZ = 0f;
 
     public void UpdateCachedPoints()
     {
@@ -34,39 +31,7 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
         Vector3 risingEnd = lowerBound;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
-        // 1. Find the target frame BEFORE generating the curve
-        float lowestInnerZ = risingEnd.z;
-        float customDropZ = lowestInnerZ;
-        
-        FramingModelTest framingModelTest = Object.FindObjectOfType<FramingModelTest>();
-        if (framingModelTest != null)
-        {
-            float spacing = framingModelTest.frameSpacing;
-            float thickness = spacing * framingModelTest.GetFrameThicknessRatioValue();
-            
-            int maxFrames = Mathf.CeilToInt(Mathf.Abs(transomTop.z) / spacing) + 5;
-            for (int i = 0; i <= maxFrames; i++)
-            {
-                float centerZ = -i * spacing;
-                float aftZ = centerZ - (thickness / 2f);
-                
-                // If this frame crosses or is behind lowestInnerZ, it is invalid!
-                if (aftZ <= lowestInnerZ) 
-                {
-                    // The valid frame was the PREVIOUS frame (i - 1).
-                    if (i > 0)
-                    {
-                        customDropZ = (- (i - 1) * spacing) - (thickness / 2f);
-                    }
-                    break;
-                }
-            }
-        }
-        
-        debugDropZ = customDropZ;
-
-        // 2. Generate the curve starting from customDropZ
-        float startZ = customDropZ;
+        float startZ = risingEnd.z;
         float endZ = transomTop.z;
         
         bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
@@ -78,15 +43,14 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
         {
             float fraction = i / (float)segments;
             float outerZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            
-            float outerY = isVertical ? Mathf.Lerp(sheerPlan.GetKeelYAtZ(startZ), transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
+            float outerY = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
             
             float delta = 0.01f;
             float zPlus = outerZ + delta;
-            float yPlus = isVertical ? Mathf.Lerp(sheerPlan.GetKeelYAtZ(startZ), transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
+            float yPlus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
             
             float zMinus = outerZ - delta;
-            float yMinus = isVertical ? Mathf.Lerp(sheerPlan.GetKeelYAtZ(startZ), transomTop.y, fraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
+            float yMinus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
             
             Vector2 tangent = new Vector2(zPlus - zMinus, yPlus - yMinus).normalized;
             Vector2 normal = new Vector2(-tangent.y, tangent.x);
@@ -98,64 +62,23 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
             rawPoints.Add(new Vector2(innerZ, innerY));
         }
 
-        if (rawPoints.Count > 0)
+        // Add the vertical parallel drop down to the bottom of the hull
+        float actualDropZ = rawPoints[0].x;
+        float dropY = sheerPlan.GetKeelYAtZ(actualDropZ);
+        if (sheerPlan.showDeadwoodRake && actualDropZ < sheerPlan.cachedDeadwoodForePoint.z && actualDropZ >= sheerPlan.cachedDeadwoodAftPoint.z)
         {
-            // Mathematically precise guillotine trim to find the exact intersection at customDropZ
-            Vector2 p1 = Vector2.zero;
-            Vector2 p2 = Vector2.zero;
-            bool foundIntersection = false;
-            
-            // rawPoints is decreasing in Z. We want to find where it crosses customDropZ.
-            for (int i = 0; i < rawPoints.Count - 1; i++)
-            {
-                if (rawPoints[i].x >= customDropZ && rawPoints[i+1].x < customDropZ)
-                {
-                    p1 = rawPoints[i];
-                    p2 = rawPoints[i+1];
-                    foundIntersection = true;
-                    break;
-                }
-            }
-            
-            // Remove all points strictly forward of customDropZ
-            for (int i = rawPoints.Count - 1; i >= 0; i--)
-            {
-                if (rawPoints[i].x > customDropZ)
-                {
-                    rawPoints.RemoveAt(i);
-                }
-            }
-            
-            if (foundIntersection)
-            {
-                float t = (customDropZ - p1.x) / (p2.x - p1.x);
-                float exactY = Mathf.Lerp(p1.y, p2.y, t);
-                rawPoints.Insert(0, new Vector2(customDropZ, exactY));
-            }
-            else if (rawPoints.Count > 0)
-            {
-                // Fallback
-                rawPoints.Insert(0, new Vector2(customDropZ, rawPoints[0].y));
-            }
-            
-            if (rawPoints.Count == 0) return; // Failsafe
-
-            float dropY = sheerPlan.GetKeelYAtZ(customDropZ);
-            if (sheerPlan.showDeadwoodRake && customDropZ < sheerPlan.cachedDeadwoodForePoint.z && customDropZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-            {
-                dropY = sheerPlan.GetDeadwoodYAtZ(customDropZ);
-            }
-            
-            float topY = rawPoints[0].y;
-            if (dropY < topY)
-            {
-                int dropSegments = 20;
-                for (int i = 1; i <= dropSegments; i++)
-                {
-                    float y = Mathf.Lerp(topY, dropY, i / (float)dropSegments);
-                    rawPoints.Insert(0, new Vector2(customDropZ, y));
-                }
-            }
+            dropY = sheerPlan.GetDeadwoodYAtZ(actualDropZ);
+        }
+        
+        // Insert intermediate points for the vertical drop so it follows the curve of the lower moulds
+        float topDropY = rawPoints[0].y;
+        int dropSegments = 20;
+        for (int i = dropSegments; i >= 0; i--)
+        {
+            float t = i / (float)dropSegments;
+            float y = Mathf.Lerp(dropY, topDropY, t);
+            if (i == dropSegments) continue; // Skip the top point as it's already rawPoints[0]
+            rawPoints.Insert(0, new Vector2(actualDropZ, y));
         }
 
         bool intersectionFound = true;
@@ -233,22 +156,6 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
 
     public void DrawInnerFashionTimbers()
     {
-        if (debugDropZ < 0f)
-        {
-            Gizmos.color = Color.red;
-            float topY = sheerPlan.GetTopTimberYAtZ(debugDropZ);
-            float botY = sheerPlan.GetKeelYAtZ(debugDropZ);
-            if (sheerPlan.showDeadwoodRake && debugDropZ < sheerPlan.cachedDeadwoodForePoint.z && debugDropZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-            {
-                botY = sheerPlan.GetDeadwoodYAtZ(debugDropZ);
-            }
-            float width = 15f; 
-            
-            // Draw a single red vertical line on the center axis, and a horizontal line at the top
-            Gizmos.DrawLine(new Vector3(0, botY, debugDropZ), new Vector3(0, topY, debugDropZ));
-            Gizmos.DrawLine(new Vector3(-width, topY, debugDropZ), new Vector3(width, topY, debugDropZ));
-        }
-
         if (!showInnerFashionTimber) return;
 
         Gizmos.color = innerColor;
