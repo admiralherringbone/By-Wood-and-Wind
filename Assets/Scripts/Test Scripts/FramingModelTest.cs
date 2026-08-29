@@ -1604,12 +1604,17 @@ public class FramingModelTest : MonoBehaviour
     }
     public Vector3 GetInnerNormalAtT(FrameProfile fp, bool isUpper, float t, float zPos, Vector3 framePlaneNormal)
     {
-        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
-        Vector3 nextPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f)) : GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f), true);
+        float delta = 0.0001f;
+        float t1 = Mathf.Max(0f, t - delta);
+        float t2 = Mathf.Min(1f, t + delta);
 
-        Vector3 tangent = (nextPt - outerPt).normalized;
+        Vector3 pt1 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t1) : GetSurfacePointAtT(fp, 1f, t1, true);
+        Vector3 pt2 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t2) : GetSurfacePointAtT(fp, 1f, t2, true);
+
+        Vector3 tangent = (pt2 - pt1).normalized;
         if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
 
+        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
         Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
         
         Vector3 toCenter = new Vector3(-outerPt.x, 0, zPos - outerPt.z);
@@ -1620,11 +1625,17 @@ public class FramingModelTest : MonoBehaviour
 
     public Vector3 GetInnerPointAtT(FrameProfile fp, bool isUpper, float t, float zPos, Vector3 origin, Vector3 framePlaneNormal, float keelY, float totalHeight)
     {
-        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
-        Vector3 nextPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f)) : GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f), true);
+        float delta = 0.0001f;
+        float t1 = Mathf.Max(0f, t - delta);
+        float t2 = Mathf.Min(1f, t + delta);
 
-        Vector3 tangent = (nextPt - outerPt).normalized;
+        Vector3 pt1 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t1) : GetSurfacePointAtT(fp, 1f, t1, true);
+        Vector3 pt2 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t2) : GetSurfacePointAtT(fp, 1f, t2, true);
+
+        Vector3 tangent = (pt2 - pt1).normalized;
         if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
+
+        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
 
         Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
         

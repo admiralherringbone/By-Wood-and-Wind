@@ -31,10 +31,8 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
 
 
 
-    public float GetOuterHullXAndNormalAtYZ(float targetY, float originalZ, out float nx)
+    public Vector3 GetOuterNormalAtYZ(float targetY, float originalZ)
     {
-        nx = 1f;
-        
         bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
         FramingModelTest.FrameProfile fp;
 
@@ -56,12 +54,7 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
             }
         }
 
-        if (!fp.isValid) return 0f;
-
-        float exactX = 0f;
-        float keelY = fp.hasLower ? fp.lowerP0.y : sheerPlan.GetKeelYAtZ(originalZ);
-        float peakY = fp.hasUpper ? fp.upperP3.y : fp.lowerP3.y;
-        float totalHeight = Mathf.Max(0.01f, peakY - keelY);
+        if (!fp.isValid) return Vector3.right;
 
         Vector3 origin = new Vector3(0, 0, originalZ);
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
@@ -84,11 +77,7 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
                 else tMaxT = midT;
             }
             float tVal = (tMinT + tMaxT) / 2f;
-            Vector3 outerPt = framingModel.GetUpperSurfacePointAtT(fp, 1f, tVal);
-            exactX = outerPt.x;
-            
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, true, tVal, originalZ, framePlaneNormal);
-            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+            return framingModel.GetInnerNormalAtT(fp, true, tVal, originalZ, framePlaneNormal);
         }
         else if (!isUpper && fp.hasLower)
         {
@@ -102,14 +91,10 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
                 else fMaxT = midT;
             }
             float tVal = (fMinT + fMaxT) / 2f;
-            Vector3 outerPt = framingModel.GetSurfacePointAtT(fp, 1f, tVal, true);
-            exactX = outerPt.x;
-            
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, false, tVal, originalZ, framePlaneNormal);
-            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+            return framingModel.GetInnerNormalAtT(fp, false, tVal, originalZ, framePlaneNormal);
         }
 
-        return exactX;
+        return Vector3.right;
     }
     public void DrawInnerForeFaceFashionTimbers()
     {
@@ -170,23 +155,13 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
 
         if (foreFaceFashionTimberModelTest == null) return pts;
 
-        // ALWAYS get the Starboard outer points so that pt.x is positive for our offset math
         List<Vector3> outerPoints = foreFaceFashionTimberModelTest.GetFashionTimberPoints(true);
         if (outerPoints == null || outerPoints.Count == 0) return pts;
-
-        List<float> normalXs = new List<float>();
-        for (int i = 0; i < outerPoints.Count; i++)
-        {
-            float innerZ = outerPoints[i].z;
-            float innerY = outerPoints[i].y;
-            GetOuterHullXAndNormalAtYZ(innerY, innerZ, out float nx);
-            normalXs.Add(nx);
-        }
 
         for (int i = 0; i < outerPoints.Count; i++)
         {
             Vector3 pt = outerPoints[i];
-            float nx = normalXs[i];
+            Vector3 normal = GetOuterNormalAtYZ(pt.y, pt.z);
             
             float tKeel = Mathf.Clamp01(pt.z / sheerPlan.cachedKeelSternPoint.z);
             float theoreticalKeelY = Mathf.Lerp(sheerPlan.cachedMidshipKeel.y, sheerPlan.cachedKeelSternPoint.y, tKeel);
@@ -196,12 +171,12 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
             float unifiedOverallT = Mathf.Clamp01((pt.y - theoreticalKeelY) / theoreticalTotalHeight);
             float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, unifiedOverallT);
             
-            float exactX = pt.x - (currentThickness / nx);
+            Vector3 innerPt = pt + normal * currentThickness;
             
-            if (exactX <= 0f) continue;
+            if (innerPt.x <= 0f) continue;
             
-            if (!isStbd) exactX = -exactX;
-            pts.Add(new Vector3(exactX, pt.y, pt.z));
+            if (!isStbd) innerPt.x = -innerPt.x;
+            pts.Add(innerPt);
         }
         return pts;
     }
