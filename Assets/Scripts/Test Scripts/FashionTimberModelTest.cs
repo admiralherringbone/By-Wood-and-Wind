@@ -16,8 +16,8 @@ public class FashionTimberModelTest : MonoBehaviour
     [Tooltip("Reference to the ModularBodyPlan.")]
     public BodyPlan bodyPlan;
 
-    [Tooltip("Reference to the FramingModel.")]
-    public FramingModel framingModel;
+    [Tooltip("Reference to the FramingModelTest.")]
+    public FramingModelTest framingModel;
 
     [Header("Visualization")]
     public bool showFashionTimbers = true;
@@ -101,7 +101,7 @@ public class FashionTimberModelTest : MonoBehaviour
             evalZ = lowerAftZ;
         }
 
-        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
+        FramingModelTest.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
         if (!fp.isValid) return 0f;
 
         float exactX = 0f;
@@ -113,11 +113,11 @@ public class FashionTimberModelTest : MonoBehaviour
             for (int i = 0; i < 20; i++)
             {
                 float midT = (tMinT + tMaxT) / 2f;
-                float py = FramingModel.CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
+                float py = FramingModelTest.CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
                 if (py < targetY) tMinT = midT;
                 else tMaxT = midT;
             }
-            exactX = FramingModel.CalculateCubicBezierPoint((tMinT + tMaxT) / 2f, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
+            exactX = FramingModelTest.CalculateCubicBezierPoint((tMinT + tMaxT) / 2f, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
             
         }
         else if (!isUpper && fp.hasLower)
@@ -208,26 +208,6 @@ public class FashionTimberModelTest : MonoBehaviour
         
         float startY = risingEnd.y;
         float endY = sheerPlan.cachedTransomTopPoint.y;
-
-        // --- VERTICAL DROP TO DEADWOOD/KEEL ---
-        float dropY = sheerPlan.GetKeelYAtZ(startZ);
-        if (sheerPlan.showDeadwoodRake && startZ < sheerPlan.cachedDeadwoodForePoint.z && startZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-        {
-            dropY = sheerPlan.GetDeadwoodYAtZ(startZ);
-        }
-
-        if (dropY < startY)
-        {
-            int dropSegments = 20; // High resolution to capture frame curvature on the X/Y plane
-            for (int i = 0; i < dropSegments; i++)
-            {
-                float y = Mathf.Lerp(dropY, startY, i / (float)dropSegments);
-                float x = GetNaturalHullXAtYZ(y, startZ);
-                if (isStbd) pts.Add(new Vector3(x, y, startZ));
-                else pts.Add(new Vector3(-x, y, startZ));
-            }
-        }
-        // --------------------------------------
         
         for (int i = 0; i <= segments; i++)
         {

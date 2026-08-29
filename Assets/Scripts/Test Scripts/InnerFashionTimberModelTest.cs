@@ -13,11 +13,11 @@ public class InnerFashionTimberModelTest : MonoBehaviour
     [Tooltip("Reference to the ModularBodyPlan.")]
     public BodyPlan bodyPlan;
 
-    [Tooltip("Reference to the FramingModel.")]
-    public FramingModel framingModel;
+    [Tooltip("Reference to the FramingModelTest.")]
+    public FramingModelTest framingModel;
 
     [Tooltip("Reference to the outer FashionTimberModelTest.")]
-    public FashionTimberModelTest fashionTimberModelTest;
+    public FashionTimberModelTest fashionTimberModel;
 
     [Header("Visualization")]
     public bool showInnerFashionTimbers = true;
@@ -25,7 +25,7 @@ public class InnerFashionTimberModelTest : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || fashionTimberModelTest == null) return;
+        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || fashionTimberModel == null) return;
         DrawInnerFashionTimbers();
     }
 
@@ -41,7 +41,7 @@ public class InnerFashionTimberModelTest : MonoBehaviour
             lowerBound = sheerPlan.cachedDeadwoodAftPoint;
         }
         Vector3 risingEnd = lowerBound;
-        Vector3 hobIntersect = fashionTimberModelTest.GetFashionTimberHobIntersection();
+        Vector3 hobIntersect = fashionTimberModel.GetFashionTimberHobIntersection();
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
         // 1. Lower Fashion Timber (Rising Line End -> HoB Intersection)
@@ -75,7 +75,7 @@ public class InnerFashionTimberModelTest : MonoBehaviour
             evalZ = lowerAftZ;
         }
 
-        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
+        FramingModelTest.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
         if (!fp.isValid) return 0f;
 
         float exactX = 0f;
@@ -167,26 +167,8 @@ public class InnerFashionTimberModelTest : MonoBehaviour
             lowerBound = sheerPlan.cachedDeadwoodAftPoint;
         }
         Vector3 risingEnd = lowerBound;
-        Vector3 hobIntersect = fashionTimberModelTest.GetFashionTimberHobIntersection();
+        Vector3 hobIntersect = fashionTimberModel.GetFashionTimberHobIntersection();
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
-
-        // --- VERTICAL DROP TO DEADWOOD/KEEL ---
-        float startZ = risingEnd.z;
-        float startY = risingEnd.y;
-        float dropY = sheerPlan.GetKeelYAtZ(startZ);
-        if (sheerPlan.showDeadwoodRake && startZ < sheerPlan.cachedDeadwoodForePoint.z && startZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-        {
-            dropY = sheerPlan.GetDeadwoodYAtZ(startZ);
-        }
-
-        if (dropY < startY)
-        {
-            Vector3 dropStart = new Vector3(0, dropY, startZ);
-            Vector3 dropEnd = new Vector3(0, startY, startZ); // Exclusive top to avoid duplicate point
-            pts.AddRange(GetInnerFashionTimberSegmentPoints(dropStart, dropEnd, isStbd, 20));
-            if (pts.Count > 0) pts.RemoveAt(pts.Count - 1); // Remove the top point because the next segment will add it
-        }
-        // --------------------------------------
 
         // 1. Lower Segment
         if (Mathf.Abs(risingEnd.z - hobIntersect.z) > 0.001f || Mathf.Abs(risingEnd.y - hobIntersect.y) > 0.001f)
@@ -231,7 +213,7 @@ public class InnerFashionTimberModelTest : MonoBehaviour
             
             float exactX = outerX - (currentThickness / nx);
             
-            exactX = Mathf.Max(0.001f, exactX);
+            if (exactX <= 0f) continue;
             
             if (!isStbd) exactX = -exactX;
             pts.Add(new Vector3(exactX, exactY, currZ));

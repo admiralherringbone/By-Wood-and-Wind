@@ -10,6 +10,9 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
     [Tooltip("Reference to the FashionTimberModelTest.")]
     public FashionTimberModelTest fashionTimberModel;
 
+    [Tooltip("Reference to the ForeFashionTimberSpecialFramesTest.")]
+    public ForeFashionTimberSpecialFramesTest specialFrames;
+
     [Header("Inner Timber Settings")]
     [Tooltip("Thickness of the Fashion Timber (offset inwards).")]
     public float thickness = 0.3f;
@@ -62,23 +65,28 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
             rawPoints.Add(new Vector2(innerZ, innerY));
         }
 
-        // Add the vertical parallel drop down to the bottom of the hull
-        float actualDropZ = rawPoints[0].x;
-        float dropY = sheerPlan.GetKeelYAtZ(actualDropZ);
-        if (sheerPlan.showDeadwoodRake && actualDropZ < sheerPlan.cachedDeadwoodForePoint.z && actualDropZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-        {
-            dropY = sheerPlan.GetDeadwoodYAtZ(actualDropZ);
-        }
+        // Add the vertical parallel drop down to the bottom of the hull for inner
+        // ONLY if the Outer Timber actually has lower moulds (i.e., it starts below the HoB line).
+        bool outerStartsBelowHob = risingEnd.y < sheerPlan.GetTheoreticalHobYAtZ(risingEnd.z) - 0.001f;
         
-        // Insert intermediate points for the vertical drop so it follows the curve of the lower moulds
-        float topDropY = rawPoints[0].y;
-        int dropSegments = 20;
-        for (int i = dropSegments; i >= 0; i--)
+        if (outerStartsBelowHob)
         {
-            float t = i / (float)dropSegments;
-            float y = Mathf.Lerp(dropY, topDropY, t);
-            if (i == dropSegments) continue; // Skip the top point as it's already rawPoints[0]
-            rawPoints.Insert(0, new Vector2(actualDropZ, y));
+            float actualDropZ = rawPoints[0].x;
+            float dropY = sheerPlan.GetKeelYAtZ(actualDropZ);
+            if (sheerPlan.showDeadwoodRake && actualDropZ < sheerPlan.cachedDeadwoodForePoint.z && actualDropZ >= sheerPlan.cachedDeadwoodAftPoint.z)
+            {
+                dropY = sheerPlan.GetDeadwoodYAtZ(actualDropZ);
+            }
+            
+            float topDropY = rawPoints[0].y;
+            int dropSegments = 20;
+            for (int i = dropSegments; i >= 0; i--)
+            {
+                float t = i / (float)dropSegments;
+                float y = Mathf.Lerp(dropY, topDropY, t);
+                if (i == dropSegments) continue; // Skip the top point as it's already rawPoints[0]
+                rawPoints.Insert(0, new Vector2(actualDropZ, y));
+            }
         }
 
         bool intersectionFound = true;
@@ -94,6 +102,7 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
                         int removeCount = j - i;
                         rawPoints.RemoveRange(i + 1, removeCount);
                         rawPoints.Insert(i + 1, intersect);
+                        
                         intersectionFound = true;
                         break;
                     }
@@ -102,7 +111,7 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
             }
         }
         
-        cachedInnerPoints = rawPoints;
+        cachedInnerPoints = new List<Vector2>(rawPoints);
     }
 
     public float GetMinZ()
@@ -148,9 +157,58 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
         return cachedInnerPoints[cachedInnerPoints.Count - 1].y;
     }
 
+    public Vector3 GetHobIntersection()
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return Vector3.zero;
+        
+        for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
+        {
+            Vector2 p1 = cachedInnerPoints[i];
+            Vector2 p2 = cachedInnerPoints[i+1];
+            
+            float hob1 = sheerPlan.GetTheoreticalHobYAtZ(p1.x);
+            float hob2 = sheerPlan.GetTheoreticalHobYAtZ(p2.x);
+            
+            if ((p1.y <= hob1 && p2.y >= hob2) || (p1.y >= hob1 && p2.y <= hob2))
+            {
+                float minT = 0f;
+                float maxT = 1f;
+                for (int j = 0; j < 15; j++)
+                {
+                    float mid = (minT + maxT) / 2f;
+                    float py = Mathf.Lerp(p1.y, p2.y, mid);
+                    float pz = Mathf.Lerp(p1.x, p2.x, mid);
+                    float phob = sheerPlan.GetTheoreticalHobYAtZ(pz);
+                    if (py < phob) minT = mid;
+                    else maxT = mid;
+                }
+                float finalT = (minT + maxT) / 2f;
+                float finalZ = Mathf.Lerp(p1.x, p2.x, finalT);
+                float finalY = Mathf.Lerp(p1.y, p2.y, finalT);
+                
+                float finalX = 0f;
+                if (fashionTimberModel != null && fashionTimberModel.breadthPlan != null)
+                {
+                    finalX = fashionTimberModel.breadthPlan.GetBreadthXAtZ(finalZ);
+                }
+                return new Vector3(finalX, finalY, finalZ);
+            }
+        }
+        return new Vector3(0, cachedInnerPoints[0].y, cachedInnerPoints[0].x);
+    }
+
     private void OnDrawGizmos()
     {
         if (sheerPlan == null || fashionTimberModel == null) return;
+        
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        
+        // The backbone trace logic has been completely removed as per user request, so the black sphere is no longer needed here.
+
         DrawInnerFashionTimbers();
     }
 
@@ -165,18 +223,67 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
 
         if (stbdPoints.Count < 2) return;
 
-        for (int i = 0; i < stbdPoints.Count - 1; i++)
+        Vector3 hobIntersect = GetHobIntersection();
+        
+        // Find the index where the line crosses the HoB intersection
+        int splitIndex = stbdPoints.Count - 1;
+        for (int i = 0; i < stbdPoints.Count; i++)
         {
-            Gizmos.DrawLine(stbdPoints[i], stbdPoints[i+1]);
-            Gizmos.DrawLine(portPoints[i], portPoints[i+1]);
+            if (stbdPoints[i].y >= hobIntersect.y)
+            {
+                splitIndex = i;
+                break;
+            }
+        }
+
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
+        Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
+
+        // 1. Lower Fashion Timber
+        if (Mathf.Abs(risingEnd.z - hobIntersect.z) > 0.001f || Mathf.Abs(risingEnd.y - hobIntersect.y) > 0.001f)
+        {
+            for (int i = 0; i < splitIndex; i++)
+            {
+                Gizmos.DrawLine(stbdPoints[i], stbdPoints[i+1]);
+                Gizmos.DrawLine(portPoints[i], portPoints[i+1]);
+            }
+        }
+
+        // 2. Upper Fashion Timber
+        if (Mathf.Abs(hobIntersect.z - transomTop.z) > 0.001f || Mathf.Abs(hobIntersect.y - transomTop.y) > 0.001f)
+        {
+            for (int i = splitIndex; i < stbdPoints.Count - 1; i++)
+            {
+                Gizmos.DrawLine(stbdPoints[i], stbdPoints[i+1]);
+                Gizmos.DrawLine(portPoints[i], portPoints[i+1]);
+            }
         }
     }
+
+
 
     public List<Vector3> GetFashionTimberPoints(bool isStbd)
     {
         List<Vector3> pts = new List<Vector3>();
         UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return pts;
+
+        if (this.specialFrames == null)
+        {
+            this.specialFrames = Object.FindObjectOfType<ForeFashionTimberSpecialFramesTest>();
+        }
+        
+        float bottomZ = cachedInnerPoints[0].x;
+        FramingModelTest.FrameProfile masterFp = new FramingModelTest.FrameProfile { isValid = false };
+        if (specialFrames != null && fashionTimberModel != null && fashionTimberModel.framingModel != null)
+        {
+            masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
+        }
 
         for (int i = 0; i < cachedInnerPoints.Count; i++)
         {
@@ -208,7 +315,16 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
                 reachedTop = true;
             }
 
-            float exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
+            float exactX = 0f;
+            if (specialFrames != null && masterFp.isValid)
+            {
+                exactX = specialFrames.GetSpecialHullXAtYZ(innerY, innerZ, masterFp, bottomZ);
+            }
+            else
+            {
+                exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
+            }
+            
             if (!isStbd) exactX = -exactX;
             
             pts.Add(new Vector3(exactX, innerY, innerZ));

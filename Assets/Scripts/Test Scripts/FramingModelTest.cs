@@ -33,8 +33,11 @@ public class FramingModelTest : MonoBehaviour
 
     [Header("Gizmo Settings")]
     public Color frameColor = Color.cyan;
-    [Tooltip("Reference to the ForeFaceFashionTimberModel.")]
+    [Tooltip("Reference to the ForeFaceFashionTimberModelTest.")]
     public ForeFaceFashionTimberModelTest foreFaceFashionTimberModelTest;
+
+    [Tooltip("Reference to the FashionTimberModelTest.")]
+    public FashionTimberModelTest fashionTimberModelTest;
 
     [Header("Frame Visualization Settings")]
     public bool showFrames = true;
@@ -59,7 +62,7 @@ public class FramingModelTest : MonoBehaviour
         public Vector3 upperP0, upperP1, upperP2, upperP3;
     }
 
-    public virtual FrameProfile GetRawFrameProfile(float z, bool ignoreFashionTimber = false)
+    public virtual FrameProfile GetRawFrameProfile(float z, bool ignoreFashionTimber = false, float? keelYOverride = null)
     {
         FrameProfile fp = new FrameProfile();
         fp.isValid = false;
@@ -70,15 +73,9 @@ public class FramingModelTest : MonoBehaviour
 
         if (sheerPlan == null || breadthPlan == null || bodyPlan == null) return fp;
 
-        float fashionBottomZ = sheerPlan.cachedHobSternIntersect.z;
-        if (foreFaceFashionTimberModelTest != null)
+        if (z < sheerPlan.cachedHobSternIntersect.z)
         {
-            fashionBottomZ = foreFaceFashionTimberModelTest.GetMaxZ();
-        }
-        else
-        {
-            ForeFaceFashionTimberModelTest tempTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest>();
-            if (tempTest != null) fashionBottomZ = tempTest.GetMaxZ();
+            fp.hasLower = false;
         }
 
         // We no longer arbitrarily disable the lower mould aft of the Stern Post.
@@ -86,13 +83,6 @@ public class FramingModelTest : MonoBehaviour
 
         float hobBreadth = breadthPlan.GetBreadthXAtZ(z);
         float hobY = sheerPlan.GetHobYAtZ(z);
-        
-        // If we are aft of the Fashion Timber Fore Face, obey the HoB projection lines
-        if (z < fashionBottomZ)
-        {
-            hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(z);
-            hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
-        }
         
         if (fp.hasLower)
         {
@@ -112,7 +102,12 @@ public class FramingModelTest : MonoBehaviour
 
         // If we are aft of the Fashion Lower Bound, the frame must extend down to the virtual Fashion Projection line
         // rather than stopping at the physical Stern Post/Counter backbone.
-        if (z < fashionLowerBound.z)
+        float originalKeelY = keelY;
+        if (keelYOverride.HasValue)
+        {
+            keelY = keelYOverride.Value;
+        }
+        else if (z < fashionLowerBound.z - 0.001f)
         {
             float startHobY = sheerPlan.GetTheoreticalHobYAtZ(fashionLowerBound.z);
             float yOffset = startHobY - fashionLowerBound.y;
@@ -120,65 +115,143 @@ public class FramingModelTest : MonoBehaviour
         }
         
         float keelHalfWidth = bodyPlan.keelWidth / 2f;
-        fp.lowerP0 = new Vector3(keelHalfWidth, keelY, z); 
-        fp.lowerP3 = new Vector3(hobBreadth, hobY, z);
-
-        // 1. DIAGONAL DEADRISE TAPER (LOWER RIBBAND)
-        Vector3 masterL1 = bodyPlan.cachedL1;
-        float targetX = keelHalfWidth; // Defaults to the keel width instead of 0
-        float targetY = keelY;
-
-        if (z >= 0)
+        
+        bool usedSpecialScaling = false;
+        if (!ignoreFashionTimber)
         {
-            float bowZ = sheerPlan.cachedBowRisingEnd.z;
-            if (bowZ > 0.001f)
+            if (this.foreFaceFashionTimberModelTest == null)
             {
-                float t = sheerPlan.GetRisingLineTAtZ(z);
-                Vector3 p0 = masterL1;
-                Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
-                // Control point mimics the Rising Line's control Z, and projects X/Y to form a swept curve
-                Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z); 
-                
-                targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
-                targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                this.foreFaceFashionTimberModelTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest>();
+            }
+            ForeFaceFashionTimberModelTest foreFace = this.foreFaceFashionTimberModelTest;
+            if (foreFace != null && foreFace.showInnerFashionTimber && foreFace.cachedInnerPoints != null && foreFace.cachedInnerPoints.Count > 0)
+            {
+                float bottomZ = foreFace.cachedInnerPoints[0].x;
+                if (z < bottomZ - 0.001f)
+                {
+                    FrameProfile masterFp = GetRawFrameProfile(bottomZ, true, keelYOverride);
+                    if (masterFp.isValid && masterFp.hasLower)
+                    {
+                        usedSpecialScaling = true;
+                        
+                        float masterHobBreadth = breadthPlan.GetBreadthXAtZ(bottomZ);
+                        float masterHobY = sheerPlan.GetTheoreticalHobYAtZ(bottomZ);
+                        float masterKeelY = masterFp.lowerP0.y;
+
+                        float customKeelY = masterKeelY;
+                        float yOffset = masterHobY - masterKeelY;
+                        customKeelY = sheerPlan.GetTheoreticalHobYAtZ(z) - yOffset;
+
+                        float currHobBreadth = breadthPlan.GetBreadthXAtZ(z);
+                        float currHobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+                        
+                        float hw = keelHalfWidth;
+                        float masterXDist = masterHobBreadth - hw;
+                        float currXDist = currHobBreadth - hw;
+                        float scaleX = masterXDist > 0.001f ? currXDist / masterXDist : 1f;
+                        
+                        float masterHeight = masterHobY - masterKeelY;
+                        float currHeight = currHobY - customKeelY;
+                        float scaleY = masterHeight > 0.001f ? currHeight / masterHeight : 1f;
+
+                        Vector3 ScalePoint(Vector3 masterPt)
+                        {
+                            float nxOffset = (masterPt.x - hw) * scaleX;
+                            float finalX = hw + Mathf.Max(0f, nxOffset);
+                            float nyOffset = (masterPt.y - masterKeelY) * scaleY;
+                            float finalY = customKeelY + nyOffset;
+                            return new Vector3(finalX, finalY, z);
+                        }
+
+                        fp.lowerP0 = ScalePoint(masterFp.lowerP0);
+                        fp.lowerP1_inner = ScalePoint(masterFp.lowerP1_inner);
+                        fp.lowerP1 = ScalePoint(masterFp.lowerP1);
+                        fp.lowerPMid = ScalePoint(masterFp.lowerPMid);
+                        fp.lowerP2 = ScalePoint(masterFp.lowerP2);
+                        fp.lowerP3 = ScalePoint(masterFp.lowerP3);
+                        
+                        fp.lowerCutoffT = masterFp.lowerCutoffT;
+                        fp.lowerTopCutoffT = masterFp.lowerTopCutoffT;
+                    }
+                }
             }
         }
-        else
+
+        if (!usedSpecialScaling)
         {
-            float sternZ = sheerPlan.cachedSternRisingEnd.z;
-            if (sternZ < -0.001f)
+            fp.lowerP0 = new Vector3(keelHalfWidth, keelY, z); 
+            fp.lowerP3 = new Vector3(hobBreadth, hobY, z);
+
+            // 1. DIAGONAL DEADRISE TAPER (LOWER RIBBAND)
+            Vector3 masterL1 = bodyPlan.cachedL1;
+            float targetX = keelHalfWidth; // Defaults to the keel width instead of 0
+            float targetY = originalKeelY;
+
+            if (z >= 0)
             {
-                float t = sheerPlan.GetRisingLineTAtZ(z);
-                Vector3 p0 = masterL1;
-                Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
-                Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+                float bowZ = sheerPlan.cachedBowRisingEnd.z;
+                if (bowZ > 0.001f)
+                {
+                    float t = sheerPlan.GetRisingLineTAtZ(z);
+                    Vector3 p0 = masterL1;
+                    Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
+                    // Control point mimics the Rising Line's control Z, and projects X/Y to form a swept curve
+                    Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z); 
+                    
+                    targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
+                    targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                }
+            }
+            else
+            {
+                float sternZ = sheerPlan.cachedSternRisingEnd.z;
+                if (sternZ < -0.001f)
+                {
+                    float t = sheerPlan.GetRisingLineTAtZ(z);
+                    Vector3 p0 = masterL1;
+                    Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
+                    Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+                    
+                    targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
+                    targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                }
+            }
+
+            targetY = Mathf.Max(targetY, originalKeelY);
+
+            fp.lowerP1 = new Vector3(targetX, targetY, z);
+
+            // 2. HOB DOWNWARD ARM (LOWER P2)
+            float currentBoxHeight = hobY - originalKeelY;
+            float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
+            fp.lowerP2 = new Vector3(hobBreadth, Mathf.Max(hobY - hobDrop, targetY), z);
+
+            // 3. INNER CONTROLS (Quintic / Quartic)
+            float ribbandRatio = 0f;
+            if (masterL1.x > 0.001f)
+            {
+                ribbandRatio = Mathf.Clamp01(1f - (targetX / masterL1.x));
+            }
+            
+            float dynamicInnerKeel = Mathf.Lerp(bodyPlan.innerKeelPosition, 1.0f, ribbandRatio);
+            float dynamicMiddlePosition = Mathf.Lerp(bodyPlan.middleControlPosition, 0.0f, ribbandRatio);
+            
+            // Use a temporary unprojected P0 for interpolation
+            Vector3 unprojectedP0 = new Vector3(keelHalfWidth, originalKeelY, z);
+            fp.lowerP1_inner = Vector3.Lerp(unprojectedP0, fp.lowerP1, dynamicInnerKeel);
+            fp.lowerPMid = Vector3.Lerp(fp.lowerP1, fp.lowerP2, dynamicMiddlePosition);
+            
+            // 4. PROPORTIONAL Y-SCALING
+            if (keelY > originalKeelY + 0.001f && hobY > originalKeelY + 0.001f)
+            {
+                float scaleY = (hobY - keelY) / (hobY - originalKeelY);
                 
-                targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
-                targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                fp.lowerP1.y = keelY + (fp.lowerP1.y - originalKeelY) * scaleY;
+                fp.lowerP1_inner.y = keelY + (fp.lowerP1_inner.y - originalKeelY) * scaleY;
+                fp.lowerPMid.y = keelY + (fp.lowerPMid.y - originalKeelY) * scaleY;
+                fp.lowerP2.y = keelY + (fp.lowerP2.y - originalKeelY) * scaleY;
             }
         }
-
-        targetY = Mathf.Max(targetY, keelY);
-
-        fp.lowerP1 = new Vector3(targetX, targetY, z);
-
-        // 2. HOB DOWNWARD ARM (LOWER P2)
-        float currentBoxHeight = hobY - keelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        fp.lowerP2 = new Vector3(hobBreadth, Mathf.Max(hobY - hobDrop, targetY), z);
-
-        // 3. INNER CONTROLS (Quintic / Quartic)
-        float ribbandRatio = 0f;
-        if (masterL1.x > 0.001f)
-        {
-            ribbandRatio = Mathf.Clamp01(1f - (targetX / masterL1.x));
-        }
-        
-        float dynamicInnerKeel = Mathf.Lerp(bodyPlan.innerKeelPosition, 1.0f, ribbandRatio);
-        float dynamicMiddlePosition = Mathf.Lerp(bodyPlan.middleControlPosition, 0.0f, ribbandRatio);
-        
-        fp.lowerP1_inner = Vector3.Lerp(fp.lowerP0, fp.lowerP1, dynamicInnerKeel);
-        fp.lowerPMid = Vector3.Lerp(fp.lowerP1, fp.lowerP2, dynamicMiddlePosition);
         }
         else
         {
@@ -254,9 +327,9 @@ public class FramingModelTest : MonoBehaviour
         FrameProfile fp = GetRawFrameProfile(z);
         if (!fp.isValid) return fp;
 
-        if (foreFaceFashionTimberModelTest == null)
+        if (this.foreFaceFashionTimberModelTest == null)
         {
-            foreFaceFashionTimberModelTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest>();
+            this.foreFaceFashionTimberModelTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest>();
         }
 
         float sternBoundaryZ = foreFaceFashionTimberModelTest != null ? foreFaceFashionTimberModelTest.GetMinZ() : sheerPlan.cachedSternRisingEnd.z;
@@ -402,8 +475,6 @@ public class FramingModelTest : MonoBehaviour
             {
                 DrawFrameAtZ(z);
             }
-            
-            // Fashion Timbers extracted to FashionTimberModel.cs
         }
     }
 
@@ -487,10 +558,7 @@ public class FramingModelTest : MonoBehaviour
         List<float> positions = new List<float>();
         if (sheerPlan == null) return positions;
 
-        if (foreFaceFashionTimberModelTest == null)
-        {
-            foreFaceFashionTimberModelTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest>();
-        }
+        // Removed redundant FindObjectOfType to optimize performance
 
         if (foreFaceFashionTimberModelTest != null)
         {
@@ -525,8 +593,6 @@ public class FramingModelTest : MonoBehaviour
         
         float risingSternZ = sheerPlan.cachedSternRisingEnd.z;
         if (!positions.Contains(risingSternZ)) positions.Add(risingSternZ);
-
-        // (Removed the explicitly injected frame at the Fashion Timber boundary as requested)
         
         positions.Sort();
 
@@ -601,7 +667,11 @@ public class FramingModelTest : MonoBehaviour
         
         Gizmos.color = new Color(0.7f, 0.7f, 0.7f, 1f); // Light Grey
         
-        FashionTimberModel fModel = Object.FindObjectOfType<FashionTimberModel>();
+        if (this.fashionTimberModelTest == null)
+        {
+            this.fashionTimberModelTest = Object.FindObjectOfType<FashionTimberModelTest>();
+        }
+        FashionTimberModelTest fModel = this.fashionTimberModelTest;
         
         if (fModel != null && fModel.showFashionTimbers)
         {
@@ -662,6 +732,41 @@ public class FramingModelTest : MonoBehaviour
                     
                     Gizmos.DrawLine(new Vector3(hw, y1, z1), new Vector3(hw, y2, z2));
                     Gizmos.DrawLine(new Vector3(-hw, y1, z1), new Vector3(-hw, y2, z2));
+                }
+            }
+
+            // Draw Lower Phantom HoB Projection for Fore Face Fashion Timber (Dashed Darker Grey)
+            if (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.showInnerFashionTimber && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+            {
+                float ffLowerStartZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
+                float ffLowerEndZ = foreFaceFashionTimberModelTest.GetHobIntersection().z;
+
+                if (ffLowerEndZ < ffLowerStartZ)
+                {
+                    int dashSegments = Mathf.CeilToInt(Mathf.Abs(ffLowerStartZ - ffLowerEndZ) / 0.1f);
+                    if (dashSegments % 2 == 0) dashSegments++; // Guarantee it ends on a solid dash
+                    float dashStep = (ffLowerEndZ - ffLowerStartZ) / dashSegments;
+                    
+                    float startHobY = sheerPlan.GetTheoreticalHobYAtZ(ffLowerStartZ);
+                    float ffDropY = foreFaceFashionTimberModelTest.cachedInnerPoints[0].y;
+                    float yOffset = startHobY - ffDropY;
+                    float hw = bodyPlan.keelWidth / 2f;
+
+                    Gizmos.color = new Color(0.5f, 0.5f, 0.5f, 1f); // Slightly darker grey to differentiate
+
+                    for (int i = 0; i < dashSegments; i++)
+                    {
+                        if (i % 2 != 0) continue; // Dashed effect
+                        
+                        float z1 = ffLowerStartZ + (i * dashStep);
+                        float z2 = ffLowerStartZ + ((i + 1) * dashStep);
+                        
+                        float y1 = sheerPlan.GetTheoreticalHobYAtZ(z1) - yOffset;
+                        float y2 = sheerPlan.GetTheoreticalHobYAtZ(z2) - yOffset;
+                        
+                        Gizmos.DrawLine(new Vector3(hw, y1, z1), new Vector3(hw, y2, z2));
+                        Gizmos.DrawLine(new Vector3(-hw, y1, z1), new Vector3(-hw, y2, z2));
+                    }
                 }
             }
         }
@@ -1230,7 +1335,7 @@ public class FramingModelTest : MonoBehaviour
 
         if (!ignoreFashionTimber && fp.lowerP0.z <= sheerPlan.cachedSternRisingEnd.z)
         {
-            FashionTimberModel fModel = GetComponent<FashionTimberModel>();
+            FashionTimberModelTest fModel = GetComponent<FashionTimberModelTest>();
             if (fModel != null && fModel.showFashionTimbers)
             {
                 float exactX = fModel.GetNaturalHullXAtYZ(pt.y, fp.lowerP0.z);
@@ -1255,6 +1360,41 @@ public class FramingModelTest : MonoBehaviour
             case FrameThicknessRatio.Quarter: return 0.25f;
             case FrameThicknessRatio.Eighth: return 0.125f;
             default: return 0.5f;
+        }
+    }
+
+    protected virtual void DrawDashedFrameAtZ(float z, Color color)
+    {
+        FrameProfile fp = GetFrameProfile(z);
+        if (!fp.isValid) return;
+
+        Gizmos.color = color;
+        int segments = 20;
+
+        if (fp.hasLower)
+        {
+            float startT = fp.lowerCutoffT;
+            float endT = fp.lowerTopCutoffT;
+            
+            Vector3 prevStbd = GetSurfacePointAtT(fp, 1f, startT);
+            Vector3 prevPort = GetSurfacePointAtT(fp, -1f, startT);
+
+            for (int i = 1; i <= segments; i++)
+            {
+                float t = startT + (endT - startT) * (i / (float)segments);
+
+                Vector3 currStbd = GetSurfacePointAtT(fp, 1f, t);
+                Vector3 currPort = GetSurfacePointAtT(fp, -1f, t);
+
+                if (i % 2 != 0) // Draw every other segment to make it dashed
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
+
+                prevStbd = currStbd;
+                prevPort = currPort;
+            }
         }
     }
 

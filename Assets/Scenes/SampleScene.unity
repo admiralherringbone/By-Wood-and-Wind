@@ -267,98 +267,97 @@ MonoBehaviour:
   showInnerFashionTimber: 1
   innerColor: {r: 0.94275045, g: 0, b: 1, a: 1}
   cachedInnerPoints:
-  - {x: -9.846424, y: 4.708999}
-  - {x: -9.846424, y: 4.8061976}
-  - {x: -9.846424, y: 4.9034023}
-  - {x: -9.846424, y: 5.0006013}
-  - {x: -9.846424, y: 5.0978055}
-  - {x: -9.846424, y: 5.1950045}
-  - {x: -9.846424, y: 5.2922034}
-  - {x: -9.846424, y: 5.3894076}
-  - {x: -9.846424, y: 5.4866066}
-  - {x: -9.846424, y: 5.5838103}
-  - {x: -9.846424, y: 5.68101}
-  - {x: -9.846424, y: 5.7782087}
-  - {x: -9.846424, y: 5.875413}
-  - {x: -9.846424, y: 5.972612}
-  - {x: -9.846424, y: 6.069816}
-  - {x: -9.846424, y: 6.1806393}
-  - {x: -9.851814, y: 6.278427}
-  - {x: -9.872322, y: 6.3265395}
-  - {x: -9.892975, y: 6.371936}
-  - {x: -9.913777, y: 6.414897}
-  - {x: -9.934716, y: 6.4556274}
-  - {x: -9.955788, y: 6.4943295}
-  - {x: -9.976981, y: 6.531158}
-  - {x: -9.998278, y: 6.5662417}
-  - {x: -10.01968, y: 6.5997195}
-  - {x: -10.041177, y: 6.6317053}
-  - {x: -10.062755, y: 6.662289}
-  - {x: -10.08439, y: 6.691539}
-  - {x: -10.106092, y: 6.719563}
-  - {x: -10.127842, y: 6.7464194}
-  - {x: -10.149632, y: 6.7721786}
-  - {x: -10.171445, y: 6.79689}
-  - {x: -10.193283, y: 6.8206205}
-  - {x: -10.215134, y: 6.8434186}
-  - {x: -10.236967, y: 6.865311}
-  - {x: -10.25881, y: 6.8863764}
-  - {x: -10.280639, y: 6.9066367}
-  - {x: -10.302436, y: 6.926123}
-  - {x: -10.324209, y: 6.9448853}
-  - {x: -10.3459425, y: 6.962948}
-  - {x: -10.367647, y: 6.9803557}
-  - {x: -10.389296, y: 6.9971237}
-  - {x: -10.410895, y: 7.013288}
-  - {x: -10.432451, y: 7.0288815}
-  - {x: -10.453948, y: 7.043924}
-  - {x: -10.475389, y: 7.05844}
-  - {x: -10.496756, y: 7.072446}
-  - {x: -10.5180645, y: 7.0859756}
-  - {x: -10.539321, y: 7.099051}
-  - {x: -10.560497, y: 7.111679}
-  - {x: -10.581613, y: 7.123888}
-  - {x: -10.602649, y: 7.13569}
-  - {x: -10.623612, y: 7.147102}
-  - {x: -10.644527, y: 7.158154}
-  - {x: -10.665364, y: 7.1688476}
-  - {x: -10.686128, y: 7.1791987}
-  - {x: -10.706824, y: 7.1892242}
-  - {x: -10.727458, y: 7.1989393}
-  - {x: -10.748023, y: 7.208354}
-  - {x: -10.768516, y: 7.217477}
-  - {x: -10.788935, y: 7.22632}
-  - {x: -10.809311, y: 7.234906}
-  - {x: -10.829623, y: 7.2432375}
-  - {x: -10.849857, y: 7.251315}
-  - {x: -10.870032, y: 7.259158}
-  - {x: -10.870104, y: 7.2591853}
-  - {x: -10.884423, y: 7.307162}
-  - {x: -10.902096, y: 7.366375}
-  - {x: -10.919769, y: 7.4255905}
-  - {x: -10.937442, y: 7.484803}
-  - {x: -10.955115, y: 7.544019}
-  - {x: -10.972788, y: 7.603232}
-  - {x: -10.99046, y: 7.6624446}
-  - {x: -11.008134, y: 7.7216606}
-  - {x: -11.025806, y: 7.7808733}
-  - {x: -11.04348, y: 7.84009}
-  - {x: -11.061152, y: 7.8993025}
-  - {x: -11.078825, y: 7.9585147}
-  - {x: -11.0964985, y: 8.017732}
-  - {x: -11.114171, y: 8.076943}
-  - {x: -11.1318445, y: 8.136159}
-  - {x: -11.149517, y: 8.195372}
-  - {x: -11.16719, y: 8.254584}
-  - {x: -11.184863, y: 8.313801}
-  - {x: -11.202536, y: 8.3730135}
-  - {x: -11.220209, y: 8.432229}
-  - {x: -11.237882, y: 8.491442}
-  - {x: -11.255554, y: 8.550654}
-  - {x: -11.273229, y: 8.609872}
-  - {x: -11.290901, y: 8.669085}
-  - {x: -11.308574, y: 8.728299}
-  - {x: -11.356118, y: 8.855478}
+  - {x: -9.670571, y: 3.7418082}
+  - {x: -9.670571, y: 3.8359547}
+  - {x: -9.670571, y: 3.930101}
+  - {x: -9.670571, y: 4.0242467}
+  - {x: -9.670571, y: 4.1183934}
+  - {x: -9.670571, y: 4.212545}
+  - {x: -9.670571, y: 4.306691}
+  - {x: -9.670571, y: 4.4008374}
+  - {x: -9.670571, y: 4.4949837}
+  - {x: -9.670571, y: 4.58913}
+  - {x: -9.670571, y: 4.683276}
+  - {x: -9.670571, y: 4.7774224}
+  - {x: -9.670571, y: 4.877157}
+  - {x: -9.670571, y: 4.992518}
+  - {x: -9.670571, y: 5.039896}
+  - {x: -9.670571, y: 5.084665}
+  - {x: -9.674875, y: 5.127054}
+  - {x: -9.695111, y: 5.1673036}
+  - {x: -9.7154665, y: 5.2055664}
+  - {x: -9.735944, y: 5.242016}
+  - {x: -9.756521, y: 5.2767673}
+  - {x: -9.777203, y: 5.309961}
+  - {x: -9.797981, y: 5.34171}
+  - {x: -9.818836, y: 5.3720856}
+  - {x: -9.839754, y: 5.4011664}
+  - {x: -9.8607435, y: 5.4290586}
+  - {x: -9.881775, y: 5.455802}
+  - {x: -9.902851, y: 5.481476}
+  - {x: -9.923975, y: 5.5061483}
+  - {x: -9.945103, y: 5.5298376}
+  - {x: -9.966256, y: 5.5526223}
+  - {x: -9.987415, y: 5.5745387}
+  - {x: -10.00857, y: 5.5956225}
+  - {x: -10.029728, y: 5.6159315}
+  - {x: -10.050851, y: 5.6354694}
+  - {x: -10.0719795, y: 5.6543193}
+  - {x: -10.093067, y: 5.6724715}
+  - {x: -10.114113, y: 5.689966}
+  - {x: -10.135136, y: 5.7068496}
+  - {x: -10.156112, y: 5.7231336}
+  - {x: -10.17704, y: 5.7388477}
+  - {x: -10.197925, y: 5.754023}
+  - {x: -10.218748, y: 5.768671}
+  - {x: -10.239522, y: 5.7828264}
+  - {x: -10.260234, y: 5.796501}
+  - {x: -10.280903, y: 5.80973}
+  - {x: -10.301499, y: 5.8225155}
+  - {x: -10.322039, y: 5.8348846}
+  - {x: -10.342492, y: 5.84684}
+  - {x: -10.362898, y: 5.8584204}
+  - {x: -10.383244, y: 5.8696337}
+  - {x: -10.403526, y: 5.8804946}
+  - {x: -10.423739, y: 5.8910127}
+  - {x: -10.443891, y: 5.901207}
+  - {x: -10.463968, y: 5.911084}
+  - {x: -10.483985, y: 5.920662}
+  - {x: -10.503937, y: 5.929952}
+  - {x: -10.523843, y: 5.938971}
+  - {x: -10.543678, y: 5.94772}
+  - {x: -10.5634365, y: 5.956206}
+  - {x: -10.583148, y: 5.964451}
+  - {x: -10.602788, y: 5.9724536}
+  - {x: -10.616948, y: 5.9780755}
+  - {x: -10.624626, y: 6.0220513}
+  - {x: -10.641744, y: 6.120087}
+  - {x: -10.658862, y: 6.218128}
+  - {x: -10.67598, y: 6.316164}
+  - {x: -10.693097, y: 6.4142}
+  - {x: -10.710215, y: 6.5122356}
+  - {x: -10.727332, y: 6.6102715}
+  - {x: -10.74445, y: 6.7083073}
+  - {x: -10.761567, y: 6.806343}
+  - {x: -10.778685, y: 6.904379}
+  - {x: -10.795802, y: 7.0024147}
+  - {x: -10.81292, y: 7.100451}
+  - {x: -10.830038, y: 7.1984925}
+  - {x: -10.847156, y: 7.2965283}
+  - {x: -10.864273, y: 7.394564}
+  - {x: -10.881391, y: 7.4925995}
+  - {x: -10.898508, y: 7.5906353}
+  - {x: -10.915626, y: 7.688671}
+  - {x: -10.932743, y: 7.786707}
+  - {x: -10.949861, y: 7.8847427}
+  - {x: -10.966978, y: 7.9827785}
+  - {x: -10.984096, y: 8.080814}
+  - {x: -11.001213, y: 8.17885}
+  - {x: -11.018332, y: 8.276892}
+  - {x: -11.035449, y: 8.3749275}
+  - {x: -11.052567, y: 8.472963}
+  - {x: -11.069684, y: 8.570999}
+  - {x: -11.099104, y: 8.71634}
 --- !u!4 &67384314
 Transform:
   m_ObjectHideFlags: 0
@@ -369,6 +368,58 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 50.06966, y: -0, z: -52.77485}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &222576862
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 222576864}
+  - component: {fileID: 222576863}
+  m_Layer: 0
+  m_Name: FashionTimberDefinitionModelTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &222576863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 222576862}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e00081e99df64d79a10da2d73c4d5aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FashionTimberDefinitionModelTest
+  sheerPlan: {fileID: 1972862976}
+  fashionTimberModel: {fileID: 485762491}
+  foreFaceModel: {fileID: 1285979416}
+  specialFrames: {fileID: 0}
+  intermediateTimberCount: 4
+  timberColor: {r: 0.9085845, g: 0, b: 1, a: 1}
+  dashSize: 0.5
+  useDashedLines: 0
+--- !u!4 &222576864
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 222576862}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.09017, y: 3.57922, z: -9.82646}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -408,11 +459,11 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   frameSpacing: 0.5
   frameThicknessRatio: 1
-  frameDepth: 0.5
   frameColor: {r: 0, g: 1, b: 1, a: 1}
   foreFaceFashionTimberModelTest: {fileID: 1285979416}
+  fashionTimberModelTest: {fileID: 0}
   showFrames: 1
-  showFrameLabels: 0
+  showFrameLabels: 1
   showFloorSweepsGuide: 1
   showSurfaceRibbands: 1
   showWaterlines: 0
@@ -517,7 +568,6 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   frameSpacing: 0.5
   frameThicknessRatio: 1
-  frameDepth: 0.5
   frameColor: {r: 0, g: 1, b: 1, a: 1}
   foreFaceFashionTimberModel: {fileID: 67384313}
   showFrames: 1
@@ -1048,7 +1098,7 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   breadthPlan: {fileID: 1109839672}
   bodyPlan: {fileID: 722911565}
-  framingModel: {fileID: 287447048}
+  framingModel: {fileID: 243527243}
   showFashionTimbers: 1
   showLabels: 1
   fashionColor: {r: 1, g: 0, b: 1, a: 1}
@@ -1490,7 +1540,7 @@ MonoBehaviour:
   topTimberSternArmAngle: 0
   topTimberSternArmLength: 1
   cutMaxBeam: 3.2
-  cutTransomWidth: 0.45684832
+  cutTransomWidth: 0.4564539
   cutBowArmAngle: 0
   cutBowArmLength: 1
   cutMidshipFwdArmLength: 0.5
@@ -1503,7 +1553,7 @@ MonoBehaviour:
   cachedFwdP3: {x: 4, y: 5, z: 0}
   cachedAftP0: {x: 4, y: 5, z: 0}
   cachedAftP1: {x: 4, y: 5, z: -5}
-  cachedAftP2: {x: 2.4, y: 5, z: -10}
+  cachedAftP2: {x: 2.4, y: 5, z: -10.320983}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
   cachedTTFwdP0: {x: 0.125, y: 8, z: 10}
@@ -1512,7 +1562,7 @@ MonoBehaviour:
   cachedTTFwdP3: {x: 3.2, y: 8, z: 0}
   cachedTTAftP0: {x: 3.2, y: 8, z: 0}
   cachedTTAftP1: {x: 3.2, y: 8, z: -5}
-  cachedTTAftP2: {x: 1.4592, y: 8, z: -11.613716}
+  cachedTTAftP2: {x: 1.4592, y: 8, z: -11.38842}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
   cachedCutFwdP0: {x: 0.125, y: 8.5, z: 10}
@@ -1521,7 +1571,7 @@ MonoBehaviour:
   cachedCutFwdP3: {x: 3.2, y: 8.5, z: 0}
   cachedCutAftP0: {x: 3.2, y: 8.5, z: 0}
   cachedCutAftP1: {x: 3.2, y: 8.5, z: -5}
-  cachedCutAftP2: {x: 1.4619147, y: 8.5, z: -11.613716}
+  cachedCutAftP2: {x: 1.4606525, y: 8.5, z: -11.38842}
   cachedCutAftP3: {x: 0, y: 0, z: 0}
   cachedIsCutAftCubic: 0
 --- !u!43 &1250226744
@@ -1732,11 +1782,125 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ForeFaceFashionTimberModelTest
   sheerPlan: {fileID: 1972862976}
-  fashionTimberModel: {fileID: 900456903}
-  thickness: 0.3
+  fashionTimberModel: {fileID: 485762491}
+  specialFrames: {fileID: 2057186615}
+  thickness: 0.25
   showInnerFashionTimber: 1
   innerColor: {r: 1, g: 0, b: 1, a: 1}
-  cachedInnerPoints: []
+  cachedInnerPoints:
+  - {x: -9.464768, y: 2.556226}
+  - {x: -9.464768, y: 2.6261032}
+  - {x: -9.464768, y: 2.6959805}
+  - {x: -9.464768, y: 2.7658577}
+  - {x: -9.464768, y: 2.8357348}
+  - {x: -9.464768, y: 2.905612}
+  - {x: -9.464768, y: 2.9754894}
+  - {x: -9.464768, y: 3.0453665}
+  - {x: -9.464768, y: 3.1152437}
+  - {x: -9.464768, y: 3.185121}
+  - {x: -9.464768, y: 3.2549982}
+  - {x: -9.464768, y: 3.3248754}
+  - {x: -9.464768, y: 3.3947527}
+  - {x: -9.464768, y: 3.46463}
+  - {x: -9.464768, y: 3.534507}
+  - {x: -9.464768, y: 3.6043844}
+  - {x: -9.464768, y: 3.6742616}
+  - {x: -9.464768, y: 3.7441387}
+  - {x: -9.464768, y: 3.8140159}
+  - {x: -9.464768, y: 3.8838933}
+  - {x: -9.464768, y: 3.9537704}
+  - {x: -9.481545, y: 4.0460443}
+  - {x: -9.4983225, y: 4.1383176}
+  - {x: -9.515099, y: 4.230586}
+  - {x: -9.531876, y: 4.32286}
+  - {x: -9.548653, y: 4.4151335}
+  - {x: -9.56543, y: 4.507407}
+  - {x: -9.582207, y: 4.599681}
+  - {x: -9.598983, y: 4.6919494}
+  - {x: -9.61576, y: 4.784223}
+  - {x: -9.632555, y: 4.8765955}
+  - {x: -9.658385, y: 4.9836354}
+  - {x: -9.681986, y: 5.0423136}
+  - {x: -9.701059, y: 5.085787}
+  - {x: -9.720241, y: 5.126932}
+  - {x: -9.739528, y: 5.16596}
+  - {x: -9.758923, y: 5.2030683}
+  - {x: -9.778405, y: 5.238384}
+  - {x: -9.797979, y: 5.2720623}
+  - {x: -9.81764, y: 5.3042235}
+  - {x: -9.837378, y: 5.3349724}
+  - {x: -9.857173, y: 5.364381}
+  - {x: -9.877035, y: 5.3925576}
+  - {x: -9.896948, y: 5.419568}
+  - {x: -9.916908, y: 5.4454837}
+  - {x: -9.936903, y: 5.470362}
+  - {x: -9.956936, y: 5.494273}
+  - {x: -9.976982, y: 5.517244}
+  - {x: -9.997041, y: 5.539336}
+  - {x: -10.017123, y: 5.5606084}
+  - {x: -10.037204, y: 5.5810843}
+  - {x: -10.057278, y: 5.6008015}
+  - {x: -10.077337, y: 5.619797}
+  - {x: -10.097395, y: 5.63812}
+  - {x: -10.117433, y: 5.6557884}
+  - {x: -10.1374445, y: 5.672832}
+  - {x: -10.157421, y: 5.6892757}
+  - {x: -10.177381, y: 5.7051616}
+  - {x: -10.197294, y: 5.7204947}
+  - {x: -10.217179, y: 5.7353163}
+  - {x: -10.237022, y: 5.7496386}
+  - {x: -10.256829, y: 5.7634892}
+  - {x: -10.276577, y: 5.7768745}
+  - {x: -10.296286, y: 5.7898283}
+  - {x: -10.315943, y: 5.8023615}
+  - {x: -10.335567, y: 5.8145046}
+  - {x: -10.355129, y: 5.8262553}
+  - {x: -10.374637, y: 5.8376355}
+  - {x: -10.394094, y: 5.8486624}
+  - {x: -10.413511, y: 5.859356}
+  - {x: -10.432868, y: 5.8697195}
+  - {x: -10.452166, y: 5.879765}
+  - {x: -10.471422, y: 5.889517}
+  - {x: -10.490625, y: 5.8989778}
+  - {x: -10.50978, y: 5.908162}
+  - {x: -10.528875, y: 5.917075}
+  - {x: -10.547923, y: 5.9257326}
+  - {x: -10.566928, y: 5.934146}
+  - {x: -10.585883, y: 5.9423194}
+  - {x: -10.604781, y: 5.95026}
+  - {x: -10.623626, y: 5.9579782}
+  - {x: -10.642441, y: 5.96549}
+  - {x: -10.661201, y: 5.972792}
+  - {x: -10.667699, y: 5.975259}
+  - {x: -10.672465, y: 6.0022964}
+  - {x: -10.689242, y: 6.097463}
+  - {x: -10.706018, y: 6.192624}
+  - {x: -10.7227955, y: 6.2877903}
+  - {x: -10.739573, y: 6.3829565}
+  - {x: -10.75635, y: 6.4781227}
+  - {x: -10.773127, y: 6.5732894}
+  - {x: -10.789903, y: 6.6684504}
+  - {x: -10.80668, y: 6.7636166}
+  - {x: -10.823457, y: 6.858783}
+  - {x: -10.840234, y: 6.953949}
+  - {x: -10.857011, y: 7.0491157}
+  - {x: -10.873787, y: 7.1442766}
+  - {x: -10.890564, y: 7.239443}
+  - {x: -10.907341, y: 7.334609}
+  - {x: -10.924118, y: 7.429775}
+  - {x: -10.940895, y: 7.524942}
+  - {x: -10.957671, y: 7.620103}
+  - {x: -10.974448, y: 7.715269}
+  - {x: -10.991225, y: 7.8104353}
+  - {x: -11.008002, y: 7.9056015}
+  - {x: -11.024778, y: 8.000762}
+  - {x: -11.041555, y: 8.095929}
+  - {x: -11.058332, y: 8.191095}
+  - {x: -11.0751095, y: 8.286262}
+  - {x: -11.0918865, y: 8.381428}
+  - {x: -11.108663, y: 8.476589}
+  - {x: -11.12544, y: 8.571755}
+  - {x: -11.152646, y: 8.706648}
 --- !u!4 &1285979417
 Transform:
   m_ObjectHideFlags: 0
@@ -1784,7 +1948,7 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   breadthPlan: {fileID: 1109839672}
   bodyPlan: {fileID: 722911565}
-  framingModel: {fileID: 287447048}
+  framingModel: {fileID: 243527243}
   foreFaceFashionTimberModelTest: {fileID: 1285979416}
   showInnerForeFaceFashionTimber: 1
   innerForeFaceColor: {r: 0, g: 1, b: 1, a: 1}
@@ -1937,8 +2101,8 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   breadthPlan: {fileID: 1109839672}
   bodyPlan: {fileID: 722911565}
-  framingModel: {fileID: 287447048}
-  fashionTimberModelTest: {fileID: 485762491}
+  framingModel: {fileID: 243527243}
+  fashionTimberModel: {fileID: 485762491}
   showInnerFashionTimbers: 1
   innerFashionColor: {r: 0, g: 1, b: 1, a: 1}
 --- !u!4 &1611933122
@@ -2021,14 +2185,14 @@ MonoBehaviour:
   stemTopControlY: 0.5
   sternPostRakePercentage: 0.05
   showDeadwoodRake: 1
-  deadwoodRakeForeSlider: 0.65
-  deadwoodRakeAftSlider: 0.31
-  deadwoodBottomControlZ: 0.678
+  deadwoodRakeForeSlider: 0.86
+  deadwoodRakeAftSlider: 0.36
+  deadwoodBottomControlZ: 0.83
   deadwoodBottomControlY: 0
   deadwoodTopControlZ: 1
-  deadwoodTopControlY: 0.6
+  deadwoodTopControlY: 0.16
   enableCounter: 1
-  counterVerticalSlide: 0.56
+  counterVerticalSlide: 0.19
   counterLength: 1
   counterHeightRatio: 0.106
   counterCurveAngle: 0.214
@@ -2065,45 +2229,45 @@ MonoBehaviour:
   hobSternHeight: 3.5
   hobDropAft: 0
   hobCurveControlLength: 0.5
-  bowRisingLineEndPos: 1
+  bowRisingLineEndPos: 0.7
   bowRisingLineControl: 0.5
-  sternRisingLineEndPos: 0.76
+  sternRisingLineEndPos: 0.8
   sternRisingLineControl: 0.5
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
-  cachedBowRisingEnd: {x: 0, y: 5.499996, z: 10}
-  cachedBowP1Ctrl: {x: 0, y: -0, z: 4.9999986}
-  cachedSternRisingEnd: {x: 0, y: 4.655334, z: -9.846424}
+  cachedBowRisingEnd: {x: 0, y: 3.8500009, z: 9.827471}
+  cachedBowP1Ctrl: {x: 0, y: -0, z: 4.5146646}
+  cachedSternRisingEnd: {x: 0, y: 3.909048, z: -9.710736}
   cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
   cachedStemTopPoint: {x: 0, y: 5.5, z: 10}
-  cachedSternPostTopPoint: {x: 0, y: 6.1254396, z: -10.113716}
-  cachedCounterBasePoint: {x: 0, y: 6.1254396, z: -10.113716}
-  cachedCounterTopPoint: {x: 0, y: 7.0264397, z: -11.113716}
-  cachedCounterCp1: {x: 0, y: 6.5907025, z: -10.2941475}
-  cachedCounterCp2: {x: 0, y: 6.8638716, z: -10.597331}
-  cachedDeadwoodForePoint: {x: 0, y: 0, z: -5.85}
-  cachedDeadwoodAftPoint: {x: 0, y: 1.8988863, z: -9.345252}
-  cachedDeadwoodP1: {x: 0, y: 0, z: -7.9856997}
-  cachedDeadwoodP2: {x: 0, y: 1.1393318, z: -9.207151}
-  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10}
-  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10}
+  cachedSternPostTopPoint: {x: 0, y: 4.88631, z: -9.88842}
+  cachedCounterBasePoint: {x: 0, y: 4.88631, z: -9.88842}
+  cachedCounterTopPoint: {x: 0, y: 5.78731, z: -10.88842}
+  cachedCounterCp1: {x: 0, y: 5.351573, z: -10.068851}
+  cachedCounterCp2: {x: 0, y: 5.624742, z: -10.372035}
+  cachedDeadwoodForePoint: {x: 0, y: 0, z: -7.7400002}
+  cachedDeadwoodAftPoint: {x: 0, y: 1.7590717, z: -9.319831}
+  cachedDeadwoodP1: {x: 0, y: 0, z: -8.7858}
+  cachedDeadwoodP2: {x: 0, y: 0.28145146, z: -9.051173}
+  cachedBaseDeckSternIntersect: {x: 0, y: 5.5, z: -10.320983}
+  cachedBaseDeckSternCp: {x: 0, y: 5.5, z: -10.320983}
   cachedBaseDeckMidCpAft: {x: 0, y: 5, z: -6}
   cachedBaseDeckMidshipPoint: {x: 0, y: 5, z: 0}
   cachedBaseDeckMidCpFwd: {x: 0, y: 5, z: 6}
   cachedBaseDeckBowCp: {x: 0, y: 5.5, z: 10}
   cachedBaseDeckBowIntersect: {x: 0, y: 5.5, z: 10}
   cachedUpperStemTopPoint: {x: 0, y: 7, z: 10}
-  cachedTransomTopPoint: {x: 0, y: 8.5, z: -11.613716}
-  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.613716}
-  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.613716}
+  cachedTransomTopPoint: {x: 0, y: 8.5, z: -11.38842}
+  cachedTopTimberSternIntersect: {x: 0, y: 7, z: -11.38842}
+  cachedTopTimberSternCp: {x: 0, y: 7, z: -11.38842}
   cachedTopTimberMidCpAft: {x: 0, y: 6.5, z: -6}
   cachedTopTimberMidshipPoint: {x: 0, y: 6.5, z: 0}
   cachedTopTimberMidCpFwd: {x: 0, y: 6.5, z: 6}
   cachedTopTimberBowCp: {x: 0, y: 7, z: 10}
   cachedTopTimberBowIntersect: {x: 0, y: 7, z: 10}
-  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10}
-  cachedHobSternCp: {x: 0, y: 5.5, z: -10}
+  cachedHobSternIntersect: {x: 0, y: 5.5, z: -10.320983}
+  cachedHobSternCp: {x: 0, y: 5.5, z: -10.320983}
   cachedHobMidCpAft: {x: 0, y: 5, z: -6}
   cachedHobMidshipPoint: {x: 0, y: 5, z: 0}
   cachedHobMidCpFwd: {x: 0, y: 5, z: 6}
@@ -2111,6 +2275,54 @@ MonoBehaviour:
   cachedHobBowIntersect: {x: 0, y: 5.5, z: 10}
   cachedStemP1: {x: 0, y: 0, z: 8.5}
   cachedStemP2: {x: 0, y: 2.75, z: 10}
+--- !u!1 &2057186614
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2057186616}
+  - component: {fileID: 2057186615}
+  m_Layer: 0
+  m_Name: ForeFashionTimberSpecialFramesTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2057186615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2057186614}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa19bd9acb7294db6b07e940cf2c1990, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ForeFashionTimberSpecialFramesTest
+  framingModel: {fileID: 243527243}
+  foreFaceFashionTimberModelTest: {fileID: 1285979416}
+  frameCount: 5
+  frameColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+--- !u!4 &2057186616
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2057186614}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 18.70047, y: 0, z: -1.3901}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2136,3 +2348,5 @@ SceneRoots:
   - {fileID: 243527244}
   - {fileID: 485762492}
   - {fileID: 1611933122}
+  - {fileID: 2057186616}
+  - {fileID: 222576864}
