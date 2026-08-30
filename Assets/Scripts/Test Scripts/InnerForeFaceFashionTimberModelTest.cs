@@ -149,14 +149,18 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
         }
     }
 
-    public List<Vector3> GetFashionTimberPoints(bool isStbd)
-    {
-        List<Vector3> pts = new List<Vector3>();
+    private List<Vector3> cachedStbdPoints = new List<Vector3>();
+    private List<Vector3> cachedPortPoints = new List<Vector3>();
 
-        if (foreFaceFashionTimberModelTest == null) return pts;
+    public void UpdateCachedPoints()
+    {
+        cachedStbdPoints.Clear();
+        cachedPortPoints.Clear();
+
+        if (foreFaceFashionTimberModelTest == null) return;
 
         List<Vector3> outerPoints = foreFaceFashionTimberModelTest.GetFashionTimberPoints(true);
-        if (outerPoints == null || outerPoints.Count == 0) return pts;
+        if (outerPoints == null || outerPoints.Count == 0) return;
 
         for (int i = 0; i < outerPoints.Count; i++)
         {
@@ -173,11 +177,62 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
             
             Vector3 innerPt = pt + normal * currentThickness;
             
-            if (innerPt.x <= 0f) continue;
-            
-            if (!isStbd) innerPt.x = -innerPt.x;
-            pts.Add(innerPt);
+            if (innerPt.x > 0f)
+            {
+                cachedStbdPoints.Add(innerPt);
+                cachedPortPoints.Add(new Vector3(-innerPt.x, innerPt.y, innerPt.z));
+            }
         }
-        return pts;
+    }
+
+    public List<Vector3> GetFashionTimberPoints(bool isStbd)
+    {
+        if (cachedStbdPoints.Count == 0) UpdateCachedPoints();
+        return isStbd ? cachedStbdPoints : cachedPortPoints;
+    }
+    public float GetMinZ()
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return sheerPlan != null ? sheerPlan.cachedTransomTopPoint.z : 0;
+        float minZ = float.MaxValue;
+        foreach (var p in pts)
+        {
+            if (p.z < minZ) minZ = p.z;
+        }
+        return minZ;
+    }
+
+    public float GetMaxZ()
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return sheerPlan != null ? sheerPlan.cachedSternRisingEnd.z : 0;
+        float maxZ = float.MinValue;
+        foreach (var p in pts)
+        {
+            if (p.z > maxZ) maxZ = p.z;
+        }
+        return maxZ;
+    }
+
+    public float GetInnerYAtZ(float z)
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return 0f;
+        
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            Vector3 p1 = pts[i];
+            Vector3 p2 = pts[i+1];
+            
+            if ((z >= p1.z && z <= p2.z) || (z <= p1.z && z >= p2.z))
+            {
+                if (Mathf.Abs(p2.z - p1.z) < 0.0001f) return Mathf.Min(p1.y, p2.y);
+                float t = (z - p1.z) / (p2.z - p1.z);
+                return Mathf.Lerp(p1.y, p2.y, t);
+            }
+        }
+        
+        if (z < GetMinZ()) return pts[0].y;
+        return pts[pts.Count - 1].y;
     }
 }

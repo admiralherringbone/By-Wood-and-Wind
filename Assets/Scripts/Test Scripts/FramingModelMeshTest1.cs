@@ -13,7 +13,7 @@ public class FramingModelMeshTest1 : MonoBehaviour
     public FashionTimberModelTest sternFashionTimberTest;
     [Tooltip("Reference to the ForeFaceFashionTimberModelTest.")]
     public ForeFaceFashionTimberModelTest foreFaceFashionTimberTest;
-    public InnerFramingModel innerFramingModel;
+    public InnerFramingModelTest innerFramingModel;
     [Tooltip("Reference to the InnerFashionTimberModelTest (Aft Inner).")]
     public InnerFashionTimberModelTest innerFashionTimberTest;
     [Tooltip("Reference to the InnerForeFaceFashionTimberModelTest.")]
@@ -147,8 +147,8 @@ public class FramingModelMeshTest1 : MonoBehaviour
         // Fetch exact inner curves
         if (innerFramingModel != null)
         {
-            box.foreInnerStbd = innerFramingModel.GetCleanedInnerCurve(foreZ);
-            box.aftInnerStbd = innerFramingModel.GetCleanedInnerCurve(aftZ);
+            box.foreInnerStbd = innerFramingModel.GetCleanedInnerCurve(foreZ, fpFore);
+            box.aftInnerStbd = innerFramingModel.GetCleanedInnerCurve(aftZ, fpAft);
             
             foreach (var pt in box.foreInnerStbd) box.foreInnerPort.Add(new Vector3(-pt.x, pt.y, pt.z));
             foreach (var pt in box.aftInnerStbd) box.aftInnerPort.Add(new Vector3(-pt.x, pt.y, pt.z));

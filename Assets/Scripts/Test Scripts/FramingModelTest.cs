@@ -596,6 +596,21 @@ public class FramingModelTest : MonoBehaviour
         
         positions.Sort();
 
+        // Prevent frames from straddling the ForeFaceFashionTimber vertical drop
+        if (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.showInnerFashionTimber && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+        {
+            float ffDropZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
+            float thickness = frameSpacing * GetFrameThicknessRatioValue();
+            
+            positions.RemoveAll(z => 
+            {
+                float aftEdge = z - (thickness / 2f);
+                float foreEdge = z + (thickness / 2f);
+                // Check if the frame straddles the drop Z (allowing exact edge alignment)
+                return (aftEdge < ffDropZ - 0.001f && foreEdge > ffDropZ + 0.001f);
+            });
+        }
+
         if (sheerPlan.upperDecks != null)
         {
             float totalLength = sheerPlan.cachedTopTimberBowIntersect.z - sheerPlan.cachedTopTimberSternIntersect.z;
