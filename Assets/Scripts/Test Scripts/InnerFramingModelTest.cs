@@ -32,7 +32,6 @@ public class InnerFramingModelTest : MonoBehaviour
         if (sheerPlan == null || bodyPlan == null || framingModel == null || !showInnerFrames) return;
         
         if (innerForeFaceFashionTimberTest == null) innerForeFaceFashionTimberTest = Object.FindObjectOfType<InnerForeFaceFashionTimberModelTest>();
-        if (innerForeFaceFashionTimberTest != null) innerForeFaceFashionTimberTest.UpdateCachedPoints();
 
         DrawInnerFrames();
     }

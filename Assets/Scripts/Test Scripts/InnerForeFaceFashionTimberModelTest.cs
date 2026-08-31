@@ -26,6 +26,7 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
     private void OnDrawGizmos()
     {
         if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || foreFaceFashionTimberModelTest == null) return;
+        UpdateCachedPoints();
         DrawInnerForeFaceFashionTimbers();
     }
 
@@ -175,7 +176,10 @@ public class InnerForeFaceFashionTimberModelTest : MonoBehaviour
             float unifiedOverallT = Mathf.Clamp01((pt.y - theoreticalKeelY) / theoreticalTotalHeight);
             float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, unifiedOverallT);
             
-            Vector3 innerPt = pt + normal * currentThickness;
+            Vector3 innerPt = pt;
+            float nx = Mathf.Abs(normal.x);
+            if (nx < 0.15f) nx = 0.15f; // Clamp to prevent blowout to infinity near the keel
+            innerPt.x = pt.x + Mathf.Sign(normal.x) * (currentThickness / nx);
             
             if (innerPt.x > 0f)
             {
