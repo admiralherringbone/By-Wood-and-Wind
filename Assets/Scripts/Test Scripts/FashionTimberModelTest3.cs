@@ -85,6 +85,8 @@ public class FashionTimberModelTest3 : MonoBehaviour
 
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
+        if (sheerPlan == null || breadthPlan == null || framingModel == null) return 0f;
+
         bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
         
         Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;

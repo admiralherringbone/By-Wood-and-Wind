@@ -26,34 +26,29 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
         cachedInnerPoints.Clear();
         if (sheerPlan == null || fashionTimberModel == null) return;
 
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
-        Vector3 risingEnd = lowerBound;
+        // Start mathematical generation from the very bottom of the Stern Post 
+        // to ensure the offset curve crosses the Rising Line.
+        float startZ = sheerPlan.cachedKeelSternPoint.z;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
-
-        float startZ = risingEnd.z;
         float endZ = transomTop.z;
         
         bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
         int segments = 100;
         
-        List<Vector2> rawPoints = new List<Vector2>();
+        List<Vector2> tempPoints = new List<Vector2>();
 
         for (int i = 0; i <= segments; i++)
         {
             float fraction = i / (float)segments;
             float outerZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float outerY = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
+            float outerY = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
             
             float delta = 0.01f;
             float zPlus = outerZ + delta;
-            float yPlus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
+            float yPlus = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
             
             float zMinus = outerZ - delta;
-            float yMinus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
+            float yMinus = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, fraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
             
             Vector2 tangent = new Vector2(zPlus - zMinus, yPlus - yMinus).normalized;
             Vector2 normal = new Vector2(-tangent.y, tangent.x);
@@ -62,12 +57,43 @@ public class ForeFaceFashionTimberModelTest : MonoBehaviour
             float innerZ = outerZ + normal.x * thickness;
             float innerY = outerY + normal.y * thickness;
 
-            rawPoints.Add(new Vector2(innerZ, innerY));
+            tempPoints.Add(new Vector2(innerZ, innerY));
+        }
+
+        // Chop off any points that plunge mathematically below the Rising Line
+        List<Vector2> rawPoints = new List<Vector2>();
+        bool foundIntersection = false;
+        
+        for (int i = 0; i < tempPoints.Count; i++)
+        {
+            float z = tempPoints[i].x;
+            float y = tempPoints[i].y;
+            float risingY = sheerPlan.GetRisingLineYAtZ(z);
+            
+            if (!foundIntersection)
+            {
+                if (y >= risingY)
+                {
+                    // Snap the first valid point precisely to the Rising Line
+                    rawPoints.Add(new Vector2(z, risingY));
+                    foundIntersection = true;
+                }
+            }
+            else
+            {
+                rawPoints.Add(new Vector2(z, y));
+            }
+        }
+        
+        // Failsafe in case it never crosses the rising line mathematically
+        if (rawPoints.Count == 0)
+        {
+            rawPoints = tempPoints;
         }
 
         // Add the vertical parallel drop down to the bottom of the hull for inner
-        // ONLY if the Outer Timber actually has lower moulds (i.e., it starts below the HoB line).
-        bool outerStartsBelowHob = risingEnd.y < sheerPlan.GetTheoreticalHobYAtZ(risingEnd.z) - 0.001f;
+        // ONLY if the Outer Timber actually has lower moulds
+        bool outerStartsBelowHob = sheerPlan.cachedSternRisingEnd.y < sheerPlan.GetTheoreticalHobYAtZ(sheerPlan.cachedSternRisingEnd.z) - 0.001f;
         
         if (outerStartsBelowHob)
         {

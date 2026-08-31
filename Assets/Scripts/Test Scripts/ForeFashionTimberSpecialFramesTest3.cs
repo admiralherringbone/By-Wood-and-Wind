@@ -4,18 +4,18 @@ using UnityEngine;
 public class ForeFashionTimberSpecialFramesTest3 : MonoBehaviour
 {
     public FramingModelTest3 framingModel;
-    public ForeFaceFashionTimberModelTest foreFaceFashionTimberModelTest;
+    public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest3;
     public int frameCount = 5;
     public Color frameColor = Color.gray;
 
     private void OnDrawGizmos()
     {
-        if (framingModel == null || foreFaceFashionTimberModelTest == null || framingModel.sheerPlan == null) return;
+        if (framingModel == null || foreFaceFashionTimberModelTest3 == null || framingModel.sheerPlan == null) return;
         
-        if (foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+        if (foreFaceFashionTimberModelTest3.cachedInnerPoints != null && foreFaceFashionTimberModelTest3.cachedInnerPoints.Count > 0)
         {
-            float bottomZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
-            float endZ = foreFaceFashionTimberModelTest.GetHobIntersection().z;
+            float bottomZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[0].x;
+            float endZ = foreFaceFashionTimberModelTest3.GetHobIntersection().z;
 
             FramingModelTest3.FrameProfile masterFp = framingModel.GetRawFrameProfile(bottomZ, false);
             if (!masterFp.isValid || !masterFp.hasLower) return;
@@ -31,7 +31,7 @@ public class ForeFashionTimberSpecialFramesTest3 : MonoBehaviour
 
     public FramingModelTest3.FrameProfile GetScaledMasterFrameProfile(float z, FramingModelTest3.FrameProfile masterFp, float bottomZ)
     {
-        if (framingModel == null || foreFaceFashionTimberModelTest == null || framingModel.sheerPlan == null) return new FramingModelTest3.FrameProfile { isValid = false };
+        if (framingModel == null || foreFaceFashionTimberModelTest3 == null || framingModel.sheerPlan == null) return new FramingModelTest3.FrameProfile { isValid = false };
         
         if (!masterFp.isValid || !masterFp.hasLower) return new FramingModelTest3.FrameProfile { isValid = false };
 
@@ -90,10 +90,10 @@ public class ForeFashionTimberSpecialFramesTest3 : MonoBehaviour
         if (framingModel == null || framingModel.sheerPlan == null) return 0f;
 
         float hobY = framingModel.sheerPlan.GetTheoreticalHobYAtZ(z);
-        if (targetY > hobY - 0.001f && foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.fashionTimberModel != null)
+        if (targetY > hobY - 0.001f && foreFaceFashionTimberModelTest3 != null && foreFaceFashionTimberModelTest3.fashionTimberModel != null)
         {
             // We only scaled the lower moulds; upper moulds fall back to normal math
-            return foreFaceFashionTimberModelTest.fashionTimberModel.GetNaturalHullXAtYZ(targetY, z);
+            return foreFaceFashionTimberModelTest3.fashionTimberModel.GetNaturalHullXAtYZ(targetY, z);
         }
 
         FramingModelTest3.FrameProfile fp = GetScaledMasterFrameProfile(z, masterFp, bottomZ);

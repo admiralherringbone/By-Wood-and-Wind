@@ -36,6 +36,9 @@ public class FramingModelTest3 : MonoBehaviour
     [Tooltip("Reference to the ForeFaceFashionTimberModelTest3.")]
     public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest3;
 
+    [Tooltip("Reference to the FashionTimberModelTest3.")]
+    public FashionTimberModelTest3 fashionTimberModelTest;
+
     [Header("Frame Visualization Settings")]
     public bool showFrames = true;
     public bool showFrameLabels = false;
@@ -97,7 +100,6 @@ public class FramingModelTest3 : MonoBehaviour
             fashionLowerBound = sheerPlan.cachedDeadwoodAftPoint;
         }
 
-        // Just follow the physical backbone/deadwood instead of using phantom line projections
         float originalKeelY = keelY;
         if (keelYOverride.HasValue)
         {
@@ -258,12 +260,12 @@ public class FramingModelTest3 : MonoBehaviour
         FrameProfile fp = GetRawFrameProfile(z);
         if (!fp.isValid) return fp;
 
-        if (foreFaceFashionTimberModelTest3 == null)
+        if (this.foreFaceFashionTimberModelTest3 == null)
         {
-            foreFaceFashionTimberModelTest3 = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
+            this.foreFaceFashionTimberModelTest3 = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
         }
 
-        float sternBoundaryZ = foreFaceFashionTimberModelTest3 != null ? foreFaceFashionTimberModelTest3.GetMinZ() : sheerPlan.cachedSternRisingEnd.z;
+        float sternBoundaryZ = sheerPlan.cachedSternRisingEnd.z;
         
         // Remove any frames that are past the stern boundary
         if (z < sternBoundaryZ - 0.001f)
@@ -272,39 +274,8 @@ public class FramingModelTest3 : MonoBehaviour
             return fp;
         }
 
-        float sternMaxZ = foreFaceFashionTimberModelTest3 != null ? foreFaceFashionTimberModelTest3.GetMaxZ() : sheerPlan.cachedSternRisingEnd.z;
-        bool hitsSternProfile = z < sternMaxZ;
-        
-        if (hitsSternProfile)
-        {
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
-            float fashionY = foreFaceFashionTimberModelTest3 != null ? foreFaceFashionTimberModelTest3.GetInnerYAtZ(z) : sheerPlan.GetSternProfileYAtZ(z);
-            
-            // Removed Fashion Timber boundary override
-
-            if (fashionY >= sheerPlan.GetTopTimberYAtZ(z))
-            {
-                fp.isValid = false;
-                return fp;
-            }
-            
-            if (fashionY > hobY)
-            {
-                if (fp.hasUpper)
-                {
-                    float fMinT = 0f;
-                    float fMaxT = 1f;
-                    for (int i = 0; i < 20; i++)
-                    {
-                        float midT = (fMinT + fMaxT) / 2f;
-                        float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
-                        if (py < fashionY) fMinT = midT;
-                        else fMaxT = midT;
-                    }
-                    fp.upperCutoffT = (fMinT + fMaxT) / 2f;
-                }
-            }
-        }
+        // All Fashion Timber Restrictions have been completely removed per the user's request.
+        // The frames now continue exactly as they normally would up to the Stern End of the Rising Line.
         
         return fp;
     }
@@ -469,10 +440,7 @@ public class FramingModelTest3 : MonoBehaviour
         List<float> positions = new List<float>();
         if (sheerPlan == null) return positions;
 
-        if (foreFaceFashionTimberModelTest3 == null)
-        {
-            foreFaceFashionTimberModelTest3 = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
-        }
+        // Removed redundant FindObjectOfType to optimize performance
 
         if (foreFaceFashionTimberModelTest3 != null)
         {
@@ -480,8 +448,7 @@ public class FramingModelTest3 : MonoBehaviour
         }
 
         float bowZ = sheerPlan.cachedStemTopPoint.z;
-        float sternBoundaryZ = foreFaceFashionTimberModelTest3 != null ? foreFaceFashionTimberModelTest3.GetMinZ() : sheerPlan.cachedTransomTopPoint.z; // Extend transverse frames to the inner timber
-        float keelSternZ = sheerPlan.cachedKeelSternPoint.z;
+        float sternBoundaryZ = sheerPlan.cachedSternRisingEnd.z; // Stop frames naturally at the Stern Rising End
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
 
         for (float z = 0; z <= bowZ;)
@@ -509,6 +476,21 @@ public class FramingModelTest3 : MonoBehaviour
         if (!positions.Contains(risingSternZ)) positions.Add(risingSternZ);
         
         positions.Sort();
+
+        // Prevent frames from straddling the ForeFaceFashionTimber vertical drop
+        if (foreFaceFashionTimberModelTest3 != null && foreFaceFashionTimberModelTest3.showInnerFashionTimber && foreFaceFashionTimberModelTest3.cachedInnerPoints != null && foreFaceFashionTimberModelTest3.cachedInnerPoints.Count > 0)
+        {
+            float ffDropZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[0].x;
+            float thickness = frameSpacing * GetFrameThicknessRatioValue();
+            
+            positions.RemoveAll(z => 
+            {
+                float aftEdge = z - (thickness / 2f);
+                float foreEdge = z + (thickness / 2f);
+                // Check if the frame straddles the drop Z (allowing exact edge alignment)
+                return (aftEdge < ffDropZ - 0.001f && foreEdge > ffDropZ + 0.001f);
+            });
+        }
 
         if (sheerPlan.upperDecks != null)
         {
@@ -581,7 +563,11 @@ public class FramingModelTest3 : MonoBehaviour
         
         Gizmos.color = new Color(0.7f, 0.7f, 0.7f, 1f); // Light Grey
         
-        FashionTimberModelTest3 fModel = Object.FindObjectOfType<FashionTimberModelTest3>();
+        if (this.fashionTimberModelTest == null)
+        {
+            this.fashionTimberModelTest = Object.FindObjectOfType<FashionTimberModelTest3>();
+        }
+        FashionTimberModelTest3 fModel = this.fashionTimberModelTest;
         
         if (fModel != null && fModel.showFashionTimbers)
         {
@@ -1514,12 +1500,17 @@ public class FramingModelTest3 : MonoBehaviour
     }
     public Vector3 GetInnerNormalAtT(FrameProfile fp, bool isUpper, float t, float zPos, Vector3 framePlaneNormal)
     {
-        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
-        Vector3 nextPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f)) : GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f), true);
+        float delta = 0.0001f;
+        float t1 = Mathf.Max(0f, t - delta);
+        float t2 = Mathf.Min(1f, t + delta);
 
-        Vector3 tangent = (nextPt - outerPt).normalized;
+        Vector3 pt1 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t1) : GetSurfacePointAtT(fp, 1f, t1, true);
+        Vector3 pt2 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t2) : GetSurfacePointAtT(fp, 1f, t2, true);
+
+        Vector3 tangent = (pt2 - pt1).normalized;
         if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
 
+        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
         Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
         
         Vector3 toCenter = new Vector3(-outerPt.x, 0, zPos - outerPt.z);
@@ -1530,11 +1521,17 @@ public class FramingModelTest3 : MonoBehaviour
 
     public Vector3 GetInnerPointAtT(FrameProfile fp, bool isUpper, float t, float zPos, Vector3 origin, Vector3 framePlaneNormal, float keelY, float totalHeight)
     {
-        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
-        Vector3 nextPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f)) : GetSurfacePointAtT(fp, 1f, Mathf.Min(1f, t + 0.01f), true);
+        float delta = 0.0001f;
+        float t1 = Mathf.Max(0f, t - delta);
+        float t2 = Mathf.Min(1f, t + delta);
 
-        Vector3 tangent = (nextPt - outerPt).normalized;
+        Vector3 pt1 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t1) : GetSurfacePointAtT(fp, 1f, t1, true);
+        Vector3 pt2 = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t2) : GetSurfacePointAtT(fp, 1f, t2, true);
+
+        Vector3 tangent = (pt2 - pt1).normalized;
         if (tangent.sqrMagnitude < 0.0001f) tangent = Vector3.up;
+
+        Vector3 outerPt = isUpper ? GetUpperSurfacePointAtT(fp, 1f, t) : GetSurfacePointAtT(fp, 1f, t, true);
 
         Vector3 normal = Vector3.Cross(tangent, framePlaneNormal).normalized;
         

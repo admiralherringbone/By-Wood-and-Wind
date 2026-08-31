@@ -26,42 +26,19 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
     private void OnDrawGizmos()
     {
         if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || foreFaceFashionTimberModelTest3 == null) return;
+        UpdateCachedPoints();
         DrawInnerForeFaceFashionTimbers();
     }
 
-    public float GetOuterHullXAndNormalAtYZ(float targetY, float originalZ, out float nx)
+
+
+    public Vector3 GetOuterNormalAtYZ(float targetY, float originalZ)
     {
-        nx = 1f;
         bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
-        
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
-        float lowerAftZ = lowerBound.z;
-        float evalZ = originalZ;
+        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(originalZ, true);
+        if (!fp.isValid) return Vector3.right;
 
-        if (!isUpper && evalZ < lowerAftZ)
-        {
-            evalZ = lowerAftZ;
-        }
-
-        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
-        if (!fp.isValid) return 0f;
-
-        float exactX = 0f;
-
-        float keelY = sheerPlan.GetKeelYAtZ(evalZ);
-        if (sheerPlan.showDeadwoodRake && evalZ < sheerPlan.cachedDeadwoodForePoint.z && evalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
-        {
-            keelY = sheerPlan.GetDeadwoodYAtZ(evalZ);
-        }
-        
-        float peakY = fp.hasUpper ? fp.upperP3.y : fp.lowerP3.y;
-        float totalHeight = Mathf.Max(0.01f, peakY - keelY);
-
-        Vector3 origin = new Vector3(0, 0, evalZ);
+        Vector3 origin = new Vector3(0, 0, originalZ);
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
         Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
         Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
@@ -82,54 +59,25 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
                 else tMaxT = midT;
             }
             float tVal = (tMinT + tMaxT) / 2f;
-            Vector3 outerPt = framingModel.GetUpperSurfacePointAtT(fp, 1f, tVal);
-            
-            exactX = outerPt.x;
-            
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, true, tVal, evalZ, framePlaneNormal);
-            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+            return framingModel.GetInnerNormalAtT(fp, true, tVal, originalZ, framePlaneNormal);
         }
         else if (!isUpper && fp.hasLower)
         {
-            float mappedTargetY = targetY;
-            if (originalZ < lowerAftZ)
-            {
-                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
-                float sternHobY = sheerPlan.GetHobYAtZ(lowerAftZ);
-                float hobDifference = origHobY - sternHobY;
-                mappedTargetY = targetY - hobDifference;
-            }
-
             float fMinT = 0f;
-            float fMaxT = 1f;
+            float fMaxT = fp.lowerTopCutoffT > 0f ? fp.lowerTopCutoffT : 1f;
             for (int i = 0; i < 20; i++)
             {
                 float midT = (fMinT + fMaxT) / 2f;
                 float py = framingModel.GetSurfacePointAtT(fp, 1f, midT, true).y;
-                if (py < mappedTargetY) fMinT = midT;
+                if (py < targetY) fMinT = midT;
                 else fMaxT = midT;
             }
             float tVal = (fMinT + fMaxT) / 2f;
-            Vector3 outerPt = framingModel.GetSurfacePointAtT(fp, 1f, tVal, true);
-            exactX = outerPt.x;
-
-            if (originalZ < lowerAftZ)
-            {
-                float sternHobX = breadthPlan.GetBreadthXAtZ(lowerAftZ);
-                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
-                if (sternHobX > 0.001f)
-                {
-                    exactX *= (currHobX / sternHobX);
-                }
-            }
-            
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, false, tVal, evalZ, framePlaneNormal);
-            nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
+            return framingModel.GetInnerNormalAtT(fp, false, tVal, originalZ, framePlaneNormal);
         }
 
-        return exactX;
+        return Vector3.right;
     }
-
     public void DrawInnerForeFaceFashionTimbers()
     {
         if (!showInnerForeFaceFashionTimber) return;
@@ -141,66 +89,65 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
 
         if (stbdPts.Count < 2) return;
 
-        for (int i = 0; i < stbdPts.Count - 1; i++)
+        Vector3 hobIntersect = foreFaceFashionTimberModelTest3.GetHobIntersection();
+        
+        // Find the index where the line crosses the HoB intersection
+        int splitIndex = stbdPts.Count - 1;
+        for (int i = 0; i < stbdPts.Count; i++)
         {
-            Gizmos.DrawLine(stbdPts[i], stbdPts[i+1]);
-            Gizmos.DrawLine(portPts[i], portPts[i+1]);
+            if (stbdPts[i].y >= hobIntersect.y)
+            {
+                splitIndex = i;
+                break;
+            }
+        }
+
+        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
+        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        {
+            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
+        }
+        Vector3 risingEnd = lowerBound;
+        Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
+
+        // 1. Lower Fashion Timber
+        if (Mathf.Abs(risingEnd.z - hobIntersect.z) > 0.001f || Mathf.Abs(risingEnd.y - hobIntersect.y) > 0.001f)
+        {
+            for (int i = 0; i < splitIndex; i++)
+            {
+                Gizmos.DrawLine(stbdPts[i], stbdPts[i+1]);
+                Gizmos.DrawLine(portPts[i], portPts[i+1]);
+            }
+        }
+
+        // 2. Upper Fashion Timber
+        if (Mathf.Abs(hobIntersect.z - transomTop.z) > 0.001f || Mathf.Abs(hobIntersect.y - transomTop.y) > 0.001f)
+        {
+            for (int i = splitIndex; i < stbdPts.Count - 1; i++)
+            {
+                Gizmos.DrawLine(stbdPts[i], stbdPts[i+1]);
+                Gizmos.DrawLine(portPts[i], portPts[i+1]);
+            }
         }
     }
 
-    public List<Vector3> GetFashionTimberPoints(bool isStbd)
+    private List<Vector3> cachedStbdPoints = new List<Vector3>();
+    private List<Vector3> cachedPortPoints = new List<Vector3>();
+
+    public void UpdateCachedPoints()
     {
-        List<Vector3> pts = new List<Vector3>();
+        cachedStbdPoints.Clear();
+        cachedPortPoints.Clear();
 
-        foreFaceFashionTimberModelTest3.UpdateCachedPoints();
-        if (foreFaceFashionTimberModelTest3.cachedInnerPoints == null || foreFaceFashionTimberModelTest3.cachedInnerPoints.Count == 0) return pts;
+        if (foreFaceFashionTimberModelTest3 == null) return;
 
-        List<Vector3> outerPoints = new List<Vector3>();
-        List<float> normalXs = new List<float>();
-        for (int i = 0; i < foreFaceFashionTimberModelTest3.cachedInnerPoints.Count; i++)
-        {
-            float innerZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[i].x;
-            float innerY = foreFaceFashionTimberModelTest3.cachedInnerPoints[i].y;
-
-            float topTimberY = sheerPlan.GetTopTimberYAtZ(innerZ);
-            if (innerY >= topTimberY)
-            {
-                if (i > 0)
-                {
-                    float prevZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[i - 1].x;
-                    float prevY = foreFaceFashionTimberModelTest3.cachedInnerPoints[i - 1].y;
-                    float prevTop = sheerPlan.GetTopTimberYAtZ(prevZ);
-                    
-                    float denom = (innerY - prevY) - (topTimberY - prevTop);
-                    if (Mathf.Abs(denom) > 0.0001f)
-                    {
-                        float t = (prevTop - prevY) / denom;
-                        innerZ = Mathf.Lerp(prevZ, innerZ, t);
-                        innerY = Mathf.Lerp(prevY, innerY, t);
-                    }
-                }
-                else
-                {
-                    innerY = topTimberY;
-                }
-                
-                float outerX = GetOuterHullXAndNormalAtYZ(innerY, innerZ, out float nx);
-                outerPoints.Add(new Vector3(outerX, innerY, innerZ));
-                normalXs.Add(nx);
-                break; // reached top
-            }
-            else
-            {
-                float outerX = GetOuterHullXAndNormalAtYZ(innerY, innerZ, out float nx);
-                outerPoints.Add(new Vector3(outerX, innerY, innerZ));
-                normalXs.Add(nx);
-            }
-        }
+        List<Vector3> outerPoints = foreFaceFashionTimberModelTest3.GetFashionTimberPoints(true);
+        if (outerPoints == null || outerPoints.Count == 0) return;
 
         for (int i = 0; i < outerPoints.Count; i++)
         {
             Vector3 pt = outerPoints[i];
-            float nx = normalXs[i];
+            Vector3 normal = GetOuterNormalAtYZ(pt.y, pt.z);
             
             float tKeel = Mathf.Clamp01(pt.z / sheerPlan.cachedKeelSternPoint.z);
             float theoreticalKeelY = Mathf.Lerp(sheerPlan.cachedMidshipKeel.y, sheerPlan.cachedKeelSternPoint.y, tKeel);
@@ -210,13 +157,67 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
             float unifiedOverallT = Mathf.Clamp01((pt.y - theoreticalKeelY) / theoreticalTotalHeight);
             float currentThickness = Mathf.Lerp(bodyPlan.baseFrameThickness, bodyPlan.topFrameThickness, unifiedOverallT);
             
-            float exactX = pt.x - (currentThickness / nx);
+            Vector3 innerPt = pt;
+            float nx = Mathf.Abs(normal.x);
+            if (nx < 0.15f) nx = 0.15f; // Clamp to prevent blowout to infinity near the keel
+            innerPt.x = pt.x + Mathf.Sign(normal.x) * (currentThickness / nx);
             
-            if (exactX <= 0f) continue;
-            
-            if (!isStbd) exactX = -exactX;
-            pts.Add(new Vector3(exactX, pt.y, pt.z));
+            if (innerPt.x > 0f)
+            {
+                cachedStbdPoints.Add(innerPt);
+                cachedPortPoints.Add(new Vector3(-innerPt.x, innerPt.y, innerPt.z));
+            }
         }
-        return pts;
+    }
+
+    public List<Vector3> GetFashionTimberPoints(bool isStbd)
+    {
+        if (cachedStbdPoints.Count == 0) UpdateCachedPoints();
+        return isStbd ? cachedStbdPoints : cachedPortPoints;
+    }
+    public float GetMinZ()
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return sheerPlan != null ? sheerPlan.cachedTransomTopPoint.z : 0;
+        float minZ = float.MaxValue;
+        foreach (var p in pts)
+        {
+            if (p.z < minZ) minZ = p.z;
+        }
+        return minZ;
+    }
+
+    public float GetMaxZ()
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return sheerPlan != null ? sheerPlan.cachedSternRisingEnd.z : 0;
+        float maxZ = float.MinValue;
+        foreach (var p in pts)
+        {
+            if (p.z > maxZ) maxZ = p.z;
+        }
+        return maxZ;
+    }
+
+    public float GetInnerYAtZ(float z)
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return 0f;
+        
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            Vector3 p1 = pts[i];
+            Vector3 p2 = pts[i+1];
+            
+            if ((z >= p1.z && z <= p2.z) || (z <= p1.z && z >= p2.z))
+            {
+                if (Mathf.Abs(p2.z - p1.z) < 0.0001f) return Mathf.Min(p1.y, p2.y);
+                float t = (z - p1.z) / (p2.z - p1.z);
+                return Mathf.Lerp(p1.y, p2.y, t);
+            }
+        }
+        
+        if (z < GetMinZ()) return pts[0].y;
+        return pts[pts.Count - 1].y;
     }
 }
