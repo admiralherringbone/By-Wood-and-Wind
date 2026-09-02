@@ -10,9 +10,15 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
     [Tooltip("Reference to the FashionTimberModelTest3.")]
     public FashionTimberModelTest3 fashionTimberModel;
 
+    [Tooltip("Reference to the ForeFashionTimberSpecialFramesTest3.")]
+    public ForeFashionTimberSpecialFramesTest3 specialFrames;
+
     [Header("Inner Timber Settings")]
     [Tooltip("Thickness of the Fashion Timber (offset inwards).")]
     public float thickness = 0.3f;
+    [Range(20, 200)]
+    [Tooltip("Resolution (number of segment samples) along the lower timber path from the Deadwood baseline to the Counter.")]
+    public int lowerTimberResolution = 100;
     public bool showInnerFashionTimber = true;
     public Color innerColor = Color.magenta;
 
@@ -23,52 +29,138 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
         cachedInnerPoints.Clear();
         if (sheerPlan == null || fashionTimberModel == null) return;
 
-        Vector3 lowerBound = sheerPlan.cachedKeelSternPoint;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedKeelSternPoint.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
-        Vector3 risingEnd = lowerBound;
-        Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
-
-        float startZ = risingEnd.z;
-        float endZ = transomTop.z;
-        
-        bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
-        int segments = 100;
-        
         List<Vector2> rawPoints = new List<Vector2>();
 
-        for (int i = 0; i <= segments; i++)
+        // 1. STERN POST SEGMENT (Straight parallel line extending down to Deadwood/Keel)
+        Vector3 postA3 = sheerPlan.cachedKeelSternPoint;
+        Vector3 postB3 = sheerPlan.cachedSternPostTopPoint;
+        
+        Vector2 postA = new Vector2(postA3.z, postA3.y);
+        Vector2 postB = new Vector2(postB3.z, postB3.y);
+        
+        Vector2 postDir = (postB - postA);
+        if (postDir.sqrMagnitude < 0.0001f) postDir = Vector2.up;
+        
+        Vector2 postTangent = postDir.normalized;
+        Vector2 postNormal = new Vector2(-postTangent.y, postTangent.x);
+        if (postNormal.x < 0) postNormal = -postNormal;
+
+        Vector2 offsetA = postA + postNormal * thickness;
+        Vector2 offsetB = postB + postNormal * thickness;
+
+        // Calculate where the straight offset line meets the Deadwood/Keel baseline
+        float bottomY = sheerPlan.GetKeelYAtZ(offsetA.x);
+        if (sheerPlan.showDeadwoodRake)
         {
-            float fraction = i / (float)segments;
-            float outerZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, fraction);
-            float outerY = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
-            
-            float delta = 0.01f;
-            float zPlus = outerZ + delta;
-            float yPlus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
-            
-            float zMinus = outerZ - delta;
-            float yMinus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, fraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
-            
-            Vector2 tangent = new Vector2(zPlus - zMinus, yPlus - yMinus).normalized;
-            Vector2 normal = new Vector2(-tangent.y, tangent.x);
-            if (normal.x < 0) normal = -normal;
-
-            float innerZ = outerZ + normal.x * thickness;
-            float innerY = outerY + normal.y * thickness;
-
-            rawPoints.Add(new Vector2(innerZ, innerY));
+            if (offsetA.x >= sheerPlan.cachedDeadwoodAftPoint.z && offsetA.x < sheerPlan.cachedDeadwoodForePoint.z)
+            {
+                bottomY = sheerPlan.GetDeadwoodYAtZ(offsetA.x);
+            }
+            else if (offsetA.x < sheerPlan.cachedDeadwoodAftPoint.z)
+            {
+                bottomY = sheerPlan.cachedDeadwoodAftPoint.y;
+            }
         }
 
-        // The user explicitly requested to parallel the FULL stern profile (including the Stern Post) 
-        // down to the Deadwood, so we no longer need to artificially extrapolate tangents.
+        Vector2 startPt = offsetA;
+        if (Mathf.Abs(postTangent.y) > 0.0001f)
+        {
+            float sStart = (bottomY - offsetA.y) / postTangent.y;
+            startPt = offsetA + postTangent * sStart;
+        }
 
+        int postSegments = Mathf.Max(10, lowerTimberResolution);
+        for (int i = 0; i <= postSegments; i++)
+        {
+            float t = i / (float)postSegments;
+            rawPoints.Add(Vector2.Lerp(startPt, offsetB, t));
+        }
+
+        // Inject exact Rising Line landmark vertex to prevent chordal corner-cutting across the Rising Line height
+        float risingY = sheerPlan.cachedSternRisingEnd.y;
+        if (risingY > startPt.y && risingY < offsetB.y && Mathf.Abs(postTangent.y) > 0.0001f)
+        {
+            float sRising = (risingY - startPt.y) / postTangent.y;
+            Vector2 risingPt = startPt + postTangent * sRising;
+            rawPoints.Add(risingPt);
+        }
+
+        rawPoints.Sort((p1, p2) => p1.y.CompareTo(p2.y));
+
+        // 2. COUNTER & TRANSOM SEGMENTS
+        if (sheerPlan.enableCounter)
+        {
+            Vector3 cBase = sheerPlan.cachedCounterBasePoint;
+            Vector3 cCp1 = sheerPlan.cachedCounterCp1;
+            Vector3 cCp2 = sheerPlan.cachedCounterCp2;
+            Vector3 cTop = sheerPlan.cachedCounterTopPoint;
+
+            int counterSegments = 40;
+            for (int i = 1; i <= counterSegments; i++)
+            {
+                float t = i / (float)counterSegments;
+                Vector3 p = CalculateCubicBezierPoint(t, cBase, cCp1, cCp2, cTop);
+                Vector3 tangent3 = CalculateCubicBezierTangent(t, cBase, cCp1, cCp2, cTop);
+                
+                Vector2 tan2 = new Vector2(tangent3.z, tangent3.y).normalized;
+                Vector2 norm2 = new Vector2(-tan2.y, tan2.x);
+                if (norm2.x < 0) norm2 = -norm2;
+
+                Vector2 offsetPt = new Vector2(p.z, p.y) + norm2 * thickness;
+                rawPoints.Add(offsetPt);
+            }
+
+            // Upper Transom Rake above Counter
+            Vector3 tTop = sheerPlan.cachedTransomTopPoint;
+            Vector2 tBase2 = new Vector2(cTop.z, cTop.y);
+            Vector2 tTop2 = new Vector2(tTop.z, tTop.y);
+            Vector2 tDir = (tTop2 - tBase2);
+            if (tDir.sqrMagnitude > 0.0001f)
+            {
+                Vector2 tTan = tDir.normalized;
+                Vector2 tNorm = new Vector2(-tTan.y, tTan.x);
+                if (tNorm.x < 0) tNorm = -tNorm;
+
+                Vector2 tOffsetBase = tBase2 + tNorm * thickness;
+                Vector2 tOffsetTop = tTop2 + tNorm * thickness;
+
+                int transomSegments = 20;
+                for (int i = 1; i <= transomSegments; i++)
+                {
+                    float t = i / (float)transomSegments;
+                    rawPoints.Add(Vector2.Lerp(tOffsetBase, tOffsetTop, t));
+                }
+            }
+        }
+        else
+        {
+            // Direct Transom Rake from Stern Post Top to Transom Top
+            Vector3 tTop = sheerPlan.cachedTransomTopPoint;
+            Vector2 tBase2 = offsetB;
+            Vector2 tTop2 = new Vector2(tTop.z, tTop.y);
+            
+            Vector2 tDir = (tTop2 - new Vector2(postB3.z, postB3.y));
+            if (tDir.sqrMagnitude > 0.0001f)
+            {
+                Vector2 tTan = tDir.normalized;
+                Vector2 tNorm = new Vector2(-tTan.y, tTan.x);
+                if (tNorm.x < 0) tNorm = -tNorm;
+
+                Vector2 tOffsetTop = tTop2 + tNorm * thickness;
+
+                int transomSegments = 20;
+                for (int i = 1; i <= transomSegments; i++)
+                {
+                    float t = i / (float)transomSegments;
+                    rawPoints.Add(Vector2.Lerp(tBase2, tOffsetTop, t));
+                }
+            }
+        }
+
+        // 3. REMOVE SWALLOWTAILS
         bool intersectionFound = true;
-        // DISABLED FOR DIAGNOSTICS
-        /*
-        while (intersectionFound)
+        int safetyLoop = 0;
+        while (intersectionFound && safetyLoop++ < 100)
         {
             intersectionFound = false;
             for (int i = 0; i < rawPoints.Count - 3; i++)
@@ -88,9 +180,20 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
                 if (intersectionFound) break;
             }
         }
-        */
         
         cachedInnerPoints = new List<Vector2>(rawPoints);
+    }
+
+    private Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1 - t;
+        return (u * u * u * p0) + (3 * u * u * t * p1) + (3 * u * t * t * p2) + (t * t * t * p3);
+    }
+
+    private Vector3 CalculateCubicBezierTangent(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1 - t;
+        return 3 * u * u * (p1 - p0) + 6 * u * t * (p2 - p1) + 3 * t * t * (p3 - p2);
     }
 
     public float GetMinZ()
@@ -252,7 +355,17 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
         UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return pts;
 
+        if (this.specialFrames == null)
+        {
+            this.specialFrames = Object.FindObjectOfType<ForeFashionTimberSpecialFramesTest3>();
+        }
+        
         float bottomZ = cachedInnerPoints[0].x;
+        FramingModelTest3.FrameProfile masterFp = new FramingModelTest3.FrameProfile { isValid = false };
+        if (specialFrames != null && fashionTimberModel != null && fashionTimberModel.framingModel != null)
+        {
+            masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
+        }
 
         for (int i = 0; i < cachedInnerPoints.Count; i++)
         {
@@ -285,7 +398,14 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
             }
 
             float exactX = 0f;
-            exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
+            if (specialFrames != null && masterFp.isValid)
+            {
+                exactX = specialFrames.GetSpecialHullXAtYZ(innerY, innerZ, masterFp, bottomZ);
+            }
+            else
+            {
+                exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
+            }
             
             if (!isStbd) exactX = -exactX;
             

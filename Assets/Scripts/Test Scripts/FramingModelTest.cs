@@ -609,6 +609,15 @@ public class FramingModelTest : MonoBehaviour
                 // Check if the frame straddles the drop Z (allowing exact edge alignment)
                 return (aftEdge < ffDropZ - 0.001f && foreEdge > ffDropZ + 0.001f);
             });
+
+            // The user requested a frame right at the lowest, most-forward tip (ffDropZ),
+            // but with its AFT end aligned to it (rather than its center).
+            // Since Z increases forward (towards midship/bow), the frame's center must be shifted forward by half thickness.
+            float perfectlyAlignedCenterZ = ffDropZ + (thickness / 2f);
+            if (!positions.Contains(perfectlyAlignedCenterZ))
+            {
+                positions.Add(perfectlyAlignedCenterZ);
+            }
         }
 
         if (sheerPlan.upperDecks != null)

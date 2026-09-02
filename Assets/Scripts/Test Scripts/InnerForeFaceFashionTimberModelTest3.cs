@@ -11,13 +11,13 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
     public BreadthPlan breadthPlan;
 
     [Tooltip("Reference to the ModularBodyPlan.")]
-    public BodyPlan bodyPlan;
+    public BodyPlanTest bodyPlan;
 
     [Tooltip("Reference to the FramingModelTest3.")]
     public FramingModelTest3 framingModel;
 
     [Tooltip("Reference to the outer ForeFaceFashionTimberModelTest3.")]
-    public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest3;
+    public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest;
 
     [Header("Inner Timber Settings")]
     public bool showInnerForeFaceFashionTimber = true;
@@ -25,7 +25,7 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || foreFaceFashionTimberModelTest3 == null) return;
+        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null || foreFaceFashionTimberModelTest == null) return;
         UpdateCachedPoints();
         DrawInnerForeFaceFashionTimbers();
     }
@@ -35,7 +35,26 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
     public Vector3 GetOuterNormalAtYZ(float targetY, float originalZ)
     {
         bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
-        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(originalZ, true);
+        FramingModelTest3.FrameProfile fp;
+
+        if (isUpper)
+        {
+            fp = framingModel.GetRawFrameProfile(originalZ, true);
+        }
+        else
+        {
+            if (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.specialFrames != null && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+            {
+                float bottomZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
+                FramingModelTest3.FrameProfile masterFp = framingModel.GetRawFrameProfile(bottomZ, false);
+                fp = foreFaceFashionTimberModelTest.specialFrames.GetScaledMasterFrameProfile(originalZ, masterFp, bottomZ);
+            }
+            else
+            {
+                fp = framingModel.GetRawFrameProfile(originalZ, true);
+            }
+        }
+
         if (!fp.isValid) return Vector3.right;
 
         Vector3 origin = new Vector3(0, 0, originalZ);
@@ -89,7 +108,7 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
 
         if (stbdPts.Count < 2) return;
 
-        Vector3 hobIntersect = foreFaceFashionTimberModelTest3.GetHobIntersection();
+        Vector3 hobIntersect = foreFaceFashionTimberModelTest.GetHobIntersection();
         
         // Find the index where the line crosses the HoB intersection
         int splitIndex = stbdPts.Count - 1;
@@ -139,9 +158,9 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
         cachedStbdPoints.Clear();
         cachedPortPoints.Clear();
 
-        if (foreFaceFashionTimberModelTest3 == null) return;
+        if (foreFaceFashionTimberModelTest == null) return;
 
-        List<Vector3> outerPoints = foreFaceFashionTimberModelTest3.GetFashionTimberPoints(true);
+        List<Vector3> outerPoints = foreFaceFashionTimberModelTest.GetFashionTimberPoints(true);
         if (outerPoints == null || outerPoints.Count == 0) return;
 
         for (int i = 0; i < outerPoints.Count; i++)

@@ -11,7 +11,7 @@ public class InnerFashionTimberModelTest3 : MonoBehaviour
     public BreadthPlan breadthPlan;
 
     [Tooltip("Reference to the ModularBodyPlan.")]
-    public BodyPlan bodyPlan;
+    public BodyPlanTest bodyPlan;
 
     [Tooltip("Reference to the FramingModelTest3.")]
     public FramingModelTest3 framingModel;

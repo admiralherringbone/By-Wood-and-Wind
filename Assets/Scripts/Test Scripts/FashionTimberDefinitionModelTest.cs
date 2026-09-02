@@ -48,14 +48,19 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
 
         cachedStbdPoints.Clear();
         cachedPortPoints.Clear();
-
-        Vector3 risingEnd = lowerBound;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
 
-        float startZ = risingEnd.z;
+        // Start mathematical generation from the very bottom of the Stern Post 
+        // to ensure the offset curve crosses the Rising Line.
+        float startZ = sheerPlan.cachedKeelSternPoint.z;
         float endZ = transomTop.z;
         
         bool isVertical = Mathf.Abs(startZ - endZ) < 0.001f;
+        
+        List<Vector3> outerStbdPts = fashionTimberModel.GetFashionTimberPoints(true);
+        List<Vector3> innerStbdPts = foreFaceModel.GetFashionTimberPoints(true);
+        if (outerStbdPts == null || innerStbdPts == null || outerStbdPts.Count == 0 || innerStbdPts.Count == 0) return;
+        
         int segments = 100;
 
         if (this.specialFrames == null)
@@ -63,40 +68,78 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
             this.specialFrames = Object.FindObjectOfType<ForeFashionTimberSpecialFramesTest>();
         }
         
+        float bottomZ = 0f;
+        FramingModelTest.FrameProfile masterFp = new FramingModelTest.FrameProfile { isValid = false };
+        if (foreFaceModel.cachedInnerPoints != null && foreFaceModel.cachedInnerPoints.Count > 0)
+        {
+            bottomZ = foreFaceModel.cachedInnerPoints[0].x;
+            if (specialFrames != null && fashionTimberModel != null && fashionTimberModel.framingModel != null)
+            {
+                masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
+            }
+        }
+        
         for (int k = 1; k <= intermediateTimberCount; k++)
         {
             float fraction = (float)k / (intermediateTimberCount + 1);
             float currentThickness = totalThickness * fraction;
 
-            List<Vector2> rawPoints = new List<Vector2>();
+            List<Vector2> tempPoints = new List<Vector2>();
 
             for (int i = 0; i <= segments; i++)
             {
                 float curveFraction = i / (float)segments;
                 float outerZ = isVertical ? startZ : Mathf.Lerp(startZ, endZ, curveFraction);
-                float outerY = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, curveFraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
+                float outerY = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, curveFraction) : sheerPlan.GetSternProfileYAtZ(outerZ);
                 
                 float delta = 0.01f;
                 float zPlus = outerZ + delta;
-                float yPlus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, curveFraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
+                float yPlus = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, curveFraction + (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zPlus);
                 
                 float zMinus = outerZ - delta;
-                float yMinus = isVertical ? Mathf.Lerp(risingEnd.y, transomTop.y, curveFraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
+                float yMinus = isVertical ? Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, transomTop.y, curveFraction - (delta/Mathf.Abs(startZ - endZ))) : sheerPlan.GetSternProfileYAtZ(zMinus);
                 
                 Vector2 tangent = new Vector2(zPlus - zMinus, yPlus - yMinus).normalized;
                 Vector2 normal = new Vector2(-tangent.y, tangent.x);
                 if (normal.x < 0) normal = -normal;
 
-                float innerZ = outerZ + normal.x * currentThickness;
-                float innerY = outerY + normal.y * currentThickness;
-
-                rawPoints.Add(new Vector2(innerZ, innerY));
+                // Intermediate slice Z/Y
+                float tz = outerZ + normal.x * currentThickness;
+                float ty = outerY + normal.y * currentThickness;
+                
+                tempPoints.Add(new Vector2(tz, ty));
             }
 
+            // Chop off any points that plunge mathematically below the Rising Line
+            List<Vector2> rawPoints = new List<Vector2>();
+            bool foundIntersection = false;
+            
+            for (int i = 0; i < tempPoints.Count; i++)
+            {
+                Vector2 pt = tempPoints[i];
+                float risingY = sheerPlan.GetRisingLineYAtZ(pt.x);
+                
+                if (!foundIntersection)
+                {
+                    if (pt.y >= risingY)
+                    {
+                        rawPoints.Add(new Vector2(pt.x, risingY));
+                        foundIntersection = true;
+                    }
+                }
+                else
+                {
+                    rawPoints.Add(pt);
+                }
+            }
+            
+            if (rawPoints.Count == 0)
+            {
+                rawPoints = tempPoints;
+            }
 
-            // Vertical parallel drop
-            // ONLY if the Outer Timber actually has lower moulds (i.e., it starts below the HoB line).
-            bool outerStartsBelowHob = risingEnd.y < sheerPlan.GetTheoreticalHobYAtZ(risingEnd.z) - 0.001f;
+            // Add the vertical parallel drop
+            bool outerStartsBelowHob = sheerPlan.cachedSternRisingEnd.y < sheerPlan.GetTheoreticalHobYAtZ(sheerPlan.cachedSternRisingEnd.z) - 0.001f;
             
             if (outerStartsBelowHob)
             {
@@ -113,12 +156,13 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
                 {
                     float t = i / (float)dropSegments;
                     float y = Mathf.Lerp(dropY, topDropY, t);
+                    
                     if (i == dropSegments) continue;
                     rawPoints.Insert(0, new Vector2(actualDropZ, y));
                 }
             }
 
-            // Clean self-intersections
+            // Clean self-intersections in Z/Y
             bool intersectionFound = true;
             while (intersectionFound)
             {
@@ -140,19 +184,9 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
                 }
             }
 
-            // Resolve 3D points
+            // Apply to lists
             List<Vector3> stbdPts = new List<Vector3>();
             List<Vector3> portPts = new List<Vector3>();
-            
-            float bottomZ = foreFaceModel.cachedInnerPoints != null && foreFaceModel.cachedInnerPoints.Count > 0 ? foreFaceModel.cachedInnerPoints[0].x : rawPoints[0].x;
-            FramingModelTest.FrameProfile masterFp = new FramingModelTest.FrameProfile { isValid = false };
-            if (specialFrames != null)
-            {
-                masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
-            }
-
-            List<Vector3> outerStbdPts = fashionTimberModel.GetFashionTimberPoints(true);
-            List<Vector3> innerStbdPts = foreFaceModel.GetFashionTimberPoints(true);
 
             for (int i = 0; i < rawPoints.Count; i++)
             {
@@ -184,23 +218,11 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
                     reachedTop = true;
                 }
 
-                float minY = rawPoints[0].y;
-                float maxY = rawPoints[rawPoints.Count - 1].y;
-                float tY = (maxY - minY) > 0.0001f ? Mathf.InverseLerp(minY, maxY, ty) : 0f;
+                // Evaluate the perfectly blended X coordinate based ONLY on the actual physical boundary curves!
+                float localOuterX = GetInterpolatedXAtY(outerStbdPts, ty);
+                float localInnerX = GetInterpolatedXAtY(innerStbdPts, ty);
+                float exactX = Mathf.Lerp(localOuterX, localInnerX, fraction);
 
-                float outerDropY = outerStbdPts != null && outerStbdPts.Count > 0 ? outerStbdPts[0].y : minY;
-                float outerTopY = outerStbdPts != null && outerStbdPts.Count > 0 ? outerStbdPts[outerStbdPts.Count - 1].y : maxY;
-                float mappedOuterY = Mathf.Lerp(outerDropY, outerTopY, tY);
-
-                float innerDropY = innerStbdPts != null && innerStbdPts.Count > 0 ? innerStbdPts[0].y : minY;
-                float innerTopY = innerStbdPts != null && innerStbdPts.Count > 0 ? innerStbdPts[innerStbdPts.Count - 1].y : maxY;
-                float mappedInnerY = Mathf.Lerp(innerDropY, innerTopY, tY);
-
-                float outerX = GetInterpolatedXAtY(outerStbdPts, mappedOuterY);
-                float innerX = GetInterpolatedXAtY(innerStbdPts, mappedInnerY);
-                
-                float exactX = Mathf.Lerp(outerX, innerX, fraction);
-                
                 stbdPts.Add(new Vector3(exactX, ty, tz));
                 portPts.Add(new Vector3(-exactX, ty, tz));
                 
@@ -352,5 +374,29 @@ public class FashionTimberDefinitionModelTest : MonoBehaviour
                 currentSegment++;
             }
         }
+    }
+
+    private Vector3 GetInterpolatedPointAtY(List<Vector3> pts, float targetY)
+    {
+        if (pts == null || pts.Count == 0) return Vector3.zero;
+        if (pts.Count == 1) return pts[0];
+
+        if (targetY <= pts[0].y) return pts[0];
+        if (targetY >= pts[pts.Count - 1].y) return pts[pts.Count - 1];
+
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            float y1 = pts[i].y;
+            float y2 = pts[i+1].y;
+
+            if ((targetY >= y1 && targetY <= y2) || (targetY <= y1 && targetY >= y2))
+            {
+                float denom = y2 - y1;
+                if (Mathf.Abs(denom) < 0.0001f) return pts[i];
+                float t = (targetY - y1) / denom;
+                return Vector3.Lerp(pts[i], pts[i+1], t);
+            }
+        }
+        return pts[pts.Count - 1];
     }
 }

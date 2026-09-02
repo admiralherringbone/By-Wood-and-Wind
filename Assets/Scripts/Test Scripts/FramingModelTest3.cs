@@ -15,7 +15,7 @@ public class FramingModelTest3 : MonoBehaviour
     public BreadthPlan breadthPlan;
 
     [Tooltip("Reference to the ModularBodyPlan.")]
-    public BodyPlan bodyPlan;
+    public BodyPlanTest bodyPlan;
 
     public enum FrameThicknessRatio
     {
@@ -27,32 +27,66 @@ public class FramingModelTest3 : MonoBehaviour
 
     [Header("Frame Dimensions")]
     [Tooltip("The longitudinal distance between the centers of each frame (Z-axis).")]
+    [Min(0.25f)]
     public float frameSpacing = 1.0f;
     [Tooltip("The thickness of each frame relative to the frame spacing.")]
     public FrameThicknessRatio frameThicknessRatio = FrameThicknessRatio.Half;
 
+    private void OnValidate()
+    {
+        frameSpacing = Mathf.Max(0.25f, frameSpacing);
+    }
+
     [Header("Gizmo Settings")]
     public Color frameColor = Color.cyan;
     [Tooltip("Reference to the ForeFaceFashionTimberModelTest3.")]
-    public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest3;
+    public ForeFaceFashionTimberModelTest3 foreFaceFashionTimberModelTest;
 
     [Tooltip("Reference to the FashionTimberModelTest3.")]
     public FashionTimberModelTest3 fashionTimberModelTest;
+
+    private ForeFaceFashionTimberModelTest3 _cachedForeFace;
+    private FashionTimberModelTest3 _cachedFashionModel;
+    private readonly List<float> _zPosListCache = new List<float>();
+    private readonly List<float> _basicZPosListCache = new List<float>();
+    private readonly List<float> _landmarkZPosListCache = new List<float>();
 
     [Header("Frame Visualization Settings")]
     public bool showFrames = true;
     public bool showFrameLabels = false;
     public bool showFloorSweepsGuide = true;
+    [Tooltip("If true, frames are cut/clipped by the Fore Face Fashion Timber boundary at the stern.")]
+    public bool cutFramesAtFashionTimber = true;
+    [Tooltip("If true, structural landmark boundaries render as partial fill frames spanning between the nearest basic frame edge and the landmark point.")]
+    public bool enableLandmarkFillFrames = true;
     [Tooltip("Draws lines showing the control arms for each frame.")]
     public bool showSurfaceRibbands = true;
     public bool showWaterlines = false;
     public bool showFrameControlArms = false;
 
+    public struct FillFrame
+    {
+        public bool isValid;
+        public float startZ;
+        public float endZ;
+        public FrameProfile startFp;
+        public FrameProfile endFp;
+        public string label;
+    }
+
+    private readonly List<FillFrame> _fillFrameListCache = new List<FillFrame>();
+
+    public Color GetFillFrameColor()
+    {
+        // Darker shade of current frame color as requested by user
+        return new Color(frameColor.r * 0.65f, frameColor.g * 0.65f, frameColor.b * 0.65f, frameColor.a);
+    }
+
     public struct FrameProfile
     {
         public bool isValid;
         public bool hasLower;
-        public Vector3 lowerP0, lowerP1_inner, lowerP1, lowerPMid, lowerP2, lowerP3;
+        public Vector3 lowerP0, lowerP1_inner, lowerP1, lowerLR, lowerPMid, lowerP2, lowerP3;
         
         public bool hasUpper;
         public float upperCutoffT; // LOWER cutoff (e.g. for Fashion Timber)
@@ -73,16 +107,17 @@ public class FramingModelTest3 : MonoBehaviour
 
         if (sheerPlan == null || breadthPlan == null || bodyPlan == null) return fp;
 
-        if (z < sheerPlan.cachedHobSternIntersect.z)
-        {
-            fp.hasLower = false;
-        }
+        // We no longer cull the lower mould aft of the HoB stern intersection, allowing full frames to the transom
+        // if (z < sheerPlan.cachedHobSternIntersect.z)
+        // {
+        //     fp.hasLower = false;
+        // }
 
         // We no longer arbitrarily disable the lower mould aft of the Stern Post.
         // The Counter sliding system now handles clipping the lower moulds dynamically in GetFrameProfile.
 
-        float hobBreadth = breadthPlan.GetBreadthXAtZ(z);
-        float hobY = sheerPlan.GetHobYAtZ(z);
+        float hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(z);
+        float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
         
         if (fp.hasLower)
         {
@@ -100,6 +135,28 @@ public class FramingModelTest3 : MonoBehaviour
             fashionLowerBound = sheerPlan.cachedDeadwoodAftPoint;
         }
 
+        // If we are aft of the Stern Post, extend the Keel mathematically (Phantom Keel Projection)
+        // rather than letting it curve upwards along the Stern Profile.
+        if (z < sheerPlan.cachedKeelSternPoint.z)
+        {
+            if (sheerPlan.showDeadwoodRake && sheerPlan.cachedDeadwoodAftPoint.y > 0.001f)
+            {
+                keelY = sheerPlan.cachedDeadwoodAftPoint.y;
+            }
+            else if (sheerPlan.keelMidshipDrop == 0f)
+            {
+                keelY = 0f;
+            }
+            else
+            {
+                float t = z / sheerPlan.cachedKeelSternPoint.z; // Continues past 1.0
+                Vector3 p0 = sheerPlan.cachedMidshipKeel;
+                Vector3 p2 = sheerPlan.cachedKeelSternPoint;
+                Vector3 p1 = new Vector3(0, 0, p2.z / 2f);
+                keelY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+            }
+        }
+
         float originalKeelY = keelY;
         if (keelYOverride.HasValue)
         {
@@ -109,16 +166,84 @@ public class FramingModelTest3 : MonoBehaviour
         float keelHalfWidth = bodyPlan.keelWidth / 2f;
         
         bool usedSpecialScaling = false;
+        // The user requested to completely ignore the Fashion Timber's phantom projection line
+        // and just let the frames continue naturally along the keel.
+        /*
+        if (!ignoreFashionTimber)
+        {
+            if (this.foreFaceFashionTimberModelTest == null)
+            {
+                this.foreFaceFashionTimberModelTest = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
+            }
+            ForeFaceFashionTimberModelTest3 foreFace = this.foreFaceFashionTimberModelTest;
+            if (foreFace != null && foreFace.showInnerFashionTimber && foreFace.cachedInnerPoints != null && foreFace.cachedInnerPoints.Count > 0)
+            {
+                float bottomZ = foreFace.cachedInnerPoints[0].x;
+                if (z < bottomZ - 0.001f)
+                {
+                    FrameProfile masterFp = GetRawFrameProfile(bottomZ, true, keelYOverride);
+                    if (masterFp.isValid && masterFp.hasLower)
+                    {
+                        usedSpecialScaling = true;
+                        
+                        float masterHobBreadth = breadthPlan.GetBreadthXAtZ(bottomZ);
+                        float masterHobY = sheerPlan.GetTheoreticalHobYAtZ(bottomZ);
+                        float masterKeelY = masterFp.lowerP0.y;
+
+                        float customKeelY = masterKeelY;
+                        float yOffset = masterHobY - masterKeelY;
+                        customKeelY = sheerPlan.GetTheoreticalHobYAtZ(z) - yOffset;
+
+                        float currHobBreadth = breadthPlan.GetBreadthXAtZ(z);
+                        float currHobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+                        
+                        float hw = keelHalfWidth;
+                        float masterXDist = masterHobBreadth - hw;
+                        float currXDist = currHobBreadth - hw;
+                        float scaleX = masterXDist > 0.001f ? currXDist / masterXDist : 1f;
+                        
+                        float masterHeight = masterHobY - masterKeelY;
+                        float currHeight = currHobY - customKeelY;
+                        float scaleY = masterHeight > 0.001f ? currHeight / masterHeight : 1f;
+
+                        Vector3 ScalePoint(Vector3 masterPt)
+                        {
+                            float nxOffset = (masterPt.x - hw) * scaleX;
+                            float finalX = hw + Mathf.Max(0f, nxOffset);
+                            float nyOffset = (masterPt.y - masterKeelY) * scaleY;
+                            float finalY = customKeelY + nyOffset;
+                            return new Vector3(finalX, finalY, z);
+                        }
+
+                        fp.lowerP0 = ScalePoint(masterFp.lowerP0);
+                        fp.lowerP1_inner = ScalePoint(masterFp.lowerP1_inner);
+                        fp.lowerP1 = ScalePoint(masterFp.lowerP1);
+                        fp.lowerPMid = ScalePoint(masterFp.lowerPMid);
+                        fp.lowerP2 = ScalePoint(masterFp.lowerP2);
+                        fp.lowerP3 = ScalePoint(masterFp.lowerP3);
+                        
+                        fp.lowerCutoffT = masterFp.lowerCutoffT;
+                        fp.lowerTopCutoffT = masterFp.lowerTopCutoffT;
+                    }
+                }
+            }
+        }
+        */
 
         if (!usedSpecialScaling)
         {
             fp.lowerP0 = new Vector3(keelHalfWidth, keelY, z); 
             fp.lowerP3 = new Vector3(hobBreadth, hobY, z);
 
-            // 1. DIAGONAL DEADRISE TAPER (LOWER RIBBAND)
+            // 1. DIAGONAL DEADRISE TAPER (LOWER RIBBAND FOR P1 AND RISING LINE POINT LR)
             Vector3 masterL1 = bodyPlan.cachedL1;
-            float targetX = keelHalfWidth; // Defaults to the keel width instead of 0
-            float targetY = originalKeelY;
+            Vector3 masterLR = bodyPlan.cachedLR;
+
+            float targetL1_X = keelHalfWidth;
+            float targetL1_Y = originalKeelY;
+
+            float targetLR_X = keelHalfWidth;
+            float targetLR_Y = originalKeelY;
 
             if (z >= 0)
             {
@@ -126,13 +251,21 @@ public class FramingModelTest3 : MonoBehaviour
                 if (bowZ > 0.001f)
                 {
                     float t = sheerPlan.GetRisingLineTAtZ(z);
-                    Vector3 p0 = masterL1;
-                    Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
-                    // Control point mimics the Rising Line's control Z, and projects X/Y to form a swept curve
-                    Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z); 
-                    
-                    targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
-                    targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                    Vector3 bowEnd = new Vector3(keelHalfWidth, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
+
+                    // Swept curve for P1 (Keel Control Arm)
+                    Vector3 p0_L1 = masterL1;
+                    Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
+                    Vector3 p2_L1 = bowEnd;
+                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
+                    targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+
+                    // Swept curve for LR (Rising Line Point)
+                    Vector3 p0_LR = masterLR;
+                    Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
+                    Vector3 p2_LR = bowEnd;
+                    targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
+                    targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
                 }
             }
             else
@@ -140,39 +273,80 @@ public class FramingModelTest3 : MonoBehaviour
                 float sternZ = sheerPlan.cachedSternRisingEnd.z;
                 if (sternZ < -0.001f)
                 {
-                    float t = sheerPlan.GetRisingLineTAtZ(z);
-                    Vector3 p0 = masterL1;
-                    Vector3 p2 = new Vector3(keelHalfWidth, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
-                    Vector3 p1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
-                    
-                    targetX = CalculateQuadraticBezierPoint(t, p0, p1, p2).x;
-                    targetY = CalculateQuadraticBezierPoint(t, p0, p1, p2).y;
+                    Vector3 sternEnd = new Vector3(keelHalfWidth, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
+
+                    Vector3 p0_L1 = masterL1;
+                    Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+                    Vector3 p2_L1 = sternEnd;
+
+                    Vector3 p0_LR = masterLR;
+                    Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
+                    Vector3 p2_LR = sternEnd;
+
+                    if (z < sternZ)
+                    {
+                        // Phantom projection past Stern Rising End
+                        float dzL1 = p2_L1.z - p1_L1.z;
+                        if (Mathf.Abs(dzL1) > 0.0001f)
+                        {
+                            float ratio = (z - p2_L1.z) / dzL1;
+                            targetL1_X = p2_L1.x;
+                            targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
+                        }
+                        else
+                        {
+                            targetL1_X = p2_L1.x;
+                            targetL1_Y = p2_L1.y;
+                        }
+
+                        float dzLR = p2_LR.z - p1_LR.z;
+                        if (Mathf.Abs(dzLR) > 0.0001f)
+                        {
+                            float ratio = (z - p2_LR.z) / dzLR;
+                            targetLR_X = p2_LR.x;
+                            targetLR_Y = p2_LR.y + (p2_LR.y - p1_LR.y) * ratio;
+                        }
+                        else
+                        {
+                            targetLR_X = p2_LR.x;
+                            targetLR_Y = p2_LR.y;
+                        }
+                    }
+                    else
+                    {
+                        float t = sheerPlan.GetRisingLineTAtZ(z);
+                        targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
+                        targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+
+                        targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
+                        targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
+                    }
                 }
             }
 
-            targetY = Mathf.Max(targetY, originalKeelY);
+            targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
+            targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
 
-            fp.lowerP1 = new Vector3(targetX, targetY, z);
+            fp.lowerP1 = new Vector3(targetL1_X, targetL1_Y, z);
 
             // 2. HOB DOWNWARD ARM (LOWER P2)
             float currentBoxHeight = hobY - originalKeelY;
             float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-            fp.lowerP2 = new Vector3(hobBreadth, Mathf.Max(hobY - hobDrop, targetY), z);
+            fp.lowerP2 = new Vector3(hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
 
-            // 3. INNER CONTROLS (Quintic / Quartic)
-            float ribbandRatio = 0f;
-            if (masterL1.x > 0.001f)
+            // 3. RISING LINE POINT (L_R) FOR 2-SEGMENT QUADRATIC BEZIER
+            // Position fp.lowerLR on the line between fp.lowerP1 and fp.lowerP2 such that fp.lowerLR.x matches targetLR_X
+            float dx = fp.lowerP2.x - fp.lowerP1.x;
+            float lrPosRatio = bodyPlan.risingLinePosition;
+            if (dx > 0.0001f)
             {
-                ribbandRatio = Mathf.Clamp01(1f - (targetX / masterL1.x));
+                lrPosRatio = Mathf.Clamp01((targetLR_X - fp.lowerP1.x) / dx);
             }
+            fp.lowerLR = Vector3.Lerp(fp.lowerP1, fp.lowerP2, lrPosRatio);
+            fp.lowerPMid = fp.lowerLR;
             
-            float dynamicInnerKeel = Mathf.Lerp(bodyPlan.innerKeelPosition, 1.0f, ribbandRatio);
-            float dynamicMiddlePosition = Mathf.Lerp(bodyPlan.middleControlPosition, 0.0f, ribbandRatio);
-            
-            // Use a temporary unprojected P0 for interpolation
             Vector3 unprojectedP0 = new Vector3(keelHalfWidth, originalKeelY, z);
-            fp.lowerP1_inner = Vector3.Lerp(unprojectedP0, fp.lowerP1, dynamicInnerKeel);
-            fp.lowerPMid = Vector3.Lerp(fp.lowerP1, fp.lowerP2, dynamicMiddlePosition);
+            fp.lowerP1_inner = Vector3.Lerp(unprojectedP0, fp.lowerP1, 0.5f);
             
             // 4. PROPORTIONAL Y-SCALING
             if (keelY > originalKeelY + 0.001f && hobY > originalKeelY + 0.001f)
@@ -181,7 +355,8 @@ public class FramingModelTest3 : MonoBehaviour
                 
                 fp.lowerP1.y = keelY + (fp.lowerP1.y - originalKeelY) * scaleY;
                 fp.lowerP1_inner.y = keelY + (fp.lowerP1_inner.y - originalKeelY) * scaleY;
-                fp.lowerPMid.y = keelY + (fp.lowerPMid.y - originalKeelY) * scaleY;
+                fp.lowerLR.y = keelY + (fp.lowerLR.y - originalKeelY) * scaleY;
+                fp.lowerPMid.y = fp.lowerLR.y;
                 fp.lowerP2.y = keelY + (fp.lowerP2.y - originalKeelY) * scaleY;
             }
         }
@@ -241,14 +416,14 @@ public class FramingModelTest3 : MonoBehaviour
             // CLIPPING LOGIC: Stop drawing the frame when it crosses the local Top Timber height (bulwark dropoff)
             float minT = 0f;
             float maxT = 1f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 10; i++)
             {
-                float midT = (minT + maxT) / 2f;
+                float midT = (minT + maxT) * 0.5f;
                 float py = CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
                 if (py < localTtY) minT = midT;
                 else maxT = midT;
             }
-            fp.upperTopCutoffT = (minT + maxT) / 2f;
+            fp.upperTopCutoffT = (minT + maxT) * 0.5f;
         }
 
         fp.isValid = true;
@@ -260,22 +435,85 @@ public class FramingModelTest3 : MonoBehaviour
         FrameProfile fp = GetRawFrameProfile(z);
         if (!fp.isValid) return fp;
 
-        if (this.foreFaceFashionTimberModelTest3 == null)
+        if (_cachedForeFace == null)
         {
-            this.foreFaceFashionTimberModelTest3 = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
+            _cachedForeFace = foreFaceFashionTimberModelTest != null ? foreFaceFashionTimberModelTest : Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
         }
 
-        float sternBoundaryZ = sheerPlan.cachedSternRisingEnd.z;
-        
-        // Remove any frames that are past the stern boundary
-        if (z < sternBoundaryZ - 0.001f)
+        if (cutFramesAtFashionTimber && _cachedForeFace != null)
         {
-            fp.isValid = false;
-            return fp;
-        }
+            float sternMinZ = _cachedForeFace.GetMinZ();
+            float sternMaxZ = _cachedForeFace.GetMaxZ();
+            
+            // If a frame is completely aft of (behind) the Fashion Timber curve, invalidate it entirely
+            if (z < sternMinZ - 0.001f)
+            {
+                fp.isValid = false;
+                return fp;
+            }
+            
+            if (z <= sternMaxZ + 0.001f)
+            {
+                float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+                float fashionY = _cachedForeFace.GetInnerYAtZ(z);
+                float topTimberY = sheerPlan.GetTopTimberYAtZ(z);
 
-        // All Fashion Timber Restrictions have been completely removed per the user's request.
-        // The frames now continue exactly as they normally would up to the Stern End of the Rising Line.
+                // If fashion timber height is at or above top timber, frame is completely behind fashion timber
+                if (fashionY >= topTimberY - 0.001f)
+                {
+                    fp.isValid = false;
+                    return fp;
+                }
+                
+                if (fashionY > hobY || !fp.hasLower)
+                {
+                    fp.hasLower = false;
+                    fp.lowerCutoffT = 0f;
+                    
+                    if (fp.hasUpper)
+                    {
+                        float fMinT = 0f;
+                        float fMaxT = 1f;
+                        for (int i = 0; i < 10; i++)
+                        {
+                            float midT = (fMinT + fMaxT) * 0.5f;
+                            float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
+                            if (py < fashionY) fMinT = midT;
+                            else fMaxT = midT;
+                        }
+                        fp.upperCutoffT = (fMinT + fMaxT) * 0.5f;
+
+                        if (fp.upperCutoffT >= fp.upperTopCutoffT - 0.001f)
+                        {
+                            fp.isValid = false;
+                            return fp;
+                        }
+                    }
+                    else
+                    {
+                        fp.isValid = false;
+                        return fp;
+                    }
+                }
+                else
+                {
+                    // Cut the bottom of the lower mould at the actual Lower Fashion Timber boundary
+                    float tMin = 0f;
+                    float tMax = 1f;
+                    for (int i = 0; i < 10; i++)
+                    {
+                        float midT = (tMin + tMax) * 0.5f;
+                        float py = GetSurfacePointAtT(fp, 1f, midT).y;
+                        if (py < fashionY) tMin = midT;
+                        else tMax = midT;
+                    }
+                    fp.lowerCutoffT = (tMin + tMax) * 0.5f;
+                    
+                    fp.lowerTopCutoffT = 1f; // Top reaches the HoB
+                    fp.upperCutoffT = 0f;
+                }
+            }
+        }
         
         return fp;
     }
@@ -296,9 +534,13 @@ public class FramingModelTest3 : MonoBehaviour
         breadthPlan.UpdateCachedCurves();
         bodyPlan.UpdateCachedCurves();
 
-        if (foreFaceFashionTimberModelTest3 == null)
+        if (_cachedForeFace == null)
         {
-            foreFaceFashionTimberModelTest3 = Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
+            _cachedForeFace = foreFaceFashionTimberModelTest != null ? foreFaceFashionTimberModelTest : Object.FindObjectOfType<ForeFaceFashionTimberModelTest3>();
+        }
+        if (_cachedForeFace != null)
+        {
+            _cachedForeFace.UpdateCachedPoints();
         }
 
         if (!showFrames && !showFloorSweepsGuide && !showSurfaceRibbands && !showWaterlines) return;
@@ -308,25 +550,76 @@ public class FramingModelTest3 : MonoBehaviour
         {
             float hw = bodyPlan.keelWidth / 2f;
             Vector3 masterL1 = bodyPlan.cachedL1;
+            Vector3 masterLR = bodyPlan.cachedLR;
+
             Vector3 bowEnd = new Vector3(hw, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
             Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
 
             Vector3 bowP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
             Vector3 sternP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
 
-            // Starboard Ribband
+            Vector3 bowP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
+            Vector3 sternP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
+
+            // Starboard Keel Arm Ribband (Yellow)
             DrawQuadraticBezier3D(masterL1, sternP1, sternEnd, Color.yellow);
             DrawQuadraticBezier3D(masterL1, bowP1, bowEnd, Color.yellow);
+
+            // Starboard Rising Line Ribband (Green)
+            DrawQuadraticBezier3D(masterLR, sternP1_LR, sternEnd, Color.green);
+            DrawQuadraticBezier3D(masterLR, bowP1_LR, bowEnd, Color.green);
             
-            // Port Ribband
+            // Port Ribbands
             Vector3 mMasterL1 = new Vector3(-masterL1.x, masterL1.y, masterL1.z);
             Vector3 mBowP1 = new Vector3(-bowP1.x, bowP1.y, bowP1.z);
             Vector3 mSternP1 = new Vector3(-sternP1.x, sternP1.y, sternP1.z);
             Vector3 mBowEnd = new Vector3(-hw, bowEnd.y, bowEnd.z);
             Vector3 mSternEnd = new Vector3(-hw, sternEnd.y, sternEnd.z);
+
+            Vector3 mMasterLR = new Vector3(-masterLR.x, masterLR.y, masterLR.z);
+            Vector3 mBowP1_LR = new Vector3(-bowP1_LR.x, bowP1_LR.y, bowP1_LR.z);
+            Vector3 mSternP1_LR = new Vector3(-sternP1_LR.x, sternP1_LR.y, sternP1_LR.z);
             
             DrawQuadraticBezier3D(mMasterL1, mSternP1, mSternEnd, Color.yellow);
             DrawQuadraticBezier3D(mMasterL1, mBowP1, mBowEnd, Color.yellow);
+
+            DrawQuadraticBezier3D(mMasterLR, mSternP1_LR, mSternEnd, Color.green);
+            DrawQuadraticBezier3D(mMasterLR, mBowP1_LR, mBowEnd, Color.green);
+            
+            // Draw Phantom Projection of Stern Rising Line (Gray Dashed)
+            float finalZ = sheerPlan.cachedTransomTopPoint.z;
+            if (finalZ < sternEnd.z - 0.001f)
+            {
+                Gizmos.color = Color.gray;
+                int dashCount = 20;
+                float dzTotal = finalZ - sternEnd.z;
+                float dzTangent = sternEnd.z - sternP1.z;
+                
+                if (Mathf.Abs(dzTangent) > 0.0001f)
+                {
+                    for (int i = 0; i < dashCount; i++)
+                    {
+                        if (i % 2 == 1) continue; // Skip every other segment to make it dashed
+                        
+                        float t1 = (float)i / dashCount;
+                        float t2 = (float)(i + 1) / dashCount;
+                        
+                        float z1 = sternEnd.z + t1 * dzTotal;
+                        float z2 = sternEnd.z + t2 * dzTotal;
+                        
+                        float ratio1 = (z1 - sternEnd.z) / dzTangent;
+                        float ratio2 = (z2 - sternEnd.z) / dzTangent;
+                        
+                        float y1 = sternEnd.y + (sternEnd.y - sternP1.y) * ratio1;
+                        float y2 = sternEnd.y + (sternEnd.y - sternP1.y) * ratio2;
+                        
+                        // Draw Starboard side
+                        Gizmos.DrawLine(new Vector3(hw, y1, z1), new Vector3(hw, y2, z2));
+                        // Draw Port side
+                        Gizmos.DrawLine(new Vector3(-hw, y1, z1), new Vector3(-hw, y2, z2));
+                    }
+                }
+            }
         }
 
         // Draw HoB / Base Deck Ribband
@@ -356,6 +649,14 @@ public class FramingModelTest3 : MonoBehaviour
             foreach (float z in GetFrameZPositions())
             {
                 DrawFrameAtZ(z);
+            }
+
+            if (enableLandmarkFillFrames)
+            {
+                foreach (FillFrame fill in GetFillFrames())
+                {
+                    DrawFillFrame(fill);
+                }
             }
         }
     }
@@ -435,62 +736,47 @@ public class FramingModelTest3 : MonoBehaviour
         }
     }
 
-    public virtual List<float> GetFrameZPositions()
+    public virtual List<float> GetBasicFrameZPositions()
     {
-        List<float> positions = new List<float>();
-        if (sheerPlan == null) return positions;
-
-        // Removed redundant FindObjectOfType to optimize performance
-
-        if (foreFaceFashionTimberModelTest3 != null)
-        {
-            foreFaceFashionTimberModelTest3.UpdateCachedPoints();
-        }
+        _basicZPosListCache.Clear();
+        if (sheerPlan == null) return _basicZPosListCache;
 
         float bowZ = sheerPlan.cachedStemTopPoint.z;
-        float sternBoundaryZ = sheerPlan.cachedSternRisingEnd.z; // Stop frames naturally at the Stern Rising End
+        float sternBoundaryZ = sheerPlan.cachedTransomTopPoint.z;
+        float spacing = Mathf.Max(0.25f, frameSpacing);
+
+        int safetyCount = 0;
+        int maxSafetyFrames = 400;
+
+        for (float z = 0; z <= bowZ && safetyCount < maxSafetyFrames; safetyCount++)
+        {
+            if (!_basicZPosListCache.Contains(z)) _basicZPosListCache.Add(z);
+            z += spacing;
+        }
+
+        for (float z = -spacing; z >= sternBoundaryZ && safetyCount < maxSafetyFrames; safetyCount++)
+        {
+            if (!_basicZPosListCache.Contains(z)) _basicZPosListCache.Add(z);
+            z -= spacing;
+        }
+
+        _basicZPosListCache.Sort();
+        return _basicZPosListCache;
+    }
+
+    public virtual List<float> GetLandmarkZPositions()
+    {
+        _landmarkZPosListCache.Clear();
+        if (sheerPlan == null) return _landmarkZPosListCache;
+
+        float bowZ = sheerPlan.cachedStemTopPoint.z;
+        float sternBoundaryZ = sheerPlan.cachedTransomTopPoint.z;
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
-
-        for (float z = 0; z <= bowZ;)
-        {
-            if (!positions.Contains(z)) positions.Add(z);
-            z += frameSpacing;
-        }
-
-        for (float z = 0; z >= sternBoundaryZ;)
-        {
-            if (!positions.Contains(z)) positions.Add(z);
-            z -= frameSpacing;
-        }
-        
-        // Ensure the exact boundary frame is added if the loop missed it
-        if (!positions.Contains(sternBoundaryZ))
-        {
-            positions.Add(sternBoundaryZ);
-        }
-        
-        // Explicitly inject the structural keel corners so the mesh doesn't cut them off
-        if (!positions.Contains(keelBowZ)) positions.Add(keelBowZ);
-        
         float risingSternZ = sheerPlan.cachedSternRisingEnd.z;
-        if (!positions.Contains(risingSternZ)) positions.Add(risingSternZ);
-        
-        positions.Sort();
 
-        // Prevent frames from straddling the ForeFaceFashionTimber vertical drop
-        if (foreFaceFashionTimberModelTest3 != null && foreFaceFashionTimberModelTest3.showInnerFashionTimber && foreFaceFashionTimberModelTest3.cachedInnerPoints != null && foreFaceFashionTimberModelTest3.cachedInnerPoints.Count > 0)
-        {
-            float ffDropZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[0].x;
-            float thickness = frameSpacing * GetFrameThicknessRatioValue();
-            
-            positions.RemoveAll(z => 
-            {
-                float aftEdge = z - (thickness / 2f);
-                float foreEdge = z + (thickness / 2f);
-                // Check if the frame straddles the drop Z (allowing exact edge alignment)
-                return (aftEdge < ffDropZ - 0.001f && foreEdge > ffDropZ + 0.001f);
-            });
-        }
+        if (!_landmarkZPosListCache.Contains(sternBoundaryZ)) _landmarkZPosListCache.Add(sternBoundaryZ);
+        if (!_landmarkZPosListCache.Contains(keelBowZ)) _landmarkZPosListCache.Add(keelBowZ);
+        if (!_landmarkZPosListCache.Contains(risingSternZ)) _landmarkZPosListCache.Add(risingSternZ);
 
         if (sheerPlan.upperDecks != null)
         {
@@ -500,22 +786,93 @@ public class FramingModelTest3 : MonoBehaviour
             {
                 float aftZ = startZ + (deck.globalAftExtent * totalLength);
                 float foreZ = startZ + (deck.globalForeExtent * totalLength);
-                
-                if (aftZ > sternBoundaryZ && aftZ < bowZ)
+
+                if (aftZ > sternBoundaryZ && aftZ < bowZ && !_landmarkZPosListCache.Contains(aftZ)) _landmarkZPosListCache.Add(aftZ);
+                if (foreZ > sternBoundaryZ && foreZ < bowZ && !_landmarkZPosListCache.Contains(foreZ)) _landmarkZPosListCache.Add(foreZ);
+            }
+        }
+
+        _landmarkZPosListCache.Sort();
+        return _landmarkZPosListCache;
+    }
+
+    public virtual List<FillFrame> GetFillFrames()
+    {
+        _fillFrameListCache.Clear();
+        if (sheerPlan == null) return _fillFrameListCache;
+
+        List<float> basicZList = GetBasicFrameZPositions();
+        List<float> landmarkZList = GetLandmarkZPositions();
+        if (basicZList.Count == 0 || landmarkZList.Count == 0) return _fillFrameListCache;
+
+        float thickness = frameSpacing * GetFrameThicknessRatioValue();
+        float halfThickness = thickness / 2f;
+
+        foreach (float landmarkZ in landmarkZList)
+        {
+            float nearestBasicZ = basicZList[0];
+            float minDist = Mathf.Abs(landmarkZ - nearestBasicZ);
+
+            for (int i = 1; i < basicZList.Count; i++)
+            {
+                float dist = Mathf.Abs(landmarkZ - basicZList[i]);
+                if (dist < minDist)
                 {
-                    positions.Add(aftZ - 0.001f);
-                    positions.Add(aftZ + 0.001f);
+                    minDist = dist;
+                    nearestBasicZ = basicZList[i];
                 }
-                if (foreZ > sternBoundaryZ && foreZ < bowZ)
+            }
+
+            float basicEdgeZ = landmarkZ >= nearestBasicZ ? nearestBasicZ + halfThickness : nearestBasicZ - halfThickness;
+
+            float startZ = Mathf.Min(basicEdgeZ, landmarkZ);
+            float endZ = Mathf.Max(basicEdgeZ, landmarkZ);
+
+            if (endZ - startZ > 0.005f)
+            {
+                FrameProfile startFp = GetFrameProfile(startZ);
+                FrameProfile endFp = GetFrameProfile(endZ);
+
+                if (startFp.isValid || endFp.isValid)
                 {
-                    positions.Add(foreZ - 0.001f);
-                    positions.Add(foreZ + 0.001f);
+                    FillFrame fill = new FillFrame
+                    {
+                        isValid = true,
+                        startZ = startZ,
+                        endZ = endZ,
+                        startFp = startFp,
+                        endFp = endFp,
+                        label = $"Fill Z:{landmarkZ:F1}"
+                    };
+                    _fillFrameListCache.Add(fill);
                 }
             }
         }
 
-        positions.Sort();
-        return positions;
+        return _fillFrameListCache;
+    }
+
+    public virtual List<float> GetFrameZPositions()
+    {
+        if (enableLandmarkFillFrames)
+        {
+            return GetBasicFrameZPositions();
+        }
+
+        _zPosListCache.Clear();
+        if (sheerPlan == null) return _zPosListCache;
+
+        List<float> basicList = GetBasicFrameZPositions();
+        _zPosListCache.AddRange(basicList);
+
+        List<float> landmarkList = GetLandmarkZPositions();
+        foreach (float lmZ in landmarkList)
+        {
+            if (!_zPosListCache.Contains(lmZ)) _zPosListCache.Add(lmZ);
+        }
+
+        _zPosListCache.Sort();
+        return _zPosListCache;
     }
 
     private void DrawHobRibband()
@@ -632,10 +989,10 @@ public class FramingModelTest3 : MonoBehaviour
             }
 
             // Draw Lower Phantom HoB Projection for Fore Face Fashion Timber (Dashed Darker Grey)
-            if (foreFaceFashionTimberModelTest3 != null && foreFaceFashionTimberModelTest3.showInnerFashionTimber && foreFaceFashionTimberModelTest3.cachedInnerPoints != null && foreFaceFashionTimberModelTest3.cachedInnerPoints.Count > 0)
+            if (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.showInnerFashionTimber && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
             {
-                float ffLowerStartZ = foreFaceFashionTimberModelTest3.cachedInnerPoints[0].x;
-                float ffLowerEndZ = foreFaceFashionTimberModelTest3.GetHobIntersection().z;
+                float ffLowerStartZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
+                float ffLowerEndZ = foreFaceFashionTimberModelTest.GetHobIntersection().z;
 
                 if (ffLowerEndZ < ffLowerStartZ)
                 {
@@ -644,7 +1001,7 @@ public class FramingModelTest3 : MonoBehaviour
                     float dashStep = (ffLowerEndZ - ffLowerStartZ) / dashSegments;
                     
                     float startHobY = sheerPlan.GetTheoreticalHobYAtZ(ffLowerStartZ);
-                    float ffDropY = foreFaceFashionTimberModelTest3.cachedInnerPoints[0].y;
+                    float ffDropY = foreFaceFashionTimberModelTest.cachedInnerPoints[0].y;
                     float yOffset = startHobY - ffDropY;
                     float hw = bodyPlan.keelWidth / 2f;
 
@@ -1048,14 +1405,14 @@ public class FramingModelTest3 : MonoBehaviour
         {
             float min = 0f;
             float max = 1f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 10; i++)
             {
-                float mid = (min + max) / 2f;
+                float mid = (min + max) * 0.5f;
                 float py = CalculateCubicBezierY(mid, fp.upperP0.y, fp.upperP1.y, fp.upperP2.y, fp.upperP3.y);
                 if (py < targetY) min = mid;
                 else max = mid;
             }
-            t = (min + max) / 2f;
+            t = (min + max) * 0.5f;
             isUpper = true;
             return true;
         }
@@ -1064,14 +1421,14 @@ public class FramingModelTest3 : MonoBehaviour
 
         float minL = 0f;
         float maxL = 1f;
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 10; i++)
         {
-            float mid = (minL + maxL) / 2f;
+            float mid = (minL + maxL) * 0.5f;
             float py = GetSurfacePointAtT(fp, 1f, mid, true).y;
             if (py < targetY) minL = mid;
             else maxL = mid;
         }
-        t = (minL + maxL) / 2f;
+        t = (minL + maxL) * 0.5f;
         isUpper = false;
         return true;
     }
@@ -1147,14 +1504,14 @@ public class FramingModelTest3 : MonoBehaviour
         {
             float tMinT = 0f;
             float tMaxT = 1f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 10; i++)
             {
-                float midT = (tMinT + tMaxT) / 2f;
+                float midT = (tMinT + tMaxT) * 0.5f;
                 float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
                 if (py < targetY) tMinT = midT;
                 else tMaxT = midT;
             }
-            float tVal = (tMinT + tMaxT) / 2f;
+            float tVal = (tMinT + tMaxT) * 0.5f;
             Vector3 outerPt = GetUpperSurfacePointAtT(fp, 1f, tVal);
             exactX = outerPt.x;
             
@@ -1181,14 +1538,14 @@ public class FramingModelTest3 : MonoBehaviour
 
             float fMinT = 0f;
             float fMaxT = 1f;
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 10; i++)
             {
-                float midT = (fMinT + fMaxT) / 2f;
+                float midT = (fMinT + fMaxT) * 0.5f;
                 float py = GetSurfacePointAtT(fp, 1f, midT, true).y;
                 if (py < mappedTargetY) fMinT = midT;
                 else fMaxT = midT;
             }
-            float tVal = (fMinT + fMaxT) / 2f;
+            float tVal = (fMinT + fMaxT) * 0.5f;
             Vector3 outerPt = GetSurfacePointAtT(fp, 1f, tVal, true);
             exactX = outerPt.x;
 
@@ -1215,28 +1572,21 @@ public class FramingModelTest3 : MonoBehaviour
     public Vector3 GetSurfacePointAtT(FrameProfile fp, float flipX, float t, bool ignoreFashionTimber = false)
     {
         Vector3 p0 = new Vector3(fp.lowerP0.x, fp.lowerP0.y, fp.lowerP0.z);
-        Vector3 p1Inner = new Vector3(fp.lowerP1_inner.x, fp.lowerP1_inner.y, fp.lowerP1_inner.z);
         Vector3 p1 = new Vector3(fp.lowerP1.x, fp.lowerP1.y, fp.lowerP1.z);
-        Vector3 pMid = new Vector3(fp.lowerPMid.x, fp.lowerPMid.y, fp.lowerPMid.z);
+        Vector3 pR = new Vector3(fp.lowerLR.x, fp.lowerLR.y, fp.lowerLR.z);
         Vector3 p2 = new Vector3(fp.lowerP2.x, fp.lowerP2.y, fp.lowerP2.z);
         Vector3 p3 = new Vector3(fp.lowerP3.x, fp.lowerP3.y, fp.lowerP3.z);
 
         Vector3 pt;
-        if (bodyPlan.useQuinticBezier)
-            pt = CalculateQuinticBezierPoint(t, p0, p1Inner, p1, pMid, p2, p3);
-        else if (bodyPlan.useQuarticBezier)
-            pt = CalculateQuarticBezierPoint(t, p0, p1, pMid, p2, p3);
-        else
-            pt = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
-
-        if (!ignoreFashionTimber && fp.lowerP0.z <= sheerPlan.cachedSternRisingEnd.z)
+        if (t <= 0.5f)
         {
-            FashionTimberModelTest3 fModel = GetComponent<FashionTimberModelTest3>();
-            if (fModel != null && fModel.showFashionTimbers)
-            {
-                float exactX = fModel.GetNaturalHullXAtYZ(pt.y, fp.lowerP0.z);
-                if (exactX > 0.001f) pt.x = exactX;
-            }
+            float localT = t * 2f;
+            pt = CalculateQuadraticBezierPoint(localT, p0, p1, pR);
+        }
+        else
+        {
+            float localT = (t - 0.5f) * 2f;
+            pt = CalculateQuadraticBezierPoint(localT, pR, p2, p3);
         }
 
         pt.x *= flipX;
@@ -1336,6 +1686,56 @@ public class FramingModelTest3 : MonoBehaviour
 #endif
     }
 
+    private void DrawFillFrame(FillFrame fill)
+    {
+        if (!fill.isValid) return;
+
+        Gizmos.color = GetFillFrameColor();
+
+        if (fill.startFp.isValid)
+        {
+            DrawMould(fill.startFp, 1f, false);
+            DrawMould(fill.startFp, -1f, false);
+        }
+
+        if (fill.endFp.isValid)
+        {
+            DrawMould(fill.endFp, 1f, false);
+            DrawMould(fill.endFp, -1f, false);
+        }
+
+        if (fill.startFp.isValid && fill.endFp.isValid)
+        {
+            int edgeSteps = 4;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float flipX = (float)side;
+
+                if (fill.startFp.hasLower && fill.endFp.hasLower)
+                {
+                    for (int s = 0; s <= edgeSteps; s++)
+                    {
+                        float t = s / (float)edgeSteps;
+                        Vector3 pStart = GetSurfacePointAtT(fill.startFp, flipX, t);
+                        Vector3 pEnd = GetSurfacePointAtT(fill.endFp, flipX, t);
+                        Gizmos.DrawLine(pStart, pEnd);
+                    }
+                }
+
+                if (fill.startFp.hasUpper && fill.endFp.hasUpper)
+                {
+                    for (int s = 0; s <= edgeSteps; s++)
+                    {
+                        float t = s / (float)edgeSteps;
+                        Vector3 pStart = GetUpperSurfacePointAtT(fill.startFp, flipX, t);
+                        Vector3 pEnd = GetUpperSurfacePointAtT(fill.endFp, flipX, t);
+                        Gizmos.DrawLine(pStart, pEnd);
+                    }
+                }
+            }
+        }
+    }
+
     private void DrawMould(FrameProfile fp, float flipX, bool isDashed = false)
     {
         if (fp.hasLower)
@@ -1357,23 +1757,14 @@ public class FramingModelTest3 : MonoBehaviour
             {
                 Gizmos.color = new Color(frameColor.r, frameColor.g, frameColor.b, 0.3f);
                 Vector3 p0 = new Vector3(fp.lowerP0.x * flipX, fp.lowerP0.y, fp.lowerP0.z);
-                Vector3 p1Inner = new Vector3(fp.lowerP1_inner.x * flipX, fp.lowerP1_inner.y, fp.lowerP1_inner.z);
                 Vector3 p1 = new Vector3(fp.lowerP1.x * flipX, fp.lowerP1.y, fp.lowerP1.z);
-                Vector3 pMid = new Vector3(fp.lowerPMid.x * flipX, fp.lowerPMid.y, fp.lowerPMid.z);
+                Vector3 pR = new Vector3(fp.lowerLR.x * flipX, fp.lowerLR.y, fp.lowerLR.z);
                 Vector3 p2 = new Vector3(fp.lowerP2.x * flipX, fp.lowerP2.y, fp.lowerP2.z);
                 Vector3 p3 = new Vector3(fp.lowerP3.x * flipX, fp.lowerP3.y, fp.lowerP3.z);
                 
-                if (bodyPlan.useQuinticBezier)
-                {
-                    Gizmos.DrawLine(p0, p1Inner);
-                    Gizmos.DrawLine(p1Inner, p1);
-                }
-                else
-                {
-                    Gizmos.DrawLine(p0, p1);
-                }
-                Gizmos.DrawLine(p1, pMid);
-                Gizmos.DrawLine(pMid, p2);
+                Gizmos.DrawLine(p0, p1);
+                Gizmos.DrawLine(p1, pR);
+                Gizmos.DrawLine(pR, p2);
                 Gizmos.DrawLine(p2, p3);
             }
         }

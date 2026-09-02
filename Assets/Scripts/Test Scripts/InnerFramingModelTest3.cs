@@ -11,7 +11,7 @@ public class InnerFramingModelTest3 : MonoBehaviour
     public SheerPlan sheerPlan;
 
     [Tooltip("Reference to the ModularBodyPlan.")]
-    public BodyPlan bodyPlan;
+    public BodyPlanTest bodyPlan;
 
     [Tooltip("Reference to the FramingModelTest3.")]
     public FramingModelTest3 framingModel;
@@ -57,6 +57,17 @@ public class InnerFramingModelTest3 : MonoBehaviour
             if (fpAft.isValid) DrawSingleInnerFrame(fpAft, aftZ, false);
             DrawSingleInnerFrame(fpCenter, z, true);
             if (fpFore.isValid) DrawSingleInnerFrame(fpFore, foreZ, false);
+        }
+
+        if (framingModel.enableLandmarkFillFrames)
+        {
+            Color fillInnerColor = new Color(innerFrameColor.r * 0.65f, innerFrameColor.g * 0.65f, innerFrameColor.b * 0.65f, innerFrameColor.a);
+            Gizmos.color = fillInnerColor;
+            foreach (var fill in framingModel.GetFillFrames())
+            {
+                if (fill.startFp.isValid) DrawSingleInnerFrame(fill.startFp, fill.startZ, false);
+                if (fill.endFp.isValid) DrawSingleInnerFrame(fill.endFp, fill.endZ, false);
+            }
         }
 
         if (showInnerHobLine)
@@ -353,7 +364,8 @@ public class InnerFramingModelTest3 : MonoBehaviour
     private void RemoveSwallowtails(List<Vector2> rawPoints)
     {
         bool intersectionFound = true;
-        while (intersectionFound)
+        int safetyLoop = 0;
+        while (intersectionFound && safetyLoop++ < 100)
         {
             intersectionFound = false;
             for (int i = 0; i < rawPoints.Count - 3; i++)

@@ -148,9 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b321987d3730947c1bc92b20acdd111e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InnerFashionTimberModelTest3
-  sheerPlan: {fileID: 0}
+  sheerPlan: {fileID: 2005584223}
   breadthPlan: {fileID: 565977956}
-  bodyPlan: {fileID: 1532814935}
+  bodyPlan: {fileID: 0}
   framingModel: {fileID: 357762064}
   fashionTimberModel: {fileID: 1401990679}
   showInnerFashionTimbers: 1
@@ -201,15 +201,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FramingModelTest3
   sheerPlan: {fileID: 2005584223}
   breadthPlan: {fileID: 565977956}
-  bodyPlan: {fileID: 1532814935}
-  frameSpacing: 1
+  bodyPlan: {fileID: 1201162030}
+  frameSpacing: 0.5
   frameThicknessRatio: 1
   frameColor: {r: 0, g: 1, b: 1, a: 1}
-  foreFaceFashionTimberModelTest3: {fileID: 775590939}
+  foreFaceFashionTimberModelTest: {fileID: 775590939}
   fashionTimberModelTest: {fileID: 1401990679}
   showFrames: 1
   showFrameLabels: 0
   showFloorSweepsGuide: 1
+  cutFramesAtFashionTimber: 1
   showSurfaceRibbands: 1
   showWaterlines: 0
   showFrameControlArms: 0
@@ -257,11 +258,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ed7bf2d8908c41029f9ddfec1f0b302, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InnerForeFaceFashionTimberModelTest3
-  sheerPlan: {fileID: 0}
+  sheerPlan: {fileID: 2005584223}
   breadthPlan: {fileID: 565977956}
-  bodyPlan: {fileID: 1532814935}
+  bodyPlan: {fileID: 0}
   framingModel: {fileID: 357762064}
-  foreFaceFashionTimberModelTest3: {fileID: 775590939}
+  foreFaceFashionTimberModelTest: {fileID: 775590939}
   showInnerForeFaceFashionTimber: 1
   innerForeFaceColor: {r: 0, g: 1, b: 1, a: 1}
 --- !u!4 &413914576
@@ -319,7 +320,7 @@ MonoBehaviour:
   midshipAftArmLength: 0.5
   sternArmAngle: 0
   sternArmLength: 1
-  topTimberMaxBeam: 3.2
+  topTimberMaxBeam: 3.44
   topTimberTransomWidth: 0.456
   topTimberBowArmAngle: 0
   topTimberBowArmLength: 1
@@ -327,7 +328,7 @@ MonoBehaviour:
   topTimberMidshipAftArmLength: 0.5
   topTimberSternArmAngle: 0
   topTimberSternArmLength: 1
-  cutMaxBeam: 3.2
+  cutMaxBeam: 3.44
   cutTransomWidth: 0.456
   cutBowArmAngle: 0
   cutBowArmLength: 1
@@ -335,31 +336,31 @@ MonoBehaviour:
   cutMidshipAftArmLength: 0.5
   cutSternArmAngle: 0
   cutSternArmLength: 1
-  cachedFwdP0: {x: 0.125, y: 5, z: 10}
-  cachedFwdP1: {x: 4.125, y: 5, z: 10}
-  cachedFwdP2: {x: 4, y: 5, z: 5}
-  cachedFwdP3: {x: 4, y: 5, z: 0}
-  cachedAftP0: {x: 4, y: 5, z: 0}
-  cachedAftP1: {x: 4, y: 5, z: -5}
-  cachedAftP2: {x: 2.4, y: 5, z: -10.369074}
+  cachedFwdP0: {x: 0.125, y: 4, z: 10}
+  cachedFwdP1: {x: 4.125, y: 4, z: 10}
+  cachedFwdP2: {x: 4, y: 4, z: 5}
+  cachedFwdP3: {x: 4, y: 4, z: 0}
+  cachedAftP0: {x: 4, y: 4, z: 0}
+  cachedAftP1: {x: 4, y: 4, z: -5}
+  cachedAftP2: {x: 2.4, y: 4, z: -10.105457}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
-  cachedTTFwdP0: {x: 0.125, y: 6.5, z: 10}
-  cachedTTFwdP1: {x: 3.325, y: 6.5, z: 10}
-  cachedTTFwdP2: {x: 3.2, y: 6.5, z: 5}
-  cachedTTFwdP3: {x: 3.2, y: 6.5, z: 0}
-  cachedTTAftP0: {x: 3.2, y: 6.5, z: 0}
-  cachedTTAftP1: {x: 3.2, y: 6.5, z: -5}
-  cachedTTAftP2: {x: 1.4592, y: 6.5, z: -11.615385}
+  cachedTTFwdP0: {x: 0.125, y: 5.5, z: 10}
+  cachedTTFwdP1: {x: 3.565, y: 5.5, z: 10}
+  cachedTTFwdP2: {x: 3.44, y: 5.5, z: 5}
+  cachedTTFwdP3: {x: 3.44, y: 5.5, z: 0}
+  cachedTTAftP0: {x: 3.44, y: 5.5, z: 0}
+  cachedTTAftP1: {x: 3.44, y: 5.5, z: -5}
+  cachedTTAftP2: {x: 1.56864, y: 5.5, z: -11.43938}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
-  cachedCutFwdP0: {x: 0.125, y: 8, z: 10}
-  cachedCutFwdP1: {x: 3.325, y: 8, z: 10}
-  cachedCutFwdP2: {x: 3.2, y: 8, z: 5}
-  cachedCutFwdP3: {x: 3.2, y: 8, z: 0}
-  cachedCutAftP0: {x: 3.2, y: 8, z: 0}
-  cachedCutAftP1: {x: 3.2, y: 8, z: -5}
-  cachedCutAftP2: {x: 1.4592, y: 8, z: -11.615385}
+  cachedCutFwdP0: {x: 0.125, y: 6.5, z: 10}
+  cachedCutFwdP1: {x: 3.565, y: 6.5, z: 10}
+  cachedCutFwdP2: {x: 3.44, y: 6.5, z: 5}
+  cachedCutFwdP3: {x: 3.44, y: 6.5, z: 0}
+  cachedCutAftP0: {x: 3.44, y: 6.5, z: 0}
+  cachedCutAftP1: {x: 3.44, y: 6.5, z: -5}
+  cachedCutAftP2: {x: 1.56864, y: 6.5, z: -11.43938}
   cachedCutAftP3: {x: 0, y: 0, z: 0}
   cachedIsCutAftCubic: 0
 --- !u!4 &565977957
@@ -408,111 +409,109 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ForeFaceFashionTimberModelTest3
   sheerPlan: {fileID: 2005584223}
   fashionTimberModel: {fileID: 1401990679}
-  thickness: 0.3
+  specialFrames: {fileID: 0}
+  thickness: 0.25
   showInnerFashionTimber: 1
   innerColor: {r: 1, g: 0, b: 1, a: 1}
   cachedInnerPoints:
-  - {x: -8.826566, y: 0.8456196}
-  - {x: -8.851489, y: 1.0076212}
-  - {x: -8.876411, y: 1.1696165}
-  - {x: -8.901335, y: 1.331618}
-  - {x: -8.926258, y: 1.4936194}
-  - {x: -8.951181, y: 1.6556209}
-  - {x: -8.976104, y: 1.8176162}
-  - {x: -9.001027, y: 1.9796177}
-  - {x: -9.02595, y: 2.1416192}
-  - {x: -9.050874, y: 2.3036206}
-  - {x: -9.075796, y: 2.465616}
-  - {x: -9.100719, y: 2.6276174}
-  - {x: -9.125643, y: 2.789619}
-  - {x: -9.150566, y: 2.9516203}
-  - {x: -9.175488, y: 3.1136158}
-  - {x: -9.200412, y: 3.2756174}
-  - {x: -9.225335, y: 3.4376187}
-  - {x: -9.250258, y: 3.5996203}
-  - {x: -9.275181, y: 3.7616155}
-  - {x: -9.300104, y: 3.9236171}
-  - {x: -9.325202, y: 4.086262}
-  - {x: -9.350809, y: 4.241592}
-  - {x: -9.376441, y: 4.3847284}
-  - {x: -9.402087, y: 4.5178976}
-  - {x: -9.427746, y: 4.6427374}
-  - {x: -9.45342, y: 4.7604833}
-  - {x: -9.479109, y: 4.872087}
-  - {x: -9.504814, y: 4.9782887}
-  - {x: -9.530532, y: 5.079695}
-  - {x: -9.556264, y: 5.176794}
-  - {x: -9.582017, y: 5.270021}
-  - {x: -9.607782, y: 5.3596983}
-  - {x: -9.633565, y: 5.4461365}
-  - {x: -9.659366, y: 5.5295863}
-  - {x: -9.6851845, y: 5.610276}
-  - {x: -9.71102, y: 5.6883917}
-  - {x: -9.736871, y: 5.764094}
-  - {x: -9.762747, y: 5.8375673}
-  - {x: -9.788635, y: 5.908912}
-  - {x: -9.814545, y: 5.978265}
-  - {x: -9.840478, y: 6.0457435}
-  - {x: -9.866429, y: 6.111427}
-  - {x: -9.892399, y: 6.175409}
-  - {x: -9.918391, y: 6.237774}
-  - {x: -9.94441, y: 6.298615}
-  - {x: -9.9704485, y: 6.3579693}
-  - {x: -9.996512, y: 6.4159164}
-  - {x: -10.022596, y: 6.4725065}
-  - {x: -10.048711, y: 6.527808}
-  - {x: -10.074841, y: 6.5818424}
-  - {x: -10.101004, y: 6.634681}
-  - {x: -10.127195, y: 6.6863647}
-  - {x: -10.1533985, y: 6.736898}
-  - {x: -10.179641, y: 6.78637}
-  - {x: -10.205918, y: 6.8347993}
-  - {x: -10.232219, y: 6.8822026}
-  - {x: -10.258537, y: 6.9286}
-  - {x: -10.284899, y: 6.974054}
-  - {x: -10.311286, y: 7.018571}
-  - {x: -10.337706, y: 7.0621805}
-  - {x: -10.364159, y: 7.1049085}
-  - {x: -10.390642, y: 7.1467757}
-  - {x: -10.417164, y: 7.1878057}
-  - {x: -10.443712, y: 7.228002}
-  - {x: -10.470303, y: 7.2674093}
-  - {x: -10.496932, y: 7.306043}
-  - {x: -10.523595, y: 7.3439016}
-  - {x: -10.550303, y: 7.38102}
-  - {x: -10.57704, y: 7.417394}
-  - {x: -10.603814, y: 7.4530425}
-  - {x: -10.630643, y: 7.4880095}
-  - {x: -10.657504, y: 7.5222692}
-  - {x: -10.684404, y: 7.5558424}
-  - {x: -10.711365, y: 7.58877}
-  - {x: -10.738343, y: 7.6210127}
-  - {x: -10.76538, y: 7.652625}
-  - {x: -10.792457, y: 7.683593}
-  - {x: -10.819586, y: 7.713944}
-  - {x: -10.846781, y: 7.743694}
-  - {x: -10.873993, y: 7.772805}
-  - {x: -10.901276, y: 7.801343}
-  - {x: -10.928596, y: 7.8292685}
-  - {x: -10.955971, y: 7.8566194}
-  - {x: -10.983409, y: 7.883404}
-  - {x: -11.010873, y: 7.9095893}
-  - {x: -11.038395, y: 7.935217}
-  - {x: -11.066013, y: 7.9603276}
-  - {x: -11.093636, y: 7.984836}
-  - {x: -11.121337, y: 8.0088215}
-  - {x: -11.149083, y: 8.032256}
-  - {x: -11.176895, y: 8.05516}
-  - {x: -11.204751, y: 8.077522}
-  - {x: -11.232677, y: 8.099365}
-  - {x: -11.26066, y: 8.120685}
-  - {x: -11.28869, y: 8.141473}
-  - {x: -11.316807, y: 8.161766}
-  - {x: -11.344958, y: 8.181528}
-  - {x: -11.373167, y: 8.200778}
-  - {x: -11.4014435, y: 8.219526}
-  - {x: -11.429776, y: 8.237767}
-  - {x: -11.526678, y: 8.286585}
+  - {x: -8.8321905, y: 0.43570426}
+  - {x: -8.853742, y: 0.5434599}
+  - {x: -8.875293, y: 0.6512155}
+  - {x: -8.896844, y: 0.7589711}
+  - {x: -8.918395, y: 0.8667267}
+  - {x: -8.939946, y: 0.9744823}
+  - {x: -8.961497, y: 1.082238}
+  - {x: -8.983048, y: 1.1899935}
+  - {x: -9.0046, y: 1.2977492}
+  - {x: -9.026151, y: 1.4055047}
+  - {x: -9.047702, y: 1.5132604}
+  - {x: -9.069253, y: 1.621016}
+  - {x: -9.090804, y: 1.7287717}
+  - {x: -9.112355, y: 1.8365272}
+  - {x: -9.133906, y: 1.9442828}
+  - {x: -9.1554575, y: 2.0520384}
+  - {x: -9.177009, y: 2.159794}
+  - {x: -9.19856, y: 2.2675498}
+  - {x: -9.220111, y: 2.3753052}
+  - {x: -9.241662, y: 2.4830608}
+  - {x: -9.263212, y: 2.5908165}
+  - {x: -9.284763, y: 2.698572}
+  - {x: -9.306314, y: 2.8063278}
+  - {x: -9.327866, y: 2.9140832}
+  - {x: -9.349417, y: 3.0218391}
+  - {x: -9.370968, y: 3.1295946}
+  - {x: -9.392519, y: 3.23735}
+  - {x: -9.41407, y: 3.345106}
+  - {x: -9.435621, y: 3.4528613}
+  - {x: -9.457172, y: 3.5606172}
+  - {x: -9.478724, y: 3.6683726}
+  - {x: -9.500275, y: 3.776128}
+  - {x: -9.521826, y: 3.883884}
+  - {x: -9.543377, y: 3.9916394}
+  - {x: -9.564928, y: 4.0993953}
+  - {x: -9.586479, y: 4.207151}
+  - {x: -9.60803, y: 4.314906}
+  - {x: -9.629581, y: 4.422662}
+  - {x: -9.651133, y: 4.5304174}
+  - {x: -9.672684, y: 4.638173}
+  - {x: -9.694235, y: 4.745929}
+  - {x: -9.718675, y: 4.819542}
+  - {x: -9.733678, y: 4.8556104}
+  - {x: -9.749674, y: 4.891204}
+  - {x: -9.766635, y: 4.9263053}
+  - {x: -9.784548, y: 4.9609027}
+  - {x: -9.803393, y: 4.9949827}
+  - {x: -9.823147, y: 5.0285316}
+  - {x: -9.843795, y: 5.0615396}
+  - {x: -9.865316, y: 5.0939946}
+  - {x: -9.887694, y: 5.1258864}
+  - {x: -9.91091, y: 5.157205}
+  - {x: -9.934944, y: 5.1879406}
+  - {x: -9.959779, y: 5.2180834}
+  - {x: -9.985398, y: 5.2476234}
+  - {x: -10.011788, y: 5.2765546}
+  - {x: -10.038927, y: 5.304867}
+  - {x: -10.0668, y: 5.332551}
+  - {x: -10.095393, y: 5.359599}
+  - {x: -10.124687, y: 5.386004}
+  - {x: -10.154672, y: 5.4117575}
+  - {x: -10.185328, y: 5.436851}
+  - {x: -10.21664, y: 5.4612775}
+  - {x: -10.248597, y: 5.485028}
+  - {x: -10.281181, y: 5.508095}
+  - {x: -10.314382, y: 5.53047}
+  - {x: -10.348181, y: 5.5521464}
+  - {x: -10.382568, y: 5.573115}
+  - {x: -10.417528, y: 5.5933676}
+  - {x: -10.453048, y: 5.6128964}
+  - {x: -10.489114, y: 5.6316924}
+  - {x: -10.525712, y: 5.649748}
+  - {x: -10.562831, y: 5.667054}
+  - {x: -10.600456, y: 5.6836033}
+  - {x: -10.6385765, y: 5.6993847}
+  - {x: -10.6771755, y: 5.714391}
+  - {x: -10.716244, y: 5.7286134}
+  - {x: -10.755767, y: 5.7420425}
+  - {x: -10.766692, y: 5.745494}
+  - {x: -10.767426, y: 5.7469096}
+  - {x: -10.792425, y: 5.79514}
+  - {x: -10.817426, y: 5.84337}
+  - {x: -10.842425, y: 5.8915997}
+  - {x: -10.867425, y: 5.93983}
+  - {x: -10.892426, y: 5.98806}
+  - {x: -10.917425, y: 6.0362897}
+  - {x: -10.942426, y: 6.08452}
+  - {x: -10.967425, y: 6.1327496}
+  - {x: -10.992425, y: 6.1809797}
+  - {x: -11.017426, y: 6.22921}
+  - {x: -11.042425, y: 6.2774396}
+  - {x: -11.067426, y: 6.32567}
+  - {x: -11.092425, y: 6.3739}
+  - {x: -11.117425, y: 6.4221296}
+  - {x: -11.142426, y: 6.47036}
+  - {x: -11.167425, y: 6.51859}
+  - {x: -11.192426, y: 6.5668197}
+  - {x: -11.217425, y: 6.61505}
 --- !u!4 &775590940
 Transform:
   m_ObjectHideFlags: 0
@@ -792,6 +791,76 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &1201162029
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1201162031}
+  - component: {fileID: 1201162030}
+  m_Layer: 0
+  m_Name: Body Plan Test
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1201162030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1201162029}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92884b1d9ce654cdc874cfdb8ee4eae5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BodyPlanTest
+  sheerPlan: {fileID: 2005584223}
+  breadthPlan: {fileID: 565977956}
+  showLabels: 1
+  keelArmAngle: 61
+  keelArmLength: 0.178
+  hobLowerArmLength: 0.39
+  risingLinePosition: 0.5
+  flareTumblehomePercentage: 0.86
+  upperHobArmAngle: 0
+  upperHobArmLength: 0.5
+  topTimberArmAngle: 0
+  topTimberArmLength: 0.5
+  keelWidth: 0.5
+  baseFrameThickness: 0.3
+  topFrameThickness: 0.15
+  showInnerFrame: 1
+  innerFrameColor: {r: 1, g: 0, b: 1, a: 1}
+  cachedL0: {x: 0.25, y: 0, z: 0}
+  cachedL1: {x: 0.644668, y: 0.712, z: 0}
+  cachedLR: {x: 2.322334, y: 1.576, z: 0}
+  cachedL2: {x: 4, y: 2.44, z: 0}
+  cachedL3: {x: 4, y: 4, z: 0}
+  cachedU0: {x: 4, y: 4, z: 0}
+  cachedU1: {x: 4, y: 4.75, z: 0}
+  cachedU2: {x: 3.44, y: 4.75, z: 0}
+  cachedU3: {x: 3.44, y: 5.5, z: 0}
+--- !u!4 &1201162031
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1201162029}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1401990678
 GameObject:
   m_ObjectHideFlags: 0
@@ -823,7 +892,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FashionTimberModelTest3
   sheerPlan: {fileID: 2005584223}
   breadthPlan: {fileID: 565977956}
-  bodyPlan: {fileID: 1532814935}
+  bodyPlan: {fileID: 1201162030}
   framingModel: {fileID: 357762064}
   showFashionTimbers: 1
   showLabels: 1
@@ -875,9 +944,9 @@ MonoBehaviour:
   sheerPlan: {fileID: 2005584223}
   breadthPlan: {fileID: 565977956}
   showLabels: 1
-  keelArmAngle: 0
+  keelArmAngle: 24
   keelArmLength: 1
-  hobLowerArmLength: 0.5
+  hobLowerArmLength: 0
   useQuarticBezier: 0
   middleControlPosition: 0.5
   useQuinticBezier: 1
@@ -894,19 +963,19 @@ MonoBehaviour:
   showInnerFrame: 1
   innerFrameColor: {r: 1, g: 0, b: 1, a: 1}
   lastKeelArmLength: 1
-  lastKeelArmAngle: 0
-  lastHobLowerArmLength: 0.5
+  lastKeelArmAngle: 24
+  lastHobLowerArmLength: 0
   lastMiddleControlPosition: 0.5
   cachedL0: {x: 0.125, y: 0, z: 0}
-  cachedL1Inner: {x: 2.0625, y: 0, z: 0}
-  cachedL1: {x: 4, y: 0, z: 0}
-  cachedLMid: {x: 4, y: 1.25, z: 0}
-  cachedL2: {x: 4, y: 2.5, z: 0}
-  cachedL3: {x: 4, y: 5, z: 0}
-  cachedU0: {x: 4, y: 5, z: 0}
-  cachedU1: {x: 4, y: 5.75, z: 0}
-  cachedU2: {x: 3.2, y: 5.75, z: 0}
-  cachedU3: {x: 3.2, y: 6.5, z: 0}
+  cachedL1Inner: {x: 2.0625, y: 0.86263067, z: 0}
+  cachedL1: {x: 4, y: 1.7252613, z: 0}
+  cachedLMid: {x: 4, y: 2.8626306, z: 0}
+  cachedL2: {x: 4, y: 4, z: 0}
+  cachedL3: {x: 4, y: 4, z: 0}
+  cachedU0: {x: 4, y: 4, z: 0}
+  cachedU1: {x: 4, y: 4.75, z: 0}
+  cachedU2: {x: 3.2, y: 4.75, z: 0}
+  cachedU3: {x: 3.2, y: 5.5, z: 0}
   cachedUseQuartic: 0
   cachedUseQuintic: 1
 --- !u!4 &1532814936
@@ -971,16 +1040,16 @@ MonoBehaviour:
   showLabels: 1
   showControlArms: 1
   lengthBetweenPerpendiculars: 20
-  lowerHullHeight: 5
+  lowerHullHeight: 4
   upperHullHeight: 7
   keelThickness: 0.5
   drawOuterKeelProfile: 1
   drawDetailedLines: 1
-  sternPostThickness: 1
+  sternPostThickness: 0.5
   stemInheritsSheerAngle: 1
-  lastLowerHullHeight: 5
-  holdDepth: 5
-  lastHoldDepth: 5
+  lastLowerHullHeight: 4
+  holdDepth: 4
+  lastHoldDepth: 4
   keelMidshipDrop: 0
   stemRakePercentage: 0.15
   stemBottomControlZ: 0.5
@@ -996,9 +1065,9 @@ MonoBehaviour:
   deadwoodTopControlZ: 1
   deadwoodTopControlY: 0.5
   enableCounter: 1
-  counterVerticalSlide: 0
-  counterLength: 2
-  counterHeightRatio: 0.5
+  counterVerticalSlide: 0.6
+  counterLength: 1
+  counterHeightRatio: 0.129
   counterCurveAngle: 0.19
   counterCurveLength: 0.5
   bulwarkHeight: 1.5
@@ -1014,8 +1083,8 @@ MonoBehaviour:
   upperDecks: []
   lowerDecks: []
   transomAftRake: 0.5
-  baseDeckSheerFwd: 2
-  baseDeckSheerAft: 1.5
+  baseDeckSheerFwd: 1
+  baseDeckSheerAft: 1
   baseDeckCurveControlLength: 0.6
   customizeHob: 0
   hobMidshipHeight: 2.5
@@ -1023,52 +1092,52 @@ MonoBehaviour:
   hobSternHeight: 3.5
   hobDropAft: 0
   hobCurveControlLength: 0.5
-  bowRisingLineEndPos: 1
+  bowRisingLineEndPos: 0.45
   bowRisingLineControl: 0.5
-  sternRisingLineEndPos: 1
-  sternRisingLineControl: 0.5
+  sternRisingLineEndPos: 0.906
+  sternRisingLineControl: 0.462
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
-  cachedBowRisingEnd: {x: 0, y: 6.9999948, z: 10}
-  cachedBowP1Ctrl: {x: 0, y: -0, z: 4.9999986}
-  cachedSternRisingEnd: {x: 0, y: 4, z: -9.615385}
-  cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
-  cachedStemTopPoint: {x: 0, y: 7, z: 10}
-  cachedSternPostTopPoint: {x: 0, y: 4, z: -9.615385}
-  cachedCounterBasePoint: {x: 0, y: 4, z: -9.615385}
-  cachedCounterTopPoint: {x: 0, y: 8, z: -11.615385}
-  cachedCounterCp1: {x: 0, y: 5.911586, z: -9.909426}
-  cachedCounterCp2: {x: 0, y: 7.4119196, z: -10.659592}
+  cachedBowRisingEnd: {x: 0, y: 2.2499976, z: 9.416321}
+  cachedBowP1Ctrl: {x: 0, y: -0, z: 4.2142773}
+  cachedSternRisingEnd: {x: 0, y: 4.2553916, z: -9.851078}
+  cachedSternP1Ctrl: {x: 0, y: -0, z: -4.158}
+  cachedStemTopPoint: {x: 0, y: 5, z: 10}
+  cachedSternPostTopPoint: {x: 0, y: 4.6969, z: -9.93938}
+  cachedCounterBasePoint: {x: 0, y: 4.6969, z: -9.93938}
+  cachedCounterTopPoint: {x: 0, y: 5.5354, z: -10.93938}
+  cachedCounterCp1: {x: 0, y: 5.097616, z: -10.0864}
+  cachedCounterCp2: {x: 0, y: 5.4121237, z: -10.461483}
   cachedDeadwoodForePoint: {x: 0, y: 0, z: -7.2000003}
-  cachedDeadwoodAftPoint: {x: 0, y: 0.8, z: -9.123077}
+  cachedDeadwoodAftPoint: {x: 0, y: 0.93938, z: -9.187876}
   cachedDeadwoodP1: {x: 0, y: 0, z: -8.1}
-  cachedDeadwoodP2: {x: 0, y: 0.4, z: -9.061539}
-  cachedBaseDeckSternIntersect: {x: 0, y: 6.5, z: -10.369074}
-  cachedBaseDeckSternCp: {x: 0, y: 6.5, z: -10.369074}
-  cachedBaseDeckMidCpAft: {x: 0, y: 5, z: -6}
-  cachedBaseDeckMidshipPoint: {x: 0, y: 5, z: 0}
-  cachedBaseDeckMidCpFwd: {x: 0, y: 5, z: 6}
-  cachedBaseDeckBowCp: {x: 0, y: 7, z: 10}
-  cachedBaseDeckBowIntersect: {x: 0, y: 7, z: 10}
-  cachedUpperStemTopPoint: {x: 0, y: 8.5, z: 10}
-  cachedTransomTopPoint: {x: 0, y: 8, z: -11.615385}
-  cachedTopTimberSternIntersect: {x: 0, y: 8, z: -11.615385}
-  cachedTopTimberSternCp: {x: 0, y: 8, z: -11.615385}
-  cachedTopTimberMidCpAft: {x: 0, y: 6.5, z: -6}
-  cachedTopTimberMidshipPoint: {x: 0, y: 6.5, z: 0}
-  cachedTopTimberMidCpFwd: {x: 0, y: 6.5, z: 6}
-  cachedTopTimberBowCp: {x: 0, y: 8.5, z: 10}
-  cachedTopTimberBowIntersect: {x: 0, y: 8.5, z: 10}
-  cachedHobSternIntersect: {x: 0, y: 6.5, z: -10.369074}
-  cachedHobSternCp: {x: 0, y: 6.5, z: -10.369074}
-  cachedHobMidCpAft: {x: 0, y: 5, z: -6}
-  cachedHobMidshipPoint: {x: 0, y: 5, z: 0}
-  cachedHobMidCpFwd: {x: 0, y: 5, z: 6}
-  cachedHobBowCp: {x: 0, y: 7, z: 10}
-  cachedHobBowIntersect: {x: 0, y: 7, z: 10}
+  cachedDeadwoodP2: {x: 0, y: 0.46969, z: -9.093938}
+  cachedBaseDeckSternIntersect: {x: 0, y: 5, z: -10.105457}
+  cachedBaseDeckSternCp: {x: 0, y: 5, z: -10.105457}
+  cachedBaseDeckMidCpAft: {x: 0, y: 4, z: -6}
+  cachedBaseDeckMidshipPoint: {x: 0, y: 4, z: 0}
+  cachedBaseDeckMidCpFwd: {x: 0, y: 4, z: 6}
+  cachedBaseDeckBowCp: {x: 0, y: 5, z: 10}
+  cachedBaseDeckBowIntersect: {x: 0, y: 5, z: 10}
+  cachedUpperStemTopPoint: {x: 0, y: 6.5, z: 10}
+  cachedTransomTopPoint: {x: 0, y: 6.5, z: -11.43938}
+  cachedTopTimberSternIntersect: {x: 0, y: 6.5, z: -11.43938}
+  cachedTopTimberSternCp: {x: 0, y: 6.5, z: -11.43938}
+  cachedTopTimberMidCpAft: {x: 0, y: 5.5, z: -6}
+  cachedTopTimberMidshipPoint: {x: 0, y: 5.5, z: 0}
+  cachedTopTimberMidCpFwd: {x: 0, y: 5.5, z: 6}
+  cachedTopTimberBowCp: {x: 0, y: 6.5, z: 10}
+  cachedTopTimberBowIntersect: {x: 0, y: 6.5, z: 10}
+  cachedHobSternIntersect: {x: 0, y: 5, z: -10.105457}
+  cachedHobSternCp: {x: 0, y: 5, z: -10.105457}
+  cachedHobMidCpAft: {x: 0, y: 4, z: -6}
+  cachedHobMidshipPoint: {x: 0, y: 4, z: 0}
+  cachedHobMidCpFwd: {x: 0, y: 4, z: 6}
+  cachedHobBowCp: {x: 0, y: 5, z: 10}
+  cachedHobBowIntersect: {x: 0, y: 5, z: 10}
   cachedStemP1: {x: 0, y: 0, z: 8.5}
-  cachedStemP2: {x: 0, y: 3.5, z: 10}
+  cachedStemP2: {x: 0, y: 2.5, z: 10}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1083,3 +1152,4 @@ SceneRoots:
   - {fileID: 775590940}
   - {fileID: 323723588}
   - {fileID: 413914576}
+  - {fileID: 1201162031}
