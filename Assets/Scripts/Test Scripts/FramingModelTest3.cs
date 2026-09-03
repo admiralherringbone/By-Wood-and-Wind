@@ -57,6 +57,8 @@ public class FramingModelTest3 : MonoBehaviour
     public bool showFloorSweepsGuide = true;
     [Tooltip("If true, frames are cut/clipped by the Fore Face Fashion Timber boundary at the stern.")]
     public bool cutFramesAtFashionTimber = true;
+    [Tooltip("If true, frames are cut/clipped at the Deadwood top surface rather than having their base points pushed up.")]
+    public bool cutFramesAtDeadwood = true;
     [Tooltip("If true, structural landmark boundaries render as partial fill frames spanning between the nearest basic frame edge and the landmark point.")]
     public bool enableLandmarkFillFrames = true;
     [Tooltip("Draws lines showing the control arms for each frame.")]
@@ -122,12 +124,7 @@ public class FramingModelTest3 : MonoBehaviour
         if (fp.hasLower)
         {
             float keelY = sheerPlan.GetKeelYAtZ(z);
-            if (sheerPlan.showDeadwoodRake && z < sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedDeadwoodAftPoint.z)
-            {
-                keelY = sheerPlan.GetDeadwoodYAtZ(z);
-            }
-            
-        float risingY = sheerPlan.GetRisingLineYAtZ(z);
+            float risingY = sheerPlan.GetRisingLineYAtZ(z);
         
         Vector3 fashionLowerBound = sheerPlan.cachedSternRisingEnd;
         if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
@@ -136,14 +133,10 @@ public class FramingModelTest3 : MonoBehaviour
         }
 
         // If we are aft of the Stern Post, extend the Keel mathematically (Phantom Keel Projection)
-        // rather than letting it curve upwards along the Stern Profile.
+        // anchored at the flat Keel baseline rather than elevating to Deadwood Top.
         if (z < sheerPlan.cachedKeelSternPoint.z)
         {
-            if (sheerPlan.showDeadwoodRake && sheerPlan.cachedDeadwoodAftPoint.y > 0.001f)
-            {
-                keelY = sheerPlan.cachedDeadwoodAftPoint.y;
-            }
-            else if (sheerPlan.keelMidshipDrop == 0f)
+            if (sheerPlan.keelMidshipDrop == 0f)
             {
                 keelY = 0f;
             }
@@ -511,6 +504,66 @@ public class FramingModelTest3 : MonoBehaviour
                     
                     fp.lowerTopCutoffT = 1f; // Top reaches the HoB
                     fp.upperCutoffT = 0f;
+                }
+            }
+        }
+
+        if (cutFramesAtDeadwood && sheerPlan != null && sheerPlan.showDeadwoodRake)
+        {
+            float dForeZ = sheerPlan.cachedDeadwoodForePoint.z;
+            float dAftZ = sheerPlan.cachedDeadwoodAftPoint.z;
+
+            if (z >= dAftZ - 0.001f && z <= dForeZ + 0.001f)
+            {
+                float deadwoodY = sheerPlan.GetDeadwoodYAtZ(z);
+                float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+
+                if (deadwoodY > fp.lowerP0.y + 0.001f)
+                {
+                    if (deadwoodY >= hobY - 0.001f)
+                    {
+                        fp.hasLower = false;
+                        fp.lowerCutoffT = 0f;
+
+                        if (fp.hasUpper)
+                        {
+                            float uMinT = 0f;
+                            float uMaxT = 1f;
+                            for (int i = 0; i < 10; i++)
+                            {
+                                float midT = (uMinT + uMaxT) * 0.5f;
+                                float py = GetUpperSurfacePointAtT(fp, 1f, midT).y;
+                                if (py < deadwoodY) uMinT = midT;
+                                else uMaxT = midT;
+                            }
+                            fp.upperCutoffT = (uMinT + uMaxT) * 0.5f;
+
+                            if (fp.upperCutoffT >= fp.upperTopCutoffT - 0.001f)
+                            {
+                                fp.isValid = false;
+                                return fp;
+                            }
+                        }
+                        else
+                        {
+                            fp.isValid = false;
+                            return fp;
+                        }
+                    }
+                    else if (fp.hasLower)
+                    {
+                        float tMin = 0f;
+                        float tMax = 1f;
+                        for (int i = 0; i < 10; i++)
+                        {
+                            float midT = (tMin + tMax) * 0.5f;
+                            float py = GetSurfacePointAtT(fp, 1f, midT).y;
+                            if (py < deadwoodY) tMin = midT;
+                            else tMax = midT;
+                        }
+                        float deadwoodCutoffT = (tMin + tMax) * 0.5f;
+                        fp.lowerCutoffT = Mathf.Max(fp.lowerCutoffT, deadwoodCutoffT);
+                    }
                 }
             }
         }
@@ -1751,6 +1804,13 @@ public class FramingModelTest3 : MonoBehaviour
                 Vector3 curr = GetSurfacePointAtT(fp, flipX, t);
                 if (!isDashed || i % 2 != 0) Gizmos.DrawLine(prev, curr);
                 prev = curr;
+            }
+
+            if (startT > 0.001f && flipX > 0)
+            {
+                Vector3 stbdCutoff = GetSurfacePointAtT(fp, 1f, startT);
+                Vector3 portCutoff = new Vector3(-stbdCutoff.x, stbdCutoff.y, stbdCutoff.z);
+                Gizmos.DrawLine(stbdCutoff, portCutoff);
             }
 
             if (showFrameControlArms)

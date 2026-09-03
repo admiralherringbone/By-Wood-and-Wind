@@ -239,6 +239,27 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
         return cachedInnerPoints[cachedInnerPoints.Count - 1].y;
     }
 
+    public float GetInnerZAtY(float y)
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0f;
+        
+        for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
+        {
+            Vector2 p1 = cachedInnerPoints[i];
+            Vector2 p2 = cachedInnerPoints[i+1];
+            
+            if ((y >= p1.y && y <= p2.y) || (y <= p1.y && y >= p2.y))
+            {
+                if (Mathf.Abs(p2.y - p1.y) < 0.0001f) return Mathf.Min(p1.x, p2.x);
+                float t = (y - p1.y) / (p2.y - p1.y);
+                return Mathf.Lerp(p1.x, p2.x, t);
+            }
+        }
+        
+        if (y < cachedInnerPoints[0].y) return cachedInnerPoints[0].x;
+        return cachedInnerPoints[cachedInnerPoints.Count - 1].x;
+    }
+
     public Vector3 GetHobIntersection()
     {
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return Vector3.zero;
@@ -351,6 +372,11 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     public List<Vector3> GetFashionTimberPoints(bool isStbd)
     {
+        return GetFashionTimberPoints(isStbd, 50);
+    }
+
+    public List<Vector3> GetFashionTimberPoints(bool isStbd, int segments)
+    {
         List<Vector3> pts = new List<Vector3>();
         UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return pts;
@@ -367,42 +393,28 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
             masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
         }
 
-        for (int i = 0; i < cachedInnerPoints.Count; i++)
+        for (int i = 0; i <= segments; i++)
         {
-            float innerZ = cachedInnerPoints[i].x;
-            float innerY = cachedInnerPoints[i].y;
+            float fraction = i / (float)segments;
+            
+            float indexF = fraction * (cachedInnerPoints.Count - 1);
+            int idx1 = Mathf.FloorToInt(indexF);
+            int idx2 = Mathf.Min(idx1 + 1, cachedInnerPoints.Count - 1);
+            float tLerp = indexF - idx1;
+            
+            Vector2 p = Vector2.Lerp(cachedInnerPoints[idx1], cachedInnerPoints[idx2], tLerp);
+            float innerZ = p.x;
+            float innerY = p.y;
 
-            float topTimberY = sheerPlan.GetTopTimberYAtZ(innerZ);
-            bool reachedTop = false;
-            if (innerY >= topTimberY)
-            {
-                if (i > 0)
-                {
-                    float prevZ = cachedInnerPoints[i - 1].x;
-                    float prevY = cachedInnerPoints[i - 1].y;
-                    float prevTop = sheerPlan.GetTopTimberYAtZ(prevZ);
-                    
-                    float denom = (innerY - prevY) - (topTimberY - prevTop);
-                    if (Mathf.Abs(denom) > 0.0001f)
-                    {
-                        float t = (prevTop - prevY) / denom;
-                        innerZ = Mathf.Lerp(prevZ, innerZ, t);
-                        innerY = Mathf.Lerp(prevY, innerY, t);
-                    }
-                }
-                else
-                {
-                    innerY = topTimberY;
-                }
-                reachedTop = true;
-            }
+            float topTimberY = sheerPlan != null ? sheerPlan.GetTopTimberYAtZ(innerZ) : 100f;
+            if (innerY > topTimberY) innerY = topTimberY;
 
             float exactX = 0f;
             if (specialFrames != null && masterFp.isValid)
             {
                 exactX = specialFrames.GetSpecialHullXAtYZ(innerY, innerZ, masterFp, bottomZ);
             }
-            else
+            else if (fashionTimberModel != null)
             {
                 exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
             }
@@ -410,8 +422,6 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
             if (!isStbd) exactX = -exactX;
             
             pts.Add(new Vector3(exactX, innerY, innerZ));
-            
-            if (reachedTop) break;
         }
         return pts;
     }
