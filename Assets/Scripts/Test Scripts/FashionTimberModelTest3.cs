@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using OuterShellFramingModel = FramingModelTest3;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -19,6 +20,11 @@ public class FashionTimberModelTest3 : MonoBehaviour
     [Tooltip("Reference to the FramingModelTest3.")]
     public FramingModelTest3 framingModel;
 
+    [Tooltip("Reference to the OuterShellFramingModel.")]
+    public OuterShellFramingModel outerShellFramingModel;
+
+    private bool _searchedOuterShell = false;
+
     [Header("Visualization")]
     public bool showFashionTimbers = true;
     public bool showLabels = true;
@@ -26,7 +32,13 @@ public class FashionTimberModelTest3 : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null) return;
+        if (sheerPlan == null || breadthPlan == null || bodyPlan == null) return;
+        if (framingModel == null && outerShellFramingModel == null)
+        {
+            outerShellFramingModel = Object.FindObjectOfType<OuterShellFramingModel>();
+            _searchedOuterShell = true;
+            if (framingModel == null && outerShellFramingModel == null) return;
+        }
         DrawFashionTimbers();
     }
 
@@ -36,11 +48,9 @@ public class FashionTimberModelTest3 : MonoBehaviour
 
         Gizmos.color = fashionColor;
 
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
+        Vector3 lowerBound = (sheerPlan != null && sheerPlan.showDeadwoodRake)
+            ? sheerPlan.cachedDeadwoodAftPoint
+            : (sheerPlan != null ? sheerPlan.cachedSternRisingEnd : Vector3.zero);
         Vector3 risingEnd = lowerBound;
         Vector3 hobIntersect = sheerPlan.cachedHobSternIntersect;
         Vector3 transomTop = sheerPlan.cachedTransomTopPoint;
@@ -83,74 +93,107 @@ public class FashionTimberModelTest3 : MonoBehaviour
         return intersect;
     }
 
+    public Vector3 GetHobIntersection()
+    {
+        return GetFashionTimberHobIntersection();
+    }
+
+    public float GetMinZ()
+    {
+        if (sheerPlan == null) return 0f;
+        return Mathf.Min(sheerPlan.cachedKeelSternPoint.z, Mathf.Min(sheerPlan.cachedHobSternIntersect.z, sheerPlan.cachedTransomTopPoint.z));
+    }
+
+    public float GetMaxZ()
+    {
+        if (sheerPlan == null) return 0f;
+        return Mathf.Max(sheerPlan.cachedKeelSternPoint.z, Mathf.Max(sheerPlan.cachedHobSternIntersect.z, sheerPlan.cachedTransomTopPoint.z));
+    }
+
+    public float GetYAtZ(float z)
+    {
+        if (sheerPlan == null) return 0f;
+        return sheerPlan.GetSternProfileYAtZ(z);
+    }
+
+
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
-        bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
-        
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
+        if (outerShellFramingModel == null && !_searchedOuterShell)
         {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
-        float lowerAftZ = lowerBound.z;
-        float evalZ = originalZ;
-
-        // Lower frames do not mathematically exist aft of the Stern Post, so we must clamp Z for lower hull evaluations.
-        if (!isUpper && evalZ < lowerAftZ)
-        {
-            evalZ = lowerAftZ;
+            outerShellFramingModel = Object.FindObjectOfType<OuterShellFramingModel>();
+            _searchedOuterShell = true;
         }
 
-        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
-        if (!fp.isValid) return 0f;
+        bool isUpper = targetY >= sheerPlan.GetTheoreticalHobYAtZ(originalZ) - 0.001f;
+
+        if (outerShellFramingModel != null)
+        {
+            OuterShellFramingModel.FrameProfile fp = outerShellFramingModel.GetRawFrameProfile(originalZ, true);
+            if (!fp.isValid) return 0f;
+
+            if (isUpper && fp.hasUpper)
+            {
+                float tMinT = 0f;
+                float tMaxT = 1f;
+                for (int i = 0; i < 20; i++)
+                {
+                    float midT = (tMinT + tMaxT) * 0.5f;
+                    float py = outerShellFramingModel.GetUpperSurfacePointAtT(fp, 1f, midT).y;
+                    if (py < targetY) tMinT = midT;
+                    else tMaxT = midT;
+                }
+                return outerShellFramingModel.GetUpperSurfacePointAtT(fp, 1f, (tMinT + tMaxT) * 0.5f).x;
+            }
+            else if (!isUpper && fp.hasLower)
+            {
+                float fMinT = 0f;
+                float fMaxT = 1f;
+                for (int i = 0; i < 20; i++)
+                {
+                    float midT = (fMinT + fMaxT) * 0.5f;
+                    float py = outerShellFramingModel.GetSurfacePointAtT(fp, 1f, midT).y;
+                    if (py < targetY) fMinT = midT;
+                    else fMaxT = midT;
+                }
+                return outerShellFramingModel.GetSurfacePointAtT(fp, 1f, (fMinT + fMaxT) * 0.5f).x;
+            }
+
+            return 0f;
+        }
+
+        if (framingModel == null) return 0f;
+
+        FramingModelTest3.FrameProfile fpLegacy = framingModel.GetRawFrameProfile(originalZ, true);
+        if (!fpLegacy.isValid) return 0f;
 
         float exactX = 0f;
 
-        if (isUpper && fp.hasUpper)
+        if (isUpper && fpLegacy.hasUpper)
         {
             float tMinT = 0f;
             float tMaxT = 1f;
             for (int i = 0; i < 20; i++)
             {
                 float midT = (tMinT + tMaxT) / 2f;
-                float py = FramingModelTest3.CalculateCubicBezierPoint(midT, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).y;
+                float py = FramingModelTest3.CalculateCubicBezierPoint(midT, fpLegacy.upperP0, fpLegacy.upperP1, fpLegacy.upperP2, fpLegacy.upperP3).y;
                 if (py < targetY) tMinT = midT;
                 else tMaxT = midT;
             }
-            exactX = FramingModelTest3.CalculateCubicBezierPoint((tMinT + tMaxT) / 2f, fp.upperP0, fp.upperP1, fp.upperP2, fp.upperP3).x;
-            
+            exactX = FramingModelTest3.CalculateCubicBezierPoint((tMinT + tMaxT) / 2f, fpLegacy.upperP0, fpLegacy.upperP1, fpLegacy.upperP2, fpLegacy.upperP3).x;
         }
-        else if (!isUpper && fp.hasLower)
+        else if (!isUpper && fpLegacy.hasLower)
         {
-            float mappedTargetY = targetY;
-            if (originalZ < lowerAftZ)
-            {
-                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
-                float sternHobY = sheerPlan.GetHobYAtZ(lowerAftZ);
-                float hobDifference = origHobY - sternHobY;
-                mappedTargetY = targetY - hobDifference;
-            }
-
             float fMinT = 0f;
             float fMaxT = 1f;
             for (int i = 0; i < 20; i++)
             {
                 float midT = (fMinT + fMaxT) / 2f;
-                float py = framingModel.GetSurfacePointAtT(fp, 1f, midT, true).y;
-                if (py < mappedTargetY) fMinT = midT;
+                float py = framingModel.GetSurfacePointAtT(fpLegacy, 1f, midT, true).y;
+                if (py < targetY) fMinT = midT;
                 else fMaxT = midT;
             }
-            exactX = framingModel.GetSurfacePointAtT(fp, 1f, (fMinT + fMaxT) / 2f, true).x;
-
-            if (originalZ < lowerAftZ)
-            {
-                float sternHobX = breadthPlan.GetBreadthXAtZ(lowerAftZ);
-                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
-                if (sternHobX > 0.001f)
-                {
-                    exactX *= (currHobX / sternHobX);
-                }
-            }
+            exactX = framingModel.GetSurfacePointAtT(fpLegacy, 1f, (fMinT + fMaxT) / 2f, true).x;
         }
 
         return exactX;
@@ -196,11 +239,9 @@ public class FashionTimberModelTest3 : MonoBehaviour
     {
         List<Vector3> pts = new List<Vector3>();
         
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
+        Vector3 lowerBound = (sheerPlan != null && sheerPlan.showDeadwoodRake)
+            ? sheerPlan.cachedDeadwoodAftPoint
+            : (sheerPlan != null ? sheerPlan.cachedSternRisingEnd : Vector3.zero);
         Vector3 risingEnd = lowerBound;
         float startZ = risingEnd.z;
         float endZ = sheerPlan.cachedTransomTopPoint.z;

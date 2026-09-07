@@ -18,15 +18,31 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
     public float thickness = 0.3f;
     [Range(20, 200)]
     [Tooltip("Resolution (number of segment samples) along the lower timber path from the Deadwood baseline to the Counter.")]
-    public int lowerTimberResolution = 100;
+    public int lowerTimberResolution = 60;
     public bool showInnerFashionTimber = true;
     public Color innerColor = Color.magenta;
 
     [HideInInspector] public List<Vector2> cachedInnerPoints = new List<Vector2>();
+    private bool _isInnerPointsDirty = true;
 
-    public void UpdateCachedPoints()
+    private void OnEnable()
     {
-        cachedInnerPoints.Clear();
+        _isInnerPointsDirty = true;
+    }
+
+    private void OnValidate()
+    {
+        _isInnerPointsDirty = true;
+        _isCache50Dirty = true;
+    }
+
+    public void UpdateCachedPoints(bool force = false)
+    {
+        if (!force && !_isInnerPointsDirty && cachedInnerPoints != null && cachedInnerPoints.Count > 0) return;
+        _isInnerPointsDirty = false;
+        _isCache50Dirty = true;
+        if (cachedInnerPoints == null) cachedInnerPoints = new List<Vector2>();
+        else cachedInnerPoints.Clear();
         if (sheerPlan == null || fashionTimberModel == null) return;
 
         List<Vector2> rawPoints = new List<Vector2>();
@@ -198,6 +214,7 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     public float GetMinZ()
     {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return sheerPlan != null ? sheerPlan.cachedTransomTopPoint.z : 0;
         float minZ = float.MaxValue;
         foreach (var p in cachedInnerPoints)
@@ -209,6 +226,7 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     public float GetMaxZ()
     {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return sheerPlan != null ? sheerPlan.cachedSternRisingEnd.z : 0;
         float maxZ = float.MinValue;
         foreach (var p in cachedInnerPoints)
@@ -218,11 +236,55 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
         return maxZ;
     }
 
-    public float GetInnerYAtZ(float z)
+    public int GetHobIndex()
     {
-        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0f;
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0;
         
         for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
+        {
+            Vector2 p1 = cachedInnerPoints[i];
+            Vector2 p2 = cachedInnerPoints[i+1];
+            
+            float hob1 = sheerPlan != null ? sheerPlan.GetTheoreticalHobYAtZ(p1.x) : 0f;
+            float hob2 = sheerPlan != null ? sheerPlan.GetTheoreticalHobYAtZ(p2.x) : 0f;
+            
+            if ((p1.y <= hob1 && p2.y >= hob2) || (p1.y >= hob1 && p2.y <= hob2))
+            {
+                return i;
+            }
+        }
+        return cachedInnerPoints.Count / 2;
+    }
+
+    public float GetInnerYAtZ(float z, bool isUpper = false)
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0f;
+        
+        int hobIdx = GetHobIndex();
+        int count = cachedInnerPoints.Count;
+
+        int start1 = isUpper ? hobIdx : 0;
+        int end1 = isUpper ? count - 1 : hobIdx;
+
+        int start2 = isUpper ? 0 : hobIdx;
+        int end2 = isUpper ? hobIdx : count - 1;
+
+        for (int i = start1; i < end1 && i < count - 1; i++)
+        {
+            Vector2 p1 = cachedInnerPoints[i];
+            Vector2 p2 = cachedInnerPoints[i+1];
+            
+            if ((z >= p1.x && z <= p2.x) || (z <= p1.x && z >= p2.x))
+            {
+                if (Mathf.Abs(p2.x - p1.x) < 0.0001f) return Mathf.Min(p1.y, p2.y);
+                float t = (z - p1.x) / (p2.x - p1.x);
+                return Mathf.Lerp(p1.y, p2.y, t);
+            }
+        }
+
+        for (int i = start2; i < end2 && i < count - 1; i++)
         {
             Vector2 p1 = cachedInnerPoints[i];
             Vector2 p2 = cachedInnerPoints[i+1];
@@ -236,11 +298,12 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
         }
         
         if (z < GetMinZ()) return cachedInnerPoints[0].y;
-        return cachedInnerPoints[cachedInnerPoints.Count - 1].y;
+        return cachedInnerPoints[count - 1].y;
     }
 
     public float GetInnerZAtY(float y)
     {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return 0f;
         
         for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
@@ -262,6 +325,7 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     public Vector3 GetHobIntersection()
     {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
         if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return Vector3.zero;
         
         for (int i = 0; i < cachedInnerPoints.Count - 1; i++)
@@ -303,6 +367,7 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
     private void OnDrawGizmos()
     {
         if (sheerPlan == null || fashionTimberModel == null) return;
+        UpdateCachedPoints();
         
         Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
         if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
@@ -370,6 +435,10 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
 
 
+    private List<Vector3> _cachedStbd50 = new List<Vector3>();
+    private List<Vector3> _cachedPort50 = new List<Vector3>();
+    private bool _isCache50Dirty = true;
+
     public List<Vector3> GetFashionTimberPoints(bool isStbd)
     {
         return GetFashionTimberPoints(isStbd, 50);
@@ -377,9 +446,13 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
 
     public List<Vector3> GetFashionTimberPoints(bool isStbd, int segments)
     {
-        List<Vector3> pts = new List<Vector3>();
+        if (segments == 50 && !_isCache50Dirty && _cachedStbd50.Count == cachedInnerPoints.Count)
+        {
+            return isStbd ? _cachedStbd50 : _cachedPort50;
+        }
+
         UpdateCachedPoints();
-        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return pts;
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return isStbd ? _cachedStbd50 : _cachedPort50;
 
         if (this.specialFrames == null)
         {
@@ -393,24 +466,41 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
             masterFp = fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false);
         }
 
-        for (int i = 0; i <= segments; i++)
+        List<Vector3> stbdList = segments == 50 ? _cachedStbd50 : new List<Vector3>();
+        List<Vector3> portList = segments == 50 ? _cachedPort50 : new List<Vector3>();
+        if (segments == 50)
         {
-            float fraction = i / (float)segments;
-            
-            float indexF = fraction * (cachedInnerPoints.Count - 1);
-            int idx1 = Mathf.FloorToInt(indexF);
-            int idx2 = Mathf.Min(idx1 + 1, cachedInnerPoints.Count - 1);
-            float tLerp = indexF - idx1;
-            
-            Vector2 p = Vector2.Lerp(cachedInnerPoints[idx1], cachedInnerPoints[idx2], tLerp);
-            float innerZ = p.x;
-            float innerY = p.y;
+            stbdList.Clear();
+            portList.Clear();
+        }
+
+        int count = (segments == 50) ? cachedInnerPoints.Count : segments + 1;
+        for (int i = 0; i < count; i++)
+        {
+            float innerZ, innerY;
+            if (segments == 50)
+            {
+                Vector2 p = cachedInnerPoints[i];
+                innerZ = p.x;
+                innerY = p.y;
+            }
+            else
+            {
+                float fraction = i / (float)segments;
+                float indexF = fraction * (cachedInnerPoints.Count - 1);
+                int idx1 = Mathf.FloorToInt(indexF);
+                int idx2 = Mathf.Min(idx1 + 1, cachedInnerPoints.Count - 1);
+                float tLerp = indexF - idx1;
+                Vector2 p = Vector2.Lerp(cachedInnerPoints[idx1], cachedInnerPoints[idx2], tLerp);
+                innerZ = p.x;
+                innerY = p.y;
+            }
 
             float topTimberY = sheerPlan != null ? sheerPlan.GetTopTimberYAtZ(innerZ) : 100f;
             if (innerY > topTimberY) innerY = topTimberY;
 
             float exactX = 0f;
-            if (specialFrames != null && masterFp.isValid)
+            if (innerZ < bottomZ - 0.001f && specialFrames != null && masterFp.isValid)
             {
                 exactX = specialFrames.GetSpecialHullXAtYZ(innerY, innerZ, masterFp, bottomZ);
             }
@@ -419,11 +509,52 @@ public class ForeFaceFashionTimberModelTest3 : MonoBehaviour
                 exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, innerZ);
             }
             
-            if (!isStbd) exactX = -exactX;
-            
-            pts.Add(new Vector3(exactX, innerY, innerZ));
+            stbdList.Add(new Vector3(exactX, innerY, innerZ));
+            portList.Add(new Vector3(-exactX, innerY, innerZ));
         }
-        return pts;
+
+        if (segments == 50)
+        {
+            _isCache50Dirty = false;
+            return isStbd ? _cachedStbd50 : _cachedPort50;
+        }
+
+        return isStbd ? stbdList : portList;
+    }
+
+    public Vector3 GetFashionTimberPointAtZ(float z, bool isStbd, bool isUpper = false)
+    {
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) UpdateCachedPoints();
+        if (cachedInnerPoints == null || cachedInnerPoints.Count == 0) return Vector3.zero;
+
+        float innerY = GetInnerYAtZ(z, isUpper);
+
+        float topTimberY = sheerPlan != null ? sheerPlan.GetTopTimberYAtZ(z) : 100f;
+        if (innerY > topTimberY) innerY = topTimberY;
+
+        float bottomZ = cachedInnerPoints[0].x;
+        float exactX = 0f;
+
+        if (z < bottomZ - 0.001f && specialFrames != null)
+        {
+            FramingModelTest3.FrameProfile masterFp = (fashionTimberModel != null && fashionTimberModel.framingModel != null)
+                ? fashionTimberModel.framingModel.GetRawFrameProfile(bottomZ, false)
+                : new FramingModelTest3.FrameProfile { isValid = false };
+            if (masterFp.isValid)
+            {
+                exactX = specialFrames.GetSpecialHullXAtYZ(innerY, z, masterFp, bottomZ);
+            }
+            else if (fashionTimberModel != null)
+            {
+                exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, z);
+            }
+        }
+        else if (fashionTimberModel != null)
+        {
+            exactX = fashionTimberModel.GetNaturalHullXAtYZ(innerY, z);
+        }
+
+        return new Vector3(isStbd ? exactX : -exactX, innerY, z);
     }
 
     private bool LineIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection)

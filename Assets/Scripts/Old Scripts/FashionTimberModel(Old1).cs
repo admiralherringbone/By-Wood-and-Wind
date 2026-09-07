@@ -24,9 +24,15 @@ public class FashionTimberModel_Old1 : MonoBehaviour
     public bool showLabels = true;
     public Color fashionColor = Color.magenta;
 
+    private static Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1 - t;
+        return (u * u * u * p0) + (3 * u * u * t * p1) + (3 * u * t * t * p2) + (t * t * t * p3);
+    }
+
     private void OnDrawGizmos()
     {
-        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || framingModel == null) return;
+        if (sheerPlan == null || breadthPlan == null || bodyPlan == null) return;
         DrawFashionTimbers();
     }
 
@@ -36,17 +42,14 @@ public class FashionTimberModel_Old1 : MonoBehaviour
 
         Gizmos.color = fashionColor;
 
-        // The Lower Fashion Timber begins at the Stern End of the Rising Line.
         Vector3 risingEnd = sheerPlan.cachedSternRisingEnd;
 
-        // 1. Draw from Rising Line End to Stern Post Top
         Vector3 postTop = sheerPlan.cachedSternPostTopPoint;
         if (Mathf.Abs(risingEnd.z - postTop.z) > 0.001f || Mathf.Abs(risingEnd.y - postTop.y) > 0.001f)
         {
             DrawFashionTimberSegment(risingEnd, postTop);
         }
 
-        // 2. Draw the Counter and Transom Rake
         if (sheerPlan.enableCounter)
         {
             DrawFashionTimberSegment(postTop, sheerPlan.cachedCounterTopPoint);
@@ -57,10 +60,8 @@ public class FashionTimberModel_Old1 : MonoBehaviour
             DrawFashionTimberSegment(postTop, sheerPlan.cachedTransomTopPoint);
         }
 
-        // --- DEBUG: Draw Upper Bezier Control Arms ---
         var bezier = GetUpperFashionTimberBezier();
         
-        // Starboard Side
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(bezier.p0, bezier.p1);
         Gizmos.DrawLine(bezier.p3, bezier.p2);
@@ -70,7 +71,6 @@ public class FashionTimberModel_Old1 : MonoBehaviour
         Gizmos.DrawWireSphere(bezier.p2, 0.05f);
         Gizmos.DrawWireSphere(bezier.p3, 0.05f);
 
-        // Port Side
         Vector3 p0_port = new Vector3(-bezier.p0.x, bezier.p0.y, bezier.p0.z);
         Vector3 p1_port = new Vector3(-bezier.p1.x, bezier.p1.y, bezier.p1.z);
         Vector3 p2_port = new Vector3(-bezier.p2.x, bezier.p2.y, bezier.p2.z);
@@ -84,7 +84,6 @@ public class FashionTimberModel_Old1 : MonoBehaviour
         Gizmos.DrawWireSphere(p1_port, 0.05f);
         Gizmos.DrawWireSphere(p2_port, 0.05f);
         Gizmos.DrawWireSphere(p3_port, 0.05f);
-        // ----------------------------------------------
 
 #if UNITY_EDITOR
         if (showLabels)
@@ -161,7 +160,7 @@ public class FashionTimberModel_Old1 : MonoBehaviour
         for (int i = 0; i < 40; i++)
         {
             float mid = (min + max) / 2f;
-            float y = FramingModel.CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
+            float y = CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
             
             if (y < targetY) min = mid;
             else max = mid;
@@ -176,10 +175,8 @@ public class FashionTimberModel_Old1 : MonoBehaviour
         for (int i = 0; i < 40; i++)
         {
             float mid = (min + max) / 2f;
-            float z = FramingModel.CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
+            float z = CalculateCubicBezierPoint(mid, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
             
-            // Note: The Bezier starts at HoB (forward) and ends at Transom Top (aft).
-            // Z decreases as you move aft.
             if (z > targetZ) min = mid;
             else max = mid;
         }
@@ -190,85 +187,29 @@ public class FashionTimberModel_Old1 : MonoBehaviour
     {
         var bezier = GetUpperFashionTimberBezier();
         float t = GetFashionTimberTAtZ(targetZ, bezier);
-        return FramingModel.CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
+        return CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).y;
     }
 
     public float GetFashionTimberXAtZ(float targetZ)
     {
         var bezier = GetUpperFashionTimberBezier();
         float t = GetFashionTimberTAtZ(targetZ, bezier);
-        return FramingModel.CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
+        return CalculateCubicBezierPoint(t, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
     }
-
 
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
-        float lowerAftZ = sheerPlan.cachedSternRisingEnd.z;
-        float z = originalZ;
-        
-        if (z < lowerAftZ) z = lowerAftZ;
-
-        FramingModel.FrameProfile fp = framingModel.GetRawFrameProfile(z, true);
-        if (!fp.isValid) return 0f;
-
-        float exactX = 0f;
-
-        // TRUE physical check against the HoB curve at the actual Z coordinate
-        if (fp.hasUpper && targetY > sheerPlan.GetHobYAtZ(originalZ))
+        var bezier = GetUpperFashionTimberBezier();
+        float fMinT = 0f;
+        float fMaxT = 1f;
+        for (int i = 0; i < 20; i++)
         {
-            var bezier = GetUpperFashionTimberBezier();
-            float fMinT = 0f;
-            float fMaxT = 1f;
-            for (int i = 0; i < 20; i++)
-            {
-                float midT = (fMinT + fMaxT) / 2f;
-                float pz = FramingModel.CalculateCubicBezierPoint(midT, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
-                
-                // Pure True Z-axis binary search.
-                // Note: The Bezier starts at HoB (forward) and ends at Transom Top (aft).
-                // Z decreases as you move aft.
-                // If pz is greater than originalZ, it means we are too far forward, so we need to increase midT to move aft.
-                if (pz > originalZ) fMinT = midT;
-                else fMaxT = midT;
-            }
-            exactX = FramingModel.CalculateCubicBezierPoint((fMinT + fMaxT) / 2f, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
+            float midT = (fMinT + fMaxT) / 2f;
+            float pz = CalculateCubicBezierPoint(midT, bezier.p0, bezier.p1, bezier.p2, bezier.p3).z;
+            if (pz > originalZ) fMinT = midT;
+            else fMaxT = midT;
         }
-        else if (fp.hasLower)
-        {
-            // Lower Hull needs mappedTargetY because it evaluates against a clamped 2D frame
-            float mappedTargetY = targetY;
-            if (originalZ < lowerAftZ)
-            {
-                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
-                float sternHobY = sheerPlan.GetHobYAtZ(lowerAftZ);
-                float hobDifference = origHobY - sternHobY;
-                mappedTargetY = targetY - hobDifference;
-            }
-
-            float fMinT = 0f;
-            float fMaxT = 1f;
-            for (int i = 0; i < 20; i++)
-            {
-                float midT = (fMinT + fMaxT) / 2f;
-                float py = framingModel.GetSurfacePointAtT(fp, 1f, midT, true).y;
-                if (py < mappedTargetY) fMinT = midT;
-                else fMaxT = midT;
-            }
-            exactX = framingModel.GetSurfacePointAtT(fp, 1f, (fMinT + fMaxT) / 2f, true).x;
-            
-            // Re-apply the taper specifically for the clamped 2D lower frames
-            if (originalZ < lowerAftZ)
-            {
-                float sternHobX = breadthPlan.GetBreadthXAtZ(lowerAftZ);
-                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
-                if (sternHobX > 0.001f)
-                {
-                    exactX *= (currHobX / sternHobX);
-                }
-            }
-        }
-
-        return exactX;
+        return CalculateCubicBezierPoint((fMinT + fMaxT) / 2f, bezier.p0, bezier.p1, bezier.p2, bezier.p3).x;
     }
 
     private void DrawFashionTimberSegment(Vector3 startPoint, Vector3 endPoint)

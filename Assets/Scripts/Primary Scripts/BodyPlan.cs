@@ -29,22 +29,10 @@ public class BodyPlan : MonoBehaviour
     [Range(0f, 1f)]
     public float hobLowerArmLength = 0.5f;
 
-    [Header("Middle Control (Quartic Bezier)")]
-    [Tooltip("If true, adds a 5th control point between the arms, converting the curve into a Degree-4 Quartic Bezier.")]
-    public bool useQuarticBezier = false;
-
-    [Tooltip("Position of the Middle Control point along the line between the Keel Arm and the HoB Arm.")]
-    [Range(0f, 1f)] public float middleControlPosition = 0.5f;
-
-    [Header("Inner Keel Control (Quintic Bezier)")]
-    [Tooltip("If true, adds a 6th control point on the Keel Arm, converting the curve into a Degree-5 Quintic Bezier.")]
-    public bool useQuinticBezier = false;
-    
-    [Tooltip("Position of the Inner Keel Control point along the Keel Arm.")]
-    [Range(0f, 1f)] public float innerKeelPosition = 0.5f;
-
-    [Tooltip("If true, restricts the manual sliders to perfectly obey the Convex Hull property, mathematically preventing ripples.")]
-    public bool enforceConvexHull = true;
+    [Header("Rising Line Point")]
+    [Tooltip("Position of the Rising Line Point along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float risingLinePosition = 0.5f;
 
     [Header("Upper Mould Controls")]
     [Tooltip("The maximum half-width of the ship at the Top Timber line as a percentage of the Primary Max Beam. 1.0 = Straight. < 1.0 = Tumblehome. > 1.0 = Flare (Max 2.0 = 50% further out).")]
@@ -79,16 +67,18 @@ public class BodyPlan : MonoBehaviour
     public bool showInnerFrame = true;
     public Color innerFrameColor = Color.magenta;
 
-    [HideInInspector, SerializeField] private float lastKeelArmLength = -1f;
-    [HideInInspector] [SerializeField] private float lastKeelArmAngle = -1f;
-    [HideInInspector] [SerializeField] private float lastHobLowerArmLength = -1f;
-    [HideInInspector] [SerializeField] private float lastMiddleControlPosition = -1f;
+
+    // --- BACKWARD COMPATIBILITY FIELDS (for legacy reference scripts) ---
+    [HideInInspector] public bool useQuarticBezier = false;
+    [HideInInspector] public bool useQuinticBezier = false;
+    [HideInInspector] public float innerKeelPosition = 0.5f;
+    [HideInInspector] public float middleControlPosition = 0.5f;
+
 
     // --- CACHED POINTS ---
     [HideInInspector] public Vector3 cachedL0;
-    [HideInInspector] public Vector3 cachedL1Inner;
     [HideInInspector] public Vector3 cachedL1;
-    [HideInInspector] public Vector3 cachedLMid;
+    [HideInInspector] public Vector3 cachedLR;
     [HideInInspector] public Vector3 cachedL2;
     [HideInInspector] public Vector3 cachedL3;
     
@@ -96,9 +86,6 @@ public class BodyPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedU1;
     [HideInInspector] public Vector3 cachedU2;
     [HideInInspector] public Vector3 cachedU3;
-    
-    [HideInInspector] public bool cachedUseQuartic;
-    [HideInInspector] public bool cachedUseQuintic;
 
     private void OnValidate()
     {
@@ -121,15 +108,6 @@ public class BodyPlan : MonoBehaviour
         float maxBeam = breadthPlan.maxBeam;
         float boxHeight = hobY - keelY;
 
-        // Initialize last values if needed
-        if (lastKeelArmLength < 0)
-        {
-            lastKeelArmLength = keelArmLength;
-            lastKeelArmAngle = keelArmAngle;
-            lastHobLowerArmLength = hobLowerArmLength;
-            lastMiddleControlPosition = middleControlPosition;
-        }
-
         float keelAngleRad = keelArmAngle * Mathf.Deg2Rad;
         float keelDirX = Mathf.Cos(keelAngleRad);
         float keelDirY = Mathf.Sin(keelAngleRad);
@@ -146,44 +124,20 @@ public class BodyPlan : MonoBehaviour
             float distToTop = boxHeight / keelDirY;
             keelMaxDist = Mathf.Min(distToRight, distToTop);
         }
-        
-        float p1y = keelY + keelDirY * (keelMaxDist * keelArmLength);
-        float p2y = hobY - (boxHeight * hobLowerArmLength);
 
-        bool keelChanged = (keelArmLength != lastKeelArmLength || keelArmAngle != lastKeelArmAngle);
-        bool hobChanged = (hobLowerArmLength != lastHobLowerArmLength);
-
-        if (enforceConvexHull && p1y > p2y)
-        {
-            if (hobChanged && !keelChanged)
-            {
-                if (keelDirY > 0.0001f && keelMaxDist > 0.0001f) keelArmLength = Mathf.Clamp01((p2y - keelY) / (keelMaxDist * keelDirY));
-                else keelArmLength = 0f;
-            }
-            else
-            {
-                hobLowerArmLength = Mathf.Clamp01((hobY - p1y) / boxHeight);
-            }
-        }
-
-        lastKeelArmLength = keelArmLength;
-        lastKeelArmAngle = keelArmAngle;
-        lastHobLowerArmLength = hobLowerArmLength;
-        lastMiddleControlPosition = middleControlPosition;
-
-        // Cache final points
-        cachedL0 = new Vector3(keelWidth / 2f, keelY, 0);
+        // Cache Lower Mould points
+        // Segment 1: Keel (L0) → Keel Control (L1) → Rising Line Point (LR)
+        cachedL0 = new Vector3(keelHalfWidth, keelY, 0);
         cachedL1 = cachedL0 + new Vector3(keelDirX, keelDirY, 0) * (keelMaxDist * keelArmLength);
-        
+
+        // Segment 2: Rising Line Point (LR) → HoB Control (L2) → HoB (L3)
         float hobDrop = boxHeight * hobLowerArmLength;
         cachedL3 = new Vector3(maxBeam, hobY, 0);
         cachedL2 = new Vector3(maxBeam, hobY - hobDrop, 0);
 
-        cachedLMid = Vector3.Lerp(cachedL1, cachedL2, middleControlPosition);
-        cachedL1Inner = Vector3.Lerp(cachedL0, cachedL1, innerKeelPosition);
-
-        cachedUseQuartic = useQuarticBezier;
-        cachedUseQuintic = useQuinticBezier;
+        // Rising Line Point — constrained to lie on the line from L1 to L2
+        // This guarantees G1 tangent continuity at the join between the two quadratic segments
+        cachedLR = Vector3.Lerp(cachedL1, cachedL2, risingLinePosition);
 
         // UPPER MOULD
         // Find the absolute highest part of the hull for the master Upper Mould
@@ -241,9 +195,7 @@ public class BodyPlan : MonoBehaviour
     public float GetLowerMouldXAtY(float targetY)
     {
         float t = GetLowerMouldTAtY(targetY);
-        if (cachedUseQuintic) return CalculateQuinticBezierPoint(t, cachedL0, cachedL1Inner, cachedL1, cachedLMid, cachedL2, cachedL3).x;
-        else if (cachedUseQuartic) return CalculateQuarticBezierPoint(t, cachedL0, cachedL1, cachedLMid, cachedL2, cachedL3).x;
-        else return CalculateCubicBezierPoint(t, cachedL0, cachedL1, cachedL2, cachedL3).x;
+        return EvaluateLowerMouldAtT(t).x;
     }
 
     public float GetLowerMouldTAtY(float targetY)
@@ -253,15 +205,30 @@ public class BodyPlan : MonoBehaviour
         for (int i = 0; i < 20; i++)
         {
             float mid = (min + max) / 2f;
-            float y;
-            if (cachedUseQuintic) y = CalculateQuinticBezierPoint(mid, cachedL0, cachedL1Inner, cachedL1, cachedLMid, cachedL2, cachedL3).y;
-            else if (cachedUseQuartic) y = CalculateQuarticBezierPoint(mid, cachedL0, cachedL1, cachedLMid, cachedL2, cachedL3).y;
-            else y = CalculateCubicBezierPoint(mid, cachedL0, cachedL1, cachedL2, cachedL3).y;
+            float y = EvaluateLowerMouldAtT(mid).y;
 
             if (y < targetY) min = mid;
             else max = mid;
         }
         return (min + max) / 2f;
+    }
+
+    /// <summary>
+    /// Evaluates the lower mould at a unified t parameter [0, 1] spanning both quadratic segments.
+    /// t [0, 0.5] = Segment 1 (Keel → Rising Line), t [0.5, 1] = Segment 2 (Rising Line → HoB).
+    /// </summary>
+    public Vector3 EvaluateLowerMouldAtT(float t)
+    {
+        if (t <= 0.5f)
+        {
+            float localT = t * 2f;
+            return CalculateQuadraticBezierPoint(localT, cachedL0, cachedL1, cachedLR);
+        }
+        else
+        {
+            float localT = (t - 0.5f) * 2f;
+            return CalculateQuadraticBezierPoint(localT, cachedLR, cachedL2, cachedL3);
+        }
     }
 
     public float GetUpperMouldXAtY(float targetY)
@@ -286,6 +253,12 @@ public class BodyPlan : MonoBehaviour
 
     // --- UTILITIES ---
 
+    private Vector3 CalculateQuadraticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2)
+    {
+        float u = 1 - t;
+        return (u * u * p0) + (2 * u * t * p1) + (t * t * p2);
+    }
+
     private Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
     {
         float u = 1 - t;
@@ -298,47 +271,6 @@ public class BodyPlan : MonoBehaviour
         p += 3 * uu * t * p1;
         p += 3 * u * tt * p2;
         p += ttt * p3;
-        return p;
-    }
-
-    private Vector3 CalculateQuarticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4)
-    {
-        float u = 1 - t;
-        float u2 = u * u;
-        float u3 = u2 * u;
-        float u4 = u3 * u;
-        
-        float t2 = t * t;
-        float t3 = t2 * t;
-        float t4 = t3 * t;
-
-        Vector3 p = u4 * p0;
-        p += 4 * u3 * t * p1;
-        p += 6 * u2 * t2 * p2;
-        p += 4 * u * t3 * p3;
-        p += t4 * p4;
-        return p;
-    }
-
-    private Vector3 CalculateQuinticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Vector3 p5)
-    {
-        float u = 1 - t;
-        float u2 = u * u;
-        float u3 = u2 * u;
-        float u4 = u3 * u;
-        float u5 = u4 * u;
-        
-        float t2 = t * t;
-        float t3 = t2 * t;
-        float t4 = t3 * t;
-        float t5 = t4 * t;
-
-        Vector3 p = u5 * p0;
-        p += 5 * u4 * t * p1;
-        p += 10 * u3 * t2 * p2;
-        p += 10 * u2 * t3 * p3;
-        p += 5 * u * t4 * p4;
-        p += t5 * p5;
         return p;
     }
 
@@ -358,7 +290,7 @@ public class BodyPlan : MonoBehaviour
         Gizmos.color = new Color(0.5f, 0.25f, 0f); // Brown
         Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
         Gizmos.DrawLine(new Vector3(keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelBottomY, 0));
-        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelBottomY, 0), new Vector3(keelHalfWidth, keelBottomY, 0));
+        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelBottomY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
         Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelTopY, 0));
 
         // Draw Starboard (Green)
@@ -374,9 +306,8 @@ public class BodyPlan : MonoBehaviour
     {
         // Lower Points
         Vector3 m0 = new Vector3(cachedL0.x * flipX, cachedL0.y, cachedL0.z);
-        Vector3 m1Inner = new Vector3(cachedL1Inner.x * flipX, cachedL1Inner.y, cachedL1Inner.z);
         Vector3 m1 = new Vector3(cachedL1.x * flipX, cachedL1.y, cachedL1.z);
-        Vector3 mMid = new Vector3(cachedLMid.x * flipX, cachedLMid.y, cachedLMid.z);
+        Vector3 mR = new Vector3(cachedLR.x * flipX, cachedLR.y, cachedLR.z);
         Vector3 m2 = new Vector3(cachedL2.x * flipX, cachedL2.y, cachedL2.z);
         Vector3 m3 = new Vector3(cachedL3.x * flipX, cachedL3.y, cachedL3.z);
 
@@ -386,27 +317,18 @@ public class BodyPlan : MonoBehaviour
         Vector3 u2 = new Vector3(cachedU2.x * flipX, cachedU2.y, cachedU2.z);
         Vector3 u3 = new Vector3(cachedU3.x * flipX, cachedU3.y, cachedU3.z);
 
-        // Draw Lower Curve
-        if (cachedUseQuintic) DrawQuinticBezierCurve(m0, m1Inner, m1, mMid, m2, m3, curveColor, 40);
-        else if (cachedUseQuartic) DrawQuarticBezierCurve(m0, m1, mMid, m2, m3, curveColor, 40);
-        else DrawCubicBezierCurve(m0, m1, m2, m3, curveColor, 40);
+        // Draw Lower Curves (Two Quadratic Segments)
+        DrawQuadraticBezierCurve(m0, m1, mR, curveColor, 20);
+        DrawQuadraticBezierCurve(mR, m2, m3, curveColor, 20);
 
         // Draw Upper Curve
         DrawCubicBezierCurve(u0, u1, u2, u3, new Color(0.8f, 0.8f, 1f), 40);
 
         // Draw Handles
         Gizmos.color = new Color(curveColor.r, curveColor.g, curveColor.b, 0.3f);
-        if (cachedUseQuintic)
-        {
-            Gizmos.DrawLine(m0, m1Inner);
-            Gizmos.DrawLine(m1Inner, m1);
-        }
-        else
-        {
-            Gizmos.DrawLine(m0, m1);
-        }
-        Gizmos.DrawLine(m1, mMid);
-        Gizmos.DrawLine(mMid, m2);
+        Gizmos.DrawLine(m0, m1);
+        Gizmos.DrawLine(m1, mR);
+        Gizmos.DrawLine(mR, m2);
         Gizmos.DrawLine(m2, m3);
         
         Gizmos.color = new Color(0.8f, 0.8f, 1f, 0.3f);
@@ -415,15 +337,14 @@ public class BodyPlan : MonoBehaviour
 
         // Draw Nodes
         Gizmos.color = Color.green;
-        if (cachedUseQuintic) Gizmos.DrawSphere(m1Inner, 0.08f);
         Gizmos.DrawSphere(m1, 0.1f);
-        Gizmos.DrawSphere(mMid, 0.1f);
         Gizmos.DrawSphere(m2, 0.1f);
         Gizmos.DrawSphere(u1, 0.1f);
         Gizmos.DrawSphere(u2, 0.1f);
 
         Gizmos.color = Color.red;
         Gizmos.DrawSphere(m0, 0.15f);
+        Gizmos.DrawSphere(mR, 0.15f);
         Gizmos.DrawSphere(m3, 0.15f);
         Gizmos.DrawSphere(u3, 0.15f);
 
@@ -434,16 +355,28 @@ public class BodyPlan : MonoBehaviour
             labelStyle.normal.textColor = Color.white;
             
             Handles.Label(m0, " Keel", labelStyle);
+            Handles.Label(mR, " Rising Line", labelStyle);
             Handles.Label(m3, " HoB Midship", labelStyle);
             Handles.Label(u3, " Top Timber Midship", labelStyle);
-            if (cachedUseQuintic) Handles.Label(m1Inner, " Inner Keel Control", labelStyle);
             Handles.Label(m1, " Keel Control", labelStyle);
-            Handles.Label(mMid, " Middle Control", labelStyle);
             Handles.Label(m2, " HoB Lower Control", labelStyle);
             Handles.Label(u1, " HoB Upper Control", labelStyle);
             Handles.Label(u2, " Top Timber Lower Control", labelStyle);
         }
 #endif
+    }
+
+    protected void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments)
+    {
+        Gizmos.color = color;
+        Vector3 previousPoint = p0;
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            Vector3 point = CalculateQuadraticBezierPoint(t, p0, p1, p2);
+            Gizmos.DrawLine(previousPoint, point);
+            previousPoint = point;
+        }
     }
 
     protected void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments)
@@ -454,32 +387,6 @@ public class BodyPlan : MonoBehaviour
         {
             float t = i / (float)segments;
             Vector3 point = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
-            Gizmos.DrawLine(previousPoint, point);
-            previousPoint = point;
-        }
-    }
-
-    protected void DrawQuarticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Color color, int segments)
-    {
-        Gizmos.color = color;
-        Vector3 previousPoint = p0;
-        for (int i = 1; i <= segments; i++)
-        {
-            float t = i / (float)segments;
-            Vector3 point = CalculateQuarticBezierPoint(t, p0, p1, p2, p3, p4);
-            Gizmos.DrawLine(previousPoint, point);
-            previousPoint = point;
-        }
-    }
-
-    protected void DrawQuinticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Vector3 p5, Color color, int segments)
-    {
-        Gizmos.color = color;
-        Vector3 previousPoint = p0;
-        for (int i = 1; i <= segments; i++)
-        {
-            float t = i / (float)segments;
-            Vector3 point = CalculateQuinticBezierPoint(t, p0, p1, p2, p3, p4, p5);
             Gizmos.DrawLine(previousPoint, point);
             previousPoint = point;
         }
@@ -498,7 +405,7 @@ public class BodyPlan : MonoBehaviour
         {
             float t = i / (float)segments;
             
-            // Re-parameterize t across both Lower (0-0.5) and Upper (0.5-1.0) curves
+            // Re-parameterize t across Lower (0-0.5) and Upper (0.5-1.0) curves
             Vector2 outerPt;
             Vector2 nextPt;
             
@@ -519,8 +426,6 @@ public class BodyPlan : MonoBehaviour
             if (tangent == Vector2.zero) tangent = Vector2.up; // Fallback
             
             // Calculate normal pointing inwards. 
-            // If flipX > 0 (Starboard), tangent goes up/right. Normal should point Up/Left (-y, x).
-            // Actually, we want it to point towards centerline (x=0). 
             Vector2 normal = new Vector2(-tangent.y, tangent.x);
             
             // Ensure normal always points towards the centerline
@@ -581,10 +486,18 @@ public class BodyPlan : MonoBehaviour
     
     private Vector2 GetLowerMouldPoint(float t, float flipX)
     {
+        // t [0, 1] spans both quadratic segments
         Vector3 pt;
-        if (cachedUseQuintic) pt = CalculateQuinticBezierPoint(t, cachedL0, cachedL1Inner, cachedL1, cachedLMid, cachedL2, cachedL3);
-        else if (cachedUseQuartic) pt = CalculateQuarticBezierPoint(t, cachedL0, cachedL1, cachedLMid, cachedL2, cachedL3);
-        else pt = CalculateCubicBezierPoint(t, cachedL0, cachedL1, cachedL2, cachedL3);
+        if (t <= 0.5f)
+        {
+            float localT = t * 2f;
+            pt = CalculateQuadraticBezierPoint(localT, cachedL0, cachedL1, cachedLR);
+        }
+        else
+        {
+            float localT = (t - 0.5f) * 2f;
+            pt = CalculateQuadraticBezierPoint(localT, cachedLR, cachedL2, cachedL3);
+        }
         return new Vector2(pt.x * flipX, pt.y);
     }
     

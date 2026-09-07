@@ -22,6 +22,8 @@ public class InnerFramingModelTest3 : MonoBehaviour
     [Header("Visualization")]
     public bool showInnerFrames = true;
     public Color innerFrameColor = Color.magenta;
+    [Tooltip("Color of inner frames that are cut at the Fashion Timber boundary.")]
+    public Color cutInnerFrameColor = new Color(0.75f, 0f, 0.75f, 1f);
     public int resolution = 50; // Segments per half-frame
 
     public bool showInnerHobLine = true;
@@ -38,15 +40,31 @@ public class InnerFramingModelTest3 : MonoBehaviour
 
     public void DrawInnerFrames()
     {
-        Gizmos.color = innerFrameColor;
-        List<float> zPositions = framingModel.GetFrameZPositions();
+        if (innerForeFaceFashionTimberTest == null)
+            innerForeFaceFashionTimberTest = Object.FindObjectOfType<InnerForeFaceFashionTimberModelTest3>();
 
+        float sternMinZ = innerForeFaceFashionTimberTest != null ? innerForeFaceFashionTimberTest.GetMinZ() : 0;
+        float sternMaxZ = innerForeFaceFashionTimberTest != null ? innerForeFaceFashionTimberTest.GetMaxZ() : 0;
+
+        List<float> zPositions = framingModel.GetFrameZPositions();
         float thickness = framingModel.frameSpacing * framingModel.GetFrameThicknessRatioValue();
 
         foreach (float z in zPositions)
         {
             FramingModelTest3.FrameProfile fpCenter = framingModel.GetFrameProfile(z);
             if (!fpCenter.isValid) continue;
+
+            bool isCutByFashionTimber = false;
+            if (framingModel != null && framingModel.cutFramesAtFashionTimber && innerForeFaceFashionTimberTest != null)
+            {
+                if (z >= sternMinZ - 0.001f && z <= sternMaxZ + 0.001f)
+                {
+                    isCutByFashionTimber = true;
+                }
+            }
+
+            Color currentColor = isCutByFashionTimber ? cutInnerFrameColor : innerFrameColor;
+            Gizmos.color = currentColor;
 
             float aftZ = z - (thickness / 2f);
             float foreZ = z + (thickness / 2f);
@@ -57,16 +75,82 @@ public class InnerFramingModelTest3 : MonoBehaviour
             if (fpAft.isValid) DrawSingleInnerFrame(fpAft, aftZ, false);
             DrawSingleInnerFrame(fpCenter, z, true);
             if (fpFore.isValid) DrawSingleInnerFrame(fpFore, foreZ, false);
+
+            // Draw 3D curved connecting cut lines along InnerForeFaceFashionTimber curve
+            if (isCutByFashionTimber && innerForeFaceFashionTimberTest != null)
+            {
+                bool isUpperMesh = fpCenter.isValid && fpCenter.hasUpper;
+
+                int cutSubSteps = 40;
+                Vector3 prevInnerStbd = Vector3.zero;
+                Vector3 prevInnerPort = Vector3.zero;
+
+                for (int s = 0; s <= cutSubSteps; s++)
+                {
+                    float subZ = Mathf.Lerp(aftZ, foreZ, s / (float)cutSubSteps);
+                    Vector3 innerStbd = innerForeFaceFashionTimberTest.GetFashionTimberPointAtZ(subZ, true, isUpperMesh);
+                    Vector3 innerPort = innerForeFaceFashionTimberTest.GetFashionTimberPointAtZ(subZ, false, isUpperMesh);
+
+                    if (s > 0 && innerStbd != Vector3.zero && innerPort != Vector3.zero)
+                    {
+                        Gizmos.DrawLine(prevInnerStbd, innerStbd);
+                        Gizmos.DrawLine(prevInnerPort, innerPort);
+                    }
+
+                    prevInnerStbd = innerStbd;
+                    prevInnerPort = innerPort;
+                }
+            }
         }
 
         if (framingModel.enableLandmarkFillFrames)
         {
-            Color fillInnerColor = new Color(innerFrameColor.r * 0.65f, innerFrameColor.g * 0.65f, innerFrameColor.b * 0.65f, innerFrameColor.a);
-            Gizmos.color = fillInnerColor;
             foreach (var fill in framingModel.GetFillFrames())
             {
+                float centerZ = (fill.startZ + fill.endZ) * 0.5f;
+                bool isCutByFashionTimber = false;
+                if (framingModel != null && framingModel.cutFramesAtFashionTimber && innerForeFaceFashionTimberTest != null)
+                {
+                    if (centerZ >= sternMinZ - 0.001f && centerZ <= sternMaxZ + 0.001f)
+                    {
+                        isCutByFashionTimber = true;
+                    }
+                }
+
+                Color fillBaseColor = isCutByFashionTimber ? cutInnerFrameColor : innerFrameColor;
+                Color fillInnerColor = new Color(fillBaseColor.r * 0.65f, fillBaseColor.g * 0.65f, fillBaseColor.b * 0.65f, fillBaseColor.a);
+                Gizmos.color = fillInnerColor;
+
                 if (fill.startFp.isValid) DrawSingleInnerFrame(fill.startFp, fill.startZ, false);
                 if (fill.endFp.isValid) DrawSingleInnerFrame(fill.endFp, fill.endZ, false);
+
+                // Draw 3D curved connecting cut lines along InnerForeFaceFashionTimber curve for fill frames if cut
+                if (isCutByFashionTimber && innerForeFaceFashionTimberTest != null)
+                {
+                    bool isUpperMesh = (fill.startFp.isValid && fill.startFp.hasUpper) || (fill.endFp.isValid && fill.endFp.hasUpper);
+                    float startZ = Mathf.Min(fill.startZ, fill.endZ);
+                    float endZ = Mathf.Max(fill.startZ, fill.endZ);
+
+                    int cutSubSteps = 40;
+                    Vector3 prevInnerStbd = Vector3.zero;
+                    Vector3 prevInnerPort = Vector3.zero;
+
+                    for (int s = 0; s <= cutSubSteps; s++)
+                    {
+                        float subZ = Mathf.Lerp(startZ, endZ, s / (float)cutSubSteps);
+                        Vector3 innerStbd = innerForeFaceFashionTimberTest.GetFashionTimberPointAtZ(subZ, true, isUpperMesh);
+                        Vector3 innerPort = innerForeFaceFashionTimberTest.GetFashionTimberPointAtZ(subZ, false, isUpperMesh);
+
+                        if (s > 0 && innerStbd != Vector3.zero && innerPort != Vector3.zero)
+                        {
+                            Gizmos.DrawLine(prevInnerStbd, innerStbd);
+                            Gizmos.DrawLine(prevInnerPort, innerPort);
+                        }
+
+                        prevInnerStbd = innerStbd;
+                        prevInnerPort = innerPort;
+                    }
+                }
             }
         }
 
@@ -180,7 +264,7 @@ public class InnerFramingModelTest3 : MonoBehaviour
         }
     }
 
-    private List<Vector2> GetCleanedLocalInnerCurve(FramingModelTest3.FrameProfile fp, float zPos)
+    private List<Vector2> GetCleanedLocalInnerCurve(FramingModelTest3.FrameProfile fp, float zPos, bool ignoreFashionTimberCut = false)
     {
         if (innerForeFaceFashionTimberTest == null)
             innerForeFaceFashionTimberTest = Object.FindObjectOfType<InnerForeFaceFashionTimberModelTest3>();
@@ -216,8 +300,8 @@ public class InnerFramingModelTest3 : MonoBehaviour
         float innerLowerCutoffT = 0f;
         float innerUpperCutoffT = 0f;
 
-        // 1. Cut inner frame at InnerForeFaceFashionTimberModelTest3 if cutFramesAtFashionTimber is enabled
-        if (framingModel != null && framingModel.cutFramesAtFashionTimber && innerForeFaceFashionTimberTest != null)
+        // 1. Cut inner frame at InnerForeFaceFashionTimberModelTest3 if cutFramesAtFashionTimber is enabled and not ignored
+        if (!ignoreFashionTimberCut && framingModel != null && framingModel.cutFramesAtFashionTimber && innerForeFaceFashionTimberTest != null)
         {
             float sternMinZ = innerForeFaceFashionTimberTest.GetMinZ();
             float sternMaxZ = innerForeFaceFashionTimberTest.GetMaxZ();
@@ -229,9 +313,11 @@ public class InnerFramingModelTest3 : MonoBehaviour
 
             if (zPos <= sternMaxZ + 0.001f)
             {
-                float fashionY = innerForeFaceFashionTimberTest.GetInnerYAtZ(zPos);
-                float topTimberY = sheerPlan.GetTopTimberYAtZ(zPos);
                 float hobY = sheerPlan.GetTheoreticalHobYAtZ(zPos);
+                Vector3 hobPt = innerForeFaceFashionTimberTest.GetHobIndex() > 0 ? innerForeFaceFashionTimberTest.GetFashionTimberPoints(true)[innerForeFaceFashionTimberTest.GetHobIndex()] : Vector3.zero;
+                bool isUpper = hasUpper || (zPos < hobPt.z);
+                float fashionY = innerForeFaceFashionTimberTest.GetInnerYAtZ(zPos, isUpper);
+                float topTimberY = sheerPlan.GetTopTimberYAtZ(zPos);
 
                 if (fashionY >= topTimberY - 0.001f)
                 {
@@ -328,21 +414,8 @@ public class InnerFramingModelTest3 : MonoBehaviour
 
         if (hasUpper)
         {
-            // Find the correct top cutoff for the inner frame at Top Timber line
-            float localTtY = sheerPlan.GetTopTimberYAtZ(zPos);
-            float innerUpperTopCutoffT = 1f;
-            {
-                float tMin = 0f;
-                float tMax = 1f;
-                for (int i = 0; i < 20; i++)
-                {
-                    float midT = (tMin + tMax) / 2f;
-                    Vector3 pt = framingModel.GetInnerPointAtT(fp, true, midT, zPos, origin, framePlaneNormal, theoreticalKeelY, theoreticalTotalHeight);
-                    if (pt.y < localTtY) tMin = midT;
-                    else tMax = midT;
-                }
-                innerUpperTopCutoffT = (tMin + tMax) / 2f;
-            }
+            // Set top cutoff for the inner frame to match upperTopCutoffT of the frame profile
+            float innerUpperTopCutoffT = fp.upperTopCutoffT > 0f ? fp.upperTopCutoffT : 1f;
 
             if (innerUpperCutoffT < innerUpperTopCutoffT - 0.001f)
             {
@@ -386,7 +459,12 @@ public class InnerFramingModelTest3 : MonoBehaviour
 
     public List<Vector3> GetCleanedInnerCurve(float zPos, FramingModelTest3.FrameProfile fp)
     {
-        List<Vector2> localPoints = GetCleanedLocalInnerCurve(fp, zPos);
+        return GetCleanedInnerCurve(zPos, fp, false);
+    }
+
+    public List<Vector3> GetCleanedInnerCurve(float zPos, FramingModelTest3.FrameProfile fp, bool ignoreFashionTimberCut)
+    {
+        List<Vector2> localPoints = GetCleanedLocalInnerCurve(fp, zPos, ignoreFashionTimberCut);
         
         Vector3 origin = new Vector3(0, 0, zPos);
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
@@ -404,6 +482,11 @@ public class InnerFramingModelTest3 : MonoBehaviour
             curve3D.Add(origin + uAxis * pt.x + vAxis * pt.y);
         }
         return curve3D;
+    }
+
+    public List<Vector3> GetFullUncutInnerCurve(float zPos, FramingModelTest3.FrameProfile fp)
+    {
+        return GetCleanedInnerCurve(zPos, fp, true);
     }
 
     // Ensure the method closed successfully in previous chunk
@@ -458,5 +541,4 @@ public class InnerFramingModelTest3 : MonoBehaviour
             }
         }
     }
-
 }

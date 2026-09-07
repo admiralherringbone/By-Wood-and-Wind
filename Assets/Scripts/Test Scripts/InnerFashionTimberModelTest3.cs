@@ -60,36 +60,20 @@ public class InnerFashionTimberModelTest3 : MonoBehaviour
     public float GetOuterHullXAndNormalAtYZ(float targetY, float originalZ, out float nx)
     {
         nx = 1f;
-        bool isUpper = targetY >= sheerPlan.GetHobYAtZ(originalZ) - 0.001f;
-        
-        Vector3 lowerBound = sheerPlan.cachedSternRisingEnd;
-        if (sheerPlan.showDeadwoodRake && sheerPlan.cachedSternRisingEnd.y < sheerPlan.cachedDeadwoodAftPoint.y)
-        {
-            lowerBound = sheerPlan.cachedDeadwoodAftPoint;
-        }
-        float lowerAftZ = lowerBound.z;
-        float evalZ = originalZ;
+        bool isUpper = targetY >= sheerPlan.GetTheoreticalHobYAtZ(originalZ) - 0.001f;
 
-        if (!isUpper && evalZ < lowerAftZ)
-        {
-            evalZ = lowerAftZ;
-        }
-
-        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(evalZ, true);
+        FramingModelTest3.FrameProfile fp = framingModel.GetRawFrameProfile(originalZ, true);
         if (!fp.isValid) return 0f;
 
         float exactX = 0f;
 
-        float keelY = sheerPlan.GetKeelYAtZ(evalZ);
-        if (sheerPlan.showDeadwoodRake && evalZ < sheerPlan.cachedDeadwoodForePoint.z && evalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
+        float keelY = sheerPlan.GetKeelYAtZ(originalZ);
+        if (sheerPlan.showDeadwoodRake && originalZ < sheerPlan.cachedDeadwoodForePoint.z && originalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
         {
-            keelY = sheerPlan.GetDeadwoodYAtZ(evalZ);
+            keelY = sheerPlan.GetDeadwoodYAtZ(originalZ);
         }
         
-        float peakY = fp.hasUpper ? fp.upperP3.y : fp.lowerP3.y;
-        float totalHeight = Mathf.Max(0.01f, peakY - keelY);
-
-        Vector3 origin = new Vector3(0, 0, evalZ);
+        Vector3 origin = new Vector3(0, 0, originalZ);
         Vector3 pStart = fp.hasLower ? fp.lowerP0 : fp.upperP0;
         Vector3 pEnd = fp.hasUpper ? fp.upperP3 : fp.lowerP3;
         Vector3 uAxis = new Vector3(pEnd.x, 0, pEnd.z) - new Vector3(origin.x, 0, origin.z);
@@ -113,44 +97,25 @@ public class InnerFashionTimberModelTest3 : MonoBehaviour
             Vector3 outerPt = framingModel.GetUpperSurfacePointAtT(fp, 1f, tVal);
             exactX = outerPt.x;
             
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, true, tVal, evalZ, framePlaneNormal);
+            Vector3 normal = framingModel.GetInnerNormalAtT(fp, true, tVal, originalZ, framePlaneNormal);
             nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
         }
         else if (!isUpper && fp.hasLower)
         {
-            float mappedTargetY = targetY;
-            if (originalZ < lowerAftZ)
-            {
-                float origHobY = sheerPlan.GetHobYAtZ(originalZ);
-                float sternHobY = sheerPlan.GetHobYAtZ(lowerAftZ);
-                float hobDifference = origHobY - sternHobY;
-                mappedTargetY = targetY - hobDifference;
-            }
-
             float fMinT = 0f;
             float fMaxT = 1f;
             for (int i = 0; i < 20; i++)
             {
                 float midT = (fMinT + fMaxT) / 2f;
                 float py = framingModel.GetSurfacePointAtT(fp, 1f, midT, true).y;
-                if (py < mappedTargetY) fMinT = midT;
+                if (py < targetY) fMinT = midT;
                 else fMaxT = midT;
             }
             float tVal = (fMinT + fMaxT) / 2f;
             Vector3 outerPt = framingModel.GetSurfacePointAtT(fp, 1f, tVal, true);
             exactX = outerPt.x;
-
-            if (originalZ < lowerAftZ)
-            {
-                float sternHobX = breadthPlan.GetBreadthXAtZ(lowerAftZ);
-                float currHobX = breadthPlan.GetBreadthXAtZ(originalZ);
-                if (sternHobX > 0.001f)
-                {
-                    exactX *= (currHobX / sternHobX);
-                }
-            }
             
-            Vector3 normal = framingModel.GetInnerNormalAtT(fp, false, tVal, evalZ, framePlaneNormal);
+            Vector3 normal = framingModel.GetInnerNormalAtT(fp, false, tVal, originalZ, framePlaneNormal);
             nx = Mathf.Max(0.01f, Mathf.Abs(normal.x));
         }
 

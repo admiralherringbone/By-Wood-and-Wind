@@ -61,9 +61,12 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
         }
         else
         {
-            if (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.specialFrames != null && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+            float bottomZ = (foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.cachedInnerPoints != null && foreFaceFashionTimberModelTest.cachedInnerPoints.Count > 0)
+                ? foreFaceFashionTimberModelTest.cachedInnerPoints[0].x
+                : -999f;
+
+            if (originalZ < bottomZ - 0.001f && foreFaceFashionTimberModelTest != null && foreFaceFashionTimberModelTest.specialFrames != null)
             {
-                float bottomZ = foreFaceFashionTimberModelTest.cachedInnerPoints[0].x;
                 FramingModelTest3.FrameProfile masterFp = framingModel.GetRawFrameProfile(bottomZ, false);
                 fp = foreFaceFashionTimberModelTest.specialFrames.GetScaledMasterFrameProfile(originalZ, masterFp, bottomZ);
             }
@@ -244,6 +247,35 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
         }
         return resampled;
     }
+
+    public int GetHobIndex()
+    {
+        List<Vector3> pts = GetFashionTimberPoints(true);
+        if (pts == null || pts.Count == 0) return 0;
+        
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            Vector3 p1 = pts[i];
+            Vector3 p2 = pts[i+1];
+            
+            float hob1 = sheerPlan != null ? sheerPlan.GetTheoreticalHobYAtZ(p1.z) : 0f;
+            float hob2 = sheerPlan != null ? sheerPlan.GetTheoreticalHobYAtZ(p2.z) : 0f;
+            
+            if ((p1.y <= hob1 && p2.y >= hob2) || (p1.y >= hob1 && p2.y <= hob2))
+            {
+                return i;
+            }
+        }
+        return pts.Count / 2;
+    }
+
+    public Vector3 GetFashionTimberPointAtZ(float z, bool isStbd, bool isUpper = false)
+    {
+        float targetY = GetInnerYAtZ(z, isUpper);
+        Vector3 innerPt = GetInnerPointAtYZ(targetY, z);
+        if (!isStbd) innerPt.x = -innerPt.x;
+        return innerPt;
+    }
     public float GetMinZ()
     {
         List<Vector3> pts = GetFashionTimberPoints(true);
@@ -268,12 +300,34 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
         return maxZ;
     }
 
-    public float GetInnerYAtZ(float z)
+    public float GetInnerYAtZ(float z, bool isUpper = false)
     {
         List<Vector3> pts = GetFashionTimberPoints(true);
         if (pts == null || pts.Count == 0) return 0f;
         
-        for (int i = 0; i < pts.Count - 1; i++)
+        int hobIdx = GetHobIndex();
+        int count = pts.Count;
+
+        int start1 = isUpper ? hobIdx : 0;
+        int end1 = isUpper ? count - 1 : hobIdx;
+
+        int start2 = isUpper ? 0 : hobIdx;
+        int end2 = isUpper ? hobIdx : count - 1;
+
+        for (int i = start1; i < end1 && i < count - 1; i++)
+        {
+            Vector3 p1 = pts[i];
+            Vector3 p2 = pts[i+1];
+            
+            if ((z >= p1.z && z <= p2.z) || (z <= p1.z && z >= p2.z))
+            {
+                if (Mathf.Abs(p2.z - p1.z) < 0.0001f) return Mathf.Min(p1.y, p2.y);
+                float t = (z - p1.z) / (p2.z - p1.z);
+                return Mathf.Lerp(p1.y, p2.y, t);
+            }
+        }
+
+        for (int i = start2; i < end2 && i < count - 1; i++)
         {
             Vector3 p1 = pts[i];
             Vector3 p2 = pts[i+1];
@@ -287,6 +341,6 @@ public class InnerForeFaceFashionTimberModelTest3 : MonoBehaviour
         }
         
         if (z < GetMinZ()) return pts[0].y;
-        return pts[pts.Count - 1].y;
+        return pts[count - 1].y;
     }
 }
