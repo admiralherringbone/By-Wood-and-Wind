@@ -1696,12 +1696,33 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetPureSheerYAtZ(float z)
     {
-        float totalUpperOffset = bulwarkHeight;
-        if (upperDecks != null && upperDecks.Count > 0)
+        Vector3 stemEnd = new Vector3(0, cachedUpperStemTopPoint.y, cachedUpperStemTopPoint.z);
+        Vector3 transomEnd = new Vector3(0, cachedTransomTopPoint.y, cachedTransomTopPoint.z);
+
+        if (z >= 0)
         {
-            totalUpperOffset += GetMaxDeckHeight();
+            if (z >= stemEnd.z)
+            {
+                float dz = stemEnd.z - cachedTopTimberMidCpFwd.z;
+                float dy = stemEnd.y - cachedTopTimberMidCpFwd.y;
+                if (Mathf.Abs(dz) < 0.001f) return stemEnd.y;
+                return stemEnd.y + (dy / dz) * (z - stemEnd.z);
+            }
+            float t = GetBezierTAtZ(cachedTopTimberMidshipPoint, cachedTopTimberMidCpFwd, cachedTopTimberBowCp, stemEnd, z, true);
+            return CalculateCubicBezierPoint(t, cachedTopTimberMidshipPoint, cachedTopTimberMidCpFwd, cachedTopTimberBowCp, stemEnd).y;
         }
-        return GetBaseDeckYAtZ(z) + totalUpperOffset;
+        else
+        {
+            if (z <= transomEnd.z)
+            {
+                float dz = transomEnd.z - cachedTopTimberMidCpAft.z;
+                float dy = transomEnd.y - cachedTopTimberMidCpAft.y;
+                if (Mathf.Abs(dz) < 0.001f) return transomEnd.y;
+                return transomEnd.y + (dy / dz) * (z - transomEnd.z);
+            }
+            float t = GetBezierTAtZ(cachedTopTimberMidshipPoint, cachedTopTimberMidCpAft, cachedTopTimberSternCp, transomEnd, z, false);
+            return CalculateCubicBezierPoint(t, cachedTopTimberMidshipPoint, cachedTopTimberMidCpAft, cachedTopTimberSternCp, transomEnd).y;
+        }
     }
 
     protected void DrawDashedTopLineCurve(float startZ, float endZ, Color color, int dashCount = 80)
