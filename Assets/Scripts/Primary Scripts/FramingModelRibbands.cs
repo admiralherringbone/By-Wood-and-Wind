@@ -9,10 +9,14 @@ public class FramingModelRibbands : MonoBehaviour
     public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
     public FramingModel framingModel;
+    public FashionTimberModel fashionTimberModel;
 
     [Header("Ribband Visualization Settings")]
     [Tooltip("Show the 3D floor sweeps and rising line guide ribbands (yellow/green).")]
     public bool showFloorSweepsGuide = true;
+
+    [Tooltip("Cut ribbands as they pass behind (aft on the Z-axis) the Fashion Timbers.")]
+    public bool cutRibbandsAtFashionTimber = true;
 
     [Tooltip("Show 3D lower deck floor ribband lines tracing along the hull frames for each lower deck tier.")]
     public bool showLowerDeckLines = true;
@@ -53,6 +57,9 @@ public class FramingModelRibbands : MonoBehaviour
 
         if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
         if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
+
+        if (fashionTimberModel == null) fashionTimberModel = GetComponentInParent<FashionTimberModel>();
+        if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
     }
 
     public float GetKeelHalfWidth()
@@ -183,73 +190,97 @@ public class FramingModelRibbands : MonoBehaviour
         DrawQuadraticBezierCurve(mMasterLR, mBowP1_LR, mBowEnd, Color.green);
     }
 
-    private void DrawLowerDeckRibbands()
+    private float FindSternFashionTimberIntersectionZ(System.Func<float, float> getTargetYAtZ)
     {
-        if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
-        if (sheerPlan.lowerDecks == null || sheerPlan.lowerDecks.Count == 0) return;
+        if (sheerPlan == null) return 0f;
 
-        float startZ = sheerPlan.GetAftMostZ();
-        float endZ = sheerPlan.GetFwdMostZ();
-        float totalLength = endZ - startZ;
-        if (totalLength <= 0.001f) return;
+        float minZ = sheerPlan.GetAftMostZ();
+        float maxZ = sheerPlan.cachedKeelBowPoint.z;
 
-        List<float> zPoints = GetZPoints();
-        Gizmos.color = lowerDeckColor;
+        float lowZ = minZ;
+        float highZ = maxZ;
 
-        foreach (var deck in sheerPlan.lowerDecks)
+        for (int i = 0; i < 25; i++)
         {
-            float aftZ = startZ + (deck.aftExtent * totalLength);
-            float foreZ = startZ + (deck.foreExtent * totalLength);
-            float yDrop = sheerPlan.GetLowerDeckYDrop(deck);
+            float midZ = (lowZ + highZ) * 0.5f;
+            float yRibband = getTargetYAtZ(midZ);
+            float yFT = sheerPlan.GetSternProfileYAtZ(midZ);
 
-            Vector3? prevStbd = null;
-            Vector3? prevPort = null;
-
-            foreach (float z in zPoints)
+            if (yRibband < yFT)
             {
-                if (z < aftZ - 0.001f || z > foreZ + 0.001f)
-                {
-                    prevStbd = null;
-                    prevPort = null;
-                    continue;
-                }
-
-                float targetY = sheerPlan.GetBaseDeckYAtZ(z) - yDrop;
-
-                Vector3? currStbd = GetFrameSurfacePointAtY(z, 1f, targetY);
-                Vector3? currPort = GetFrameSurfacePointAtY(z, -1f, targetY);
-
-                if (currStbd.HasValue && prevStbd.HasValue)
-                {
-                    Gizmos.DrawLine(prevStbd.Value, currStbd.Value);
-                }
-                if (currPort.HasValue && prevPort.HasValue)
-                {
-                    Gizmos.DrawLine(prevPort.Value, currPort.Value);
-                }
-
-                prevStbd = currStbd;
-                prevPort = currPort;
+                lowZ = midZ;
+            }
+            else
+            {
+                highZ = midZ;
             }
         }
+        return (lowZ + highZ) * 0.5f;
     }
 
-    private void DrawPrimaryDeckRibband()
+    private void DrawRibbandCurve(System.Func<float, float> getTargetYAtZ, Color color, float minAllowedZ = float.MinValue, float maxAllowedZ = float.MaxValue)
     {
-        if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
+        float aftZ = sheerPlan.GetAftMostZ();
+        float fwdZ = sheerPlan.GetFwdMostZ();
 
-        List<float> zPoints = GetZPoints();
-        Gizmos.color = primaryDeckColor;
+        // 1. Calculate exact stern Fashion Timber intersection Z for this ribband curve
+        float sternZCutoff = FindSternFashionTimberIntersectionZ(getTargetYAtZ);
+
+        // 2. Build Z sample list starting from sternZCutoff (if cut enabled) up to fwdZ
+        List<float> rawZList = new List<float>();
+
+        if (cutRibbandsAtFashionTimber)
+        {
+            rawZList.Add(sternZCutoff);
+        }
+        else
+        {
+            rawZList.Add(aftZ);
+        }
+
+        if (framingModel != null)
+        {
+            foreach (float s in framingModel.CalculateFrameStations())
+            {
+                if (s >= (cutRibbandsAtFashionTimber ? sternZCutoff : aftZ))
+                {
+                    rawZList.Add(s);
+                }
+            }
+        }
+
+        int uniformCount = 80;
+        for (int i = 0; i < uniformCount; i++)
+        {
+            float z = Mathf.Lerp(aftZ, fwdZ, i / (float)(uniformCount - 1));
+            if (z >= (cutRibbandsAtFashionTimber ? sternZCutoff : aftZ))
+            {
+                rawZList.Add(z);
+            }
+        }
+
+        rawZList.Sort();
+        List<float> zPoints = new List<float>();
+        foreach (float z in rawZList)
+        {
+            if (z < minAllowedZ - 0.001f || z > maxAllowedZ + 0.001f) continue;
+            if (zPoints.Count == 0 || Mathf.Abs(z - zPoints[zPoints.Count - 1]) > 0.001f)
+            {
+                zPoints.Add(z);
+            }
+        }
+
+        Gizmos.color = color;
 
         Vector3? prevStbd = null;
         Vector3? prevPort = null;
 
         foreach (float z in zPoints)
         {
-            float targetY = sheerPlan.GetBaseDeckYAtZ(z) + sheerPlan.GetGlobalSheerOffsetAtZ(z);
+            float targetY = getTargetYAtZ(z);
 
-            Vector3? currStbd = GetFrameSurfacePointAtY(z, 1f, targetY);
-            Vector3? currPort = GetFrameSurfacePointAtY(z, -1f, targetY);
+            Vector3? currStbd = GetFrameSurfacePointAtY(z, 1f, targetY, true);
+            Vector3? currPort = GetFrameSurfacePointAtY(z, -1f, targetY, true);
 
             if (currStbd.HasValue && prevStbd.HasValue)
             {
@@ -265,40 +296,41 @@ public class FramingModelRibbands : MonoBehaviour
         }
     }
 
+    private void DrawLowerDeckRibbands()
+    {
+        if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
+        if (sheerPlan.lowerDecks == null || sheerPlan.lowerDecks.Count == 0) return;
+
+        float startZ = sheerPlan.GetAftMostZ();
+        float endZ = sheerPlan.GetFwdMostZ();
+        float totalLength = endZ - startZ;
+        if (totalLength <= 0.001f) return;
+
+        foreach (var deck in sheerPlan.lowerDecks)
+        {
+            float aftZ = startZ + (deck.aftExtent * totalLength);
+            float foreZ = startZ + (deck.foreExtent * totalLength);
+            float yDrop = sheerPlan.GetLowerDeckYDrop(deck);
+
+            DrawRibbandCurve(z => sheerPlan.GetBaseDeckYAtZ(z) - yDrop, lowerDeckColor, aftZ, foreZ);
+        }
+    }
+
+    private void DrawPrimaryDeckRibband()
+    {
+        if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
+        DrawRibbandCurve(z => sheerPlan.GetBaseDeckYAtZ(z) + sheerPlan.GetGlobalSheerOffsetAtZ(z), primaryDeckColor);
+    }
+
     private void DrawUpperDeckRibbands()
     {
         if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
         if (sheerPlan.upperDecks == null || sheerPlan.upperDecks.Count == 0) return;
 
-        List<float> zPoints = GetZPoints();
-        Gizmos.color = upperDeckColor;
-
         foreach (var deck in sheerPlan.upperDecks)
         {
             float hOffset = sheerPlan.GetAbsoluteDeckHeight(deck);
-
-            Vector3? prevStbd = null;
-            Vector3? prevPort = null;
-
-            foreach (float z in zPoints)
-            {
-                float targetY = sheerPlan.GetBaseDeckYAtZ(z) + hOffset + sheerPlan.GetGlobalSheerOffsetAtZ(z);
-
-                Vector3? currStbd = GetFrameSurfacePointAtY(z, 1f, targetY);
-                Vector3? currPort = GetFrameSurfacePointAtY(z, -1f, targetY);
-
-                if (currStbd.HasValue && prevStbd.HasValue)
-                {
-                    Gizmos.DrawLine(prevStbd.Value, currStbd.Value);
-                }
-                if (currPort.HasValue && prevPort.HasValue)
-                {
-                    Gizmos.DrawLine(prevPort.Value, currPort.Value);
-                }
-
-                prevStbd = currStbd;
-                prevPort = currPort;
-            }
+            DrawRibbandCurve(z => sheerPlan.GetBaseDeckYAtZ(z) + hOffset + sheerPlan.GetGlobalSheerOffsetAtZ(z), upperDeckColor);
         }
     }
 
@@ -306,7 +338,6 @@ public class FramingModelRibbands : MonoBehaviour
     {
         if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return;
 
-        List<float> zPoints = GetZPoints();
         List<float> sheerHeights = new List<float>();
 
         // 1. Base Top Timber Sheer Height
@@ -322,37 +353,20 @@ public class FramingModelRibbands : MonoBehaviour
             }
         }
 
-        Gizmos.color = topTimberColor;
-
         foreach (float hOffset in sheerHeights)
         {
-            Vector3? prevStbd = null;
-            Vector3? prevPort = null;
-
-            foreach (float z in zPoints)
-            {
-                float targetY = sheerPlan.GetBaseDeckYAtZ(z) + hOffset + sheerPlan.GetGlobalSheerOffsetAtZ(z);
-
-                Vector3? currStbd = GetFrameSurfacePointAtY(z, 1f, targetY);
-                Vector3? currPort = GetFrameSurfacePointAtY(z, -1f, targetY);
-
-                if (currStbd.HasValue && prevStbd.HasValue)
-                {
-                    Gizmos.DrawLine(prevStbd.Value, currStbd.Value);
-                }
-                if (currPort.HasValue && prevPort.HasValue)
-                {
-                    Gizmos.DrawLine(prevPort.Value, currPort.Value);
-                }
-
-                prevStbd = currStbd;
-                prevPort = currPort;
-            }
+            DrawRibbandCurve(z => sheerPlan.GetBaseDeckYAtZ(z) + hOffset + sheerPlan.GetGlobalSheerOffsetAtZ(z), topTimberColor);
         }
     }
 
-    private Vector3? GetFrameSurfacePointAtY(float z, float side, float targetY)
+    private Vector3? GetFrameSurfacePointAtY(float z, float side, float targetY, bool ignoreFashionCutoff = false)
     {
+        if (!ignoreFashionCutoff && cutRibbandsAtFashionTimber && sheerPlan != null)
+        {
+            float sternZCutoff = sheerPlan.GetSternProfileZAtY(targetY);
+            if (z < sternZCutoff - 0.001f) return null; // Ribband passes behind (aft of) Fashion Timber at targetY
+        }
+
         float localTopY = sheerPlan.GetTopTimberYAtZ(z);
         if (targetY > localTopY + 0.005f) return null; // Frame structure does not extend to this height at Z
 

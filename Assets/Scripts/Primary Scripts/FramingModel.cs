@@ -8,10 +8,14 @@ public class FramingModel : MonoBehaviour
     public SheerPlan sheerPlan;
     public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
+    public FashionTimberModel fashionTimberModel;
 
     [Header("Frame Layout Settings")]
     [Tooltip("Spacing distance between adjacent transverse frames along the Z axis.")]
     public float frameSpacing = 0.8f;
+
+    [Tooltip("Cut frames as they pass below the Fashion Timbers on the Y-axis.")]
+    public bool cutFramesAtFashionTimber = true;
 
     [Header("Gizmo Visualization Settings")]
     public bool showLabels = true;
@@ -44,6 +48,9 @@ public class FramingModel : MonoBehaviour
 
         if (breadthPlan == null) breadthPlan = GetComponentInParent<BreadthPlan>();
         if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
+
+        if (fashionTimberModel == null) fashionTimberModel = GetComponentInParent<FashionTimberModel>();
+        if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
     }
 
     public float GetKeelHalfWidth()
@@ -333,9 +340,49 @@ public class FramingModel : MonoBehaviour
             pL2.y = keelY + (pL2.y - originalKeelY) * scaleY;
         }
 
-        // DRAW LOWER MOULD SEGMENTS
-        DrawQuadraticBezierCurve(pL0, pL1, pLR, color, 15);
-        DrawQuadraticBezierCurve(pLR, pL2, pL3, color, 15);
+        // FASHION TIMBER CUTOFF HEIGHT (Y-AXIS)
+        float yCutoff = keelY;
+        if (cutFramesAtFashionTimber && sheerPlan != null)
+        {
+            float ftMaxZ = (fashionTimberModel != null) ? fashionTimberModel.GetMaxZ() : sheerPlan.cachedTransomTopPoint.z;
+            if (z <= ftMaxZ + 0.001f)
+            {
+                float ftY = sheerPlan.GetSternProfileYAtZ(z);
+                if (ftY > keelY)
+                {
+                    yCutoff = ftY;
+                }
+            }
+        }
+
+        // DRAW LOWER MOULD SEGMENTS (IF NOT COMPLETELY CUT BELOW FASHION TIMBER)
+        if (yCutoff < hobY - 0.001f)
+        {
+            float lowerMinT = 0f;
+            if (yCutoff > keelY + 0.001f)
+            {
+                float minT = 0f;
+                float maxT = 1f;
+                for (int i = 0; i < 15; i++)
+                {
+                    float midT = (minT + maxT) * 0.5f;
+                    Vector3 pt = midT <= 0.5f ? CalculateQuadraticBezierPoint(midT * 2f, pL0, pL1, pLR) : CalculateQuadraticBezierPoint((midT - 0.5f) * 2f, pLR, pL2, pL3);
+                    if (pt.y < yCutoff) minT = midT;
+                    else maxT = midT;
+                }
+                lowerMinT = (minT + maxT) * 0.5f;
+            }
+
+            if (lowerMinT <= 0.5f)
+            {
+                DrawQuadraticBezierCurve(pL0, pL1, pLR, color, 15, lowerMinT * 2f, 1f);
+                DrawQuadraticBezierCurve(pLR, pL2, pL3, color, 15, 0f, 1f);
+            }
+            else
+            {
+                DrawQuadraticBezierCurve(pLR, pL2, pL3, color, 15, (lowerMinT - 0.5f) * 2f, 1f);
+            }
+        }
 
         // UPPER MOULD SEGMENT (HoB -> Top Line)
         float maxSheerYAtZ = sheerPlan.GetBaseDeckYAtZ(z);
@@ -368,7 +415,22 @@ public class FramingModel : MonoBehaviour
         Vector3 pU1 = pU0 + new Vector3(side * masterU1Offset.x * sXUpper, masterU1Offset.y * sYUpper, 0);
         Vector3 pU2 = pU3 + new Vector3(side * masterU2Offset.x * sXUpper, masterU2Offset.y * sYUpper, 0);
 
-        // CLIPPING LOGIC: Stop drawing when crossing local top height (deck / bulwark top)
+        // UPPER MOULD CLIPPING LOGIC: Cut at top height and cut below Fashion Timber if yCutoff >= hobY
+        float upperMinT = 0f;
+        if (yCutoff >= hobY - 0.001f)
+        {
+            float minT = 0f;
+            float maxT = 1f;
+            for (int i = 0; i < 15; i++)
+            {
+                float midT = (minT + maxT) * 0.5f;
+                float py = CalculateCubicBezierPoint(midT, pU0, pU1, pU2, pU3).y;
+                if (py < yCutoff) minT = midT;
+                else maxT = midT;
+            }
+            upperMinT = (minT + maxT) * 0.5f;
+        }
+
         float upperTopCutoffT = 1f;
         if (maxSheerYAtZ > localTopY + 0.001f)
         {
@@ -384,13 +446,16 @@ public class FramingModel : MonoBehaviour
             upperTopCutoffT = (minT + maxT) * 0.5f;
         }
 
-        DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperTopCutoffT);
+        if (upperMinT < upperTopCutoffT)
+        {
+            DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperMinT, upperTopCutoffT);
+        }
 
         // Gizmo Node Spheres for Master Frame
         if (isMaster)
         {
             Gizmos.color = color;
-            Gizmos.DrawSphere(pL0, 0.12f);
+            if (yCutoff < hobY) Gizmos.DrawSphere(pL0, 0.12f);
             Gizmos.DrawSphere(pLR, 0.12f);
             Gizmos.DrawSphere(pL3, 0.12f);
             Vector3 topSpherePt = CalculateCubicBezierPoint(upperTopCutoffT, pU0, pU1, pU2, pU3);
@@ -468,26 +533,26 @@ public class FramingModel : MonoBehaviour
         if (sheerPlan.enableCounter) Gizmos.DrawSphere(OffsetX(sheerPlan.cachedCounterTopPoint, xOffset), 0.12f);
     }
 
-    private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 20)
+    private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 20, float minT = 0f, float maxT = 1f)
     {
         Gizmos.color = color;
-        Vector3 previousPoint = p0;
+        Vector3 previousPoint = CalculateQuadraticBezierPoint(minT, p0, p1, p2);
         for (int i = 1; i <= segments; i++)
         {
-            float t = i / (float)segments;
+            float t = Mathf.Lerp(minT, maxT, i / (float)segments);
             Vector3 currentPoint = CalculateQuadraticBezierPoint(t, p0, p1, p2);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
         }
     }
 
-    private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 20, float maxT = 1f)
+    private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 20, float minT = 0f, float maxT = 1f)
     {
         Gizmos.color = color;
-        Vector3 previousPoint = p0;
+        Vector3 previousPoint = CalculateCubicBezierPoint(minT, p0, p1, p2, p3);
         for (int i = 1; i <= segments; i++)
         {
-            float t = (i / (float)segments) * maxT;
+            float t = Mathf.Lerp(minT, maxT, i / (float)segments);
             Vector3 currentPoint = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
