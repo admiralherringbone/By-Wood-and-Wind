@@ -752,17 +752,14 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetAftMostZ()
     {
-        float minZ = cachedSternPostTopPoint.z;
+        float minZ = cachedTransomTopPoint.z;
+        minZ = Mathf.Min(minZ, cachedSternPostTopPoint.z);
         minZ = Mathf.Min(minZ, cachedKeelSternPoint.z);
         if (enableCounter)
         {
             minZ = Mathf.Min(minZ, cachedCounterBasePoint.z);
             minZ = Mathf.Min(minZ, cachedCounterTopPoint.z);
-            minZ = Mathf.Min(minZ, cachedCounterCp1.z);
-            minZ = Mathf.Min(minZ, cachedCounterCp2.z);
         }
-        minZ = Mathf.Min(minZ, cachedTransomTopPoint.z);
-        minZ = Mathf.Min(minZ, cachedProjectedSternRisingEnd.z);
         return minZ;
     }
 
@@ -1417,7 +1414,10 @@ public class SheerPlan : MonoBehaviour
         // Transom
         Gizmos.color = Color.blue;
         Vector3 transomBase = (enableCounter) ? cachedCounterTopPoint : cachedSternPostTopPoint;
-        Gizmos.DrawLine(transomBase, new Vector3(0, GetTopTimberYAtZ(cachedTransomTopPoint.z), cachedTransomTopPoint.z));
+        Vector3 transomTopPoint = new Vector3(0, GetTopTimberYAtZ(cachedTransomTopPoint.z), cachedTransomTopPoint.z);
+        Gizmos.DrawLine(transomBase, transomTopPoint);
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawSphere(cachedTransomTopPoint, 0.2f);
 
         // --- DRAW OUTER PROFILE THICKNESS ---
         if (drawOuterKeelProfile)
@@ -1528,17 +1528,29 @@ public class SheerPlan : MonoBehaviour
         if (upperDecks != null)
         {
             float totalLength = endZ - startZ;
+            float aftMostZ = GetAftMostZ();
+            float fwdMostZ = GetFwdMostZ();
+
             foreach (var deck in upperDecks)
             {
+                float deckOffset = GetAbsoluteDeckHeight(deck);
+                float bulwarkOffset = deckOffset + deck.bulwarkHeight;
+
+                // Draw Full Dashed Line for Deck spanning entire length
+                DrawDashedDeckCurve(deckOffset, new Color(0.85f, 0.85f, 0.85f, 0.8f), 80);
+
+                // Draw Full Dashed Line for Bulwark spanning entire length
+                DrawDashedDeckCurve(bulwarkOffset, new Color(0.7f, 0.7f, 0.7f, 0.8f), 80);
+
                 float aftZ = startZ + (deck.globalAftExtent * totalLength);
                 float foreZ = startZ + (deck.globalForeExtent * totalLength);
                 
                 // Clamp to physical hull bounds at this height
-                float aftDeckY = GetBaseDeckYAtZ(aftZ) + GetAbsoluteDeckHeight(deck);
+                float aftDeckY = GetBaseDeckYAtZ(aftZ) + deckOffset;
                 float aftLimit = GetSternProfileZAtY(aftDeckY);
                 if (aftZ < aftLimit) aftZ = aftLimit;
                 
-                float foreDeckY = GetBaseDeckYAtZ(foreZ) + GetAbsoluteDeckHeight(deck);
+                float foreDeckY = GetBaseDeckYAtZ(foreZ) + deckOffset;
                 float foreLimit = GetStemProfileZAtY(foreDeckY);
                 if (foreZ > foreLimit) foreZ = foreLimit;
                 
@@ -1550,8 +1562,7 @@ public class SheerPlan : MonoBehaviour
                 {
                     float t = i / 20f;
                     float z = Mathf.Lerp(aftZ, foreZ, t);
-                    // Accurately represent THIS specific deck's height
-                    Vector3 cDeck = new Vector3(0, GetBaseDeckYAtZ(z) + GetAbsoluteDeckHeight(deck), z);
+                    Vector3 cDeck = new Vector3(0, GetBaseDeckYAtZ(z) + deckOffset, z);
                     if (pDeck.HasValue) Gizmos.DrawLine(pDeck.Value, cDeck);
                     pDeck = cDeck;
                 }
@@ -1670,6 +1681,7 @@ public class SheerPlan : MonoBehaviour
             Handles.Label(cachedKeelSternPoint, "Keel Stern", labelStyle);
             Handles.Label(cachedStemTopPoint, "Stem Top", labelStyle);
             Handles.Label(cachedSternPostTopPoint, "Stern Post Top", labelStyle);
+            Handles.Label(cachedTransomTopPoint, "Transom Top", labelStyle);
             if (enableCounter) Handles.Label(cachedCounterTopPoint, "Counter Top", labelStyle);
             Handles.Label(cachedBaseDeckMidshipPoint, "Base Deck Midship", labelStyle);
             Handles.Label(cachedHobMidshipPoint, "HoB Midship", labelStyle);
@@ -1696,32 +1708,28 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetPureSheerYAtZ(float z)
     {
-        Vector3 stemEnd = new Vector3(0, cachedUpperStemTopPoint.y, cachedUpperStemTopPoint.z);
-        Vector3 transomEnd = new Vector3(0, cachedTransomTopPoint.y, cachedTransomTopPoint.z);
-
-        if (z >= 0)
+        if (upperDecks != null && upperDecks.Count > 0)
         {
-            if (z >= stemEnd.z)
-            {
-                float dz = stemEnd.z - cachedTopTimberMidCpFwd.z;
-                float dy = stemEnd.y - cachedTopTimberMidCpFwd.y;
-                if (Mathf.Abs(dz) < 0.001f) return stemEnd.y;
-                return stemEnd.y + (dy / dz) * (z - stemEnd.z);
-            }
-            float t = GetBezierTAtZ(cachedTopTimberMidshipPoint, cachedTopTimberMidCpFwd, cachedTopTimberBowCp, stemEnd, z, true);
-            return CalculateCubicBezierPoint(t, cachedTopTimberMidshipPoint, cachedTopTimberMidCpFwd, cachedTopTimberBowCp, stemEnd).y;
+            return GetBaseDeckYAtZ(z) + GetMaxDeckHeight();
         }
-        else
+        return GetBaseDeckYAtZ(z) + bulwarkHeight;
+    }
+
+    protected void DrawDashedDeckCurve(float heightOffset, Color color, int dashCount = 80)
+    {
+        float startZ = GetAftMostZ();
+        float endZ = GetFwdMostZ();
+        Gizmos.color = color;
+        Vector3 previousPoint = new Vector3(0, GetBaseDeckYAtZ(startZ) + heightOffset, startZ);
+        for (int i = 1; i <= dashCount; i++)
         {
-            if (z <= transomEnd.z)
+            float zCurr = Mathf.Lerp(startZ, endZ, i / (float)dashCount);
+            Vector3 currentPoint = new Vector3(0, GetBaseDeckYAtZ(zCurr) + heightOffset, zCurr);
+            if (i % 2 != 0)
             {
-                float dz = transomEnd.z - cachedTopTimberMidCpAft.z;
-                float dy = transomEnd.y - cachedTopTimberMidCpAft.y;
-                if (Mathf.Abs(dz) < 0.001f) return transomEnd.y;
-                return transomEnd.y + (dy / dz) * (z - transomEnd.z);
+                Gizmos.DrawLine(previousPoint, currentPoint);
             }
-            float t = GetBezierTAtZ(cachedTopTimberMidshipPoint, cachedTopTimberMidCpAft, cachedTopTimberSternCp, transomEnd, z, false);
-            return CalculateCubicBezierPoint(t, cachedTopTimberMidshipPoint, cachedTopTimberMidCpAft, cachedTopTimberSternCp, transomEnd).y;
+            previousPoint = currentPoint;
         }
     }
 

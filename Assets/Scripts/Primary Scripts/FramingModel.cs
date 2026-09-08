@@ -18,6 +18,7 @@ public class FramingModel : MonoBehaviour
     public bool showBackboneSideLines = true;
     public bool showMasterFrame = true;
     public bool showFrames = true;
+    public bool showFloorSweepsGuide = true;
 
     public Color starboardColor = Color.cyan;
     public Color portColor = Color.magenta;
@@ -110,8 +111,42 @@ public class FramingModel : MonoBehaviour
             curZ -= frameSpacing;
         }
 
+        // Upper Deck Boundary Frames (Add frame at fore/aft edge of any upper deck not at absolute ends)
+        if (sheerPlan.upperDecks != null)
+        {
+            float startZ = sheerPlan.cachedTopTimberSternIntersect.z;
+            float endZ = sheerPlan.cachedTopTimberBowIntersect.z;
+            float totalLength = endZ - startZ;
+
+            foreach (var deck in sheerPlan.upperDecks)
+            {
+                float deckAftZ = startZ + (deck.globalAftExtent * totalLength);
+                float deckForeZ = startZ + (deck.globalForeExtent * totalLength);
+
+                if (deck.globalAftExtent > 0.001f && deckAftZ > aftZ + 0.01f && deckAftZ < fwdZ - 0.01f)
+                {
+                    stations.Add(deckAftZ);
+                }
+                if (deck.globalForeExtent < 0.999f && deckForeZ < fwdZ - 0.01f && deckForeZ > aftZ + 0.01f)
+                {
+                    stations.Add(deckForeZ);
+                }
+            }
+        }
+
         stations.Sort();
-        return stations;
+
+        // Filter out near-duplicate stations (within 5mm)
+        List<float> uniqueStations = new List<float>();
+        foreach (float s in stations)
+        {
+            if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.005f)
+            {
+                uniqueStations.Add(s);
+            }
+        }
+
+        return uniqueStations;
     }
 
     private Vector3 OffsetX(Vector3 point, float xOffset)
@@ -153,6 +188,12 @@ public class FramingModel : MonoBehaviour
                 DrawFrameAtZ(z, c, isMaster);
             }
         }
+
+        // 3. FLOOR SWEEPS GUIDES (Yellow & Green 3D Ribbands)
+        if (showFloorSweepsGuide)
+        {
+            DrawFloorSweepsGuide();
+        }
     }
 
     private void DrawFrameAtZ(float z, Color color, bool isMaster = false)
@@ -165,52 +206,156 @@ public class FramingModel : MonoBehaviour
     private void DrawFrameHalfAtZ(float z, float side, Color color, bool isMaster = false)
     {
         float hw = GetKeelHalfWidth();
-        float yBot = GetFrameBottomYAtZ(z);
+        float keelY = GetFrameBottomYAtZ(z);
         float yTop = sheerPlan.GetPureSheerYAtZ(z);
-
-        // Bottom X: 0 if climbing stem above keel, otherwise keel half-width
-        float xBot = (z > sheerPlan.cachedKeelBowPoint.z) ? 0f : hw;
-
-        // HoB Line anchor (Division point between Lower and Upper Moulds)
-        float yHob = sheerPlan.GetHobYAtZ(z);
-        float xHob = breadthPlan.GetBreadthXAtZ(z);
+        float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+        float hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(z);
         float xTop = breadthPlan.GetTopTimberXAtZ(z);
 
-        // Master Frame reference dimensions at Z = 0
-        float masterLowerDx = bodyPlan.cachedL3.x - bodyPlan.cachedL0.x;
-        float masterLowerDy = bodyPlan.cachedL3.y - bodyPlan.cachedL0.y;
-        float masterUpperDx = bodyPlan.cachedU3.x - bodyPlan.cachedU0.x;
-        float masterUpperDy = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
+        // Bottom X: Always respect Keel half-width
+        float xBot = hw;
 
-        float localLowerDx = xHob - xBot;
-        float localLowerDy = yHob - yBot;
-        float localUpperDx = xTop - xHob;
-        float localUpperDy = yTop - yHob;
+        // Baseline keel height for deadrise taper & scaling (Natural Floor Rise)
+        float originalKeelY = keelY;
 
-        float sXLower = Mathf.Abs(masterLowerDx) > 0.001f ? localLowerDx / masterLowerDx : 0f;
-        float sYLower = Mathf.Abs(masterLowerDy) > 0.001f ? localLowerDy / masterLowerDy : 0f;
-        float sXUpper = Mathf.Abs(masterUpperDx) > 0.001f ? localUpperDx / masterUpperDx : 0f;
-        float sYUpper = Mathf.Abs(masterUpperDy) > 0.001f ? localUpperDy / masterUpperDy : 0f;
+        // 1. ANCHORS (pL0 & pL3)
+        Vector3 pL0 = new Vector3(side * xBot, keelY, z);
+        Vector3 pL3 = new Vector3(side * hobBreadth, hobY, z);
 
-        // LOWER MOULD SEGMENT 1 (Keel/Stem -> Rising Line Point)
-        Vector3 pL0 = new Vector3(side * xBot, yBot, z);
-        Vector3 pL3 = new Vector3(side * xHob, yHob, z);
+        // 2. DIAGONAL DEADRISE TAPER (pL1 & targetLR)
+        Vector3 masterL1 = bodyPlan.cachedL1;
+        Vector3 masterLR = bodyPlan.cachedLR;
 
-        Vector3 masterL1Offset = bodyPlan.cachedL1 - bodyPlan.cachedL0;
-        Vector3 masterL2Offset = bodyPlan.cachedL2 - bodyPlan.cachedL3;
+        float targetL1_X = hw;
+        float targetL1_Y = originalKeelY;
 
-        Vector3 pL1 = pL0 + new Vector3(side * masterL1Offset.x * sXLower, masterL1Offset.y * sYLower, 0);
-        Vector3 pL2 = pL3 + new Vector3(side * masterL2Offset.x * sXLower, masterL2Offset.y * sYLower, 0);
+        float targetLR_X = hw;
+        float targetLR_Y = originalKeelY;
 
-        Vector3 pLR = Vector3.Lerp(pL1, pL2, bodyPlan.risingLinePosition);
+        if (z >= 0)
+        {
+            float bowZ = sheerPlan.cachedBowRisingEnd.z;
+            if (bowZ > 0.001f)
+            {
+                float t = sheerPlan.GetRisingLineTAtZ(z);
+                Vector3 bowEnd = new Vector3(hw, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
 
-        // LOWER MOULD SEGMENTS DRAWING
+                // Swept curve for P1 (Keel Control Arm)
+                Vector3 p0_L1 = masterL1;
+                Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
+                Vector3 p2_L1 = bowEnd;
+                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
+                targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+
+                // Swept curve for LR (Rising Line Point)
+                Vector3 p0_LR = masterLR;
+                Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
+                Vector3 p2_LR = bowEnd;
+                targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
+                targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
+            }
+        }
+        else
+        {
+            float sternZ = sheerPlan.cachedSternRisingEnd.z;
+            if (sternZ < -0.001f)
+            {
+                Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
+
+                Vector3 p0_L1 = masterL1;
+                Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+                Vector3 p2_L1 = sternEnd;
+
+                Vector3 p0_LR = masterLR;
+                Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
+                Vector3 p2_LR = sternEnd;
+
+                if (z < sternZ)
+                {
+                    // Phantom projection past Stern Rising End
+                    float dzL1 = p2_L1.z - p1_L1.z;
+                    if (Mathf.Abs(dzL1) > 0.0001f)
+                    {
+                        float ratio = (z - p2_L1.z) / dzL1;
+                        targetL1_X = p2_L1.x;
+                        targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
+                    }
+                    else
+                    {
+                        targetL1_X = p2_L1.x;
+                        targetL1_Y = p2_L1.y;
+                    }
+
+                    float dzLR = p2_LR.z - p1_LR.z;
+                    if (Mathf.Abs(dzLR) > 0.0001f)
+                    {
+                        float ratio = (z - p2_LR.z) / dzLR;
+                        targetLR_X = p2_LR.x;
+                        targetLR_Y = p2_LR.y + (p2_LR.y - p1_LR.y) * ratio;
+                    }
+                    else
+                    {
+                        targetLR_X = p2_LR.x;
+                        targetLR_Y = p2_LR.y;
+                    }
+                }
+                else
+                {
+                    float t = sheerPlan.GetRisingLineTAtZ(z);
+                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
+                    targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+
+                    targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
+                    targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
+                }
+            }
+        }
+
+        targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
+        targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
+
+        Vector3 pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
+
+        // 3. HOB DOWNWARD ARM (pL2)
+        float currentBoxHeight = hobY - originalKeelY;
+        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
+        Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
+
+        // 4. RISING LINE POINT (pLR)
+        float dx = Mathf.Abs(pL2.x - pL1.x);
+        float lrPosRatio = bodyPlan.risingLinePosition;
+        if (dx > 0.0001f)
+        {
+            lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
+        }
+        Vector3 pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
+
+        // 5. PROPORTIONAL Y-SCALING (STEM CLIMB)
+        if (keelY > originalKeelY + 0.001f && hobY > originalKeelY + 0.001f)
+        {
+            float scaleY = (hobY - keelY) / (hobY - originalKeelY);
+
+            pL1.y = keelY + (pL1.y - originalKeelY) * scaleY;
+            pLR.y = keelY + (pLR.y - originalKeelY) * scaleY;
+            pL2.y = keelY + (pL2.y - originalKeelY) * scaleY;
+        }
+
+        // DRAW LOWER MOULD SEGMENTS
         DrawQuadraticBezierCurve(pL0, pL1, pLR, color, 15);
         DrawQuadraticBezierCurve(pLR, pL2, pL3, color, 15);
 
         // UPPER MOULD SEGMENT (HoB -> Top Line)
         Vector3 pU0 = pL3;
         Vector3 pU3 = new Vector3(side * xTop, yTop, z);
+
+        float masterUpperDx = bodyPlan.cachedU3.x - bodyPlan.cachedU0.x;
+        float masterUpperDy = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
+
+        float localUpperDx = xTop - hobBreadth;
+        float localUpperDy = yTop - hobY;
+
+        float sXUpper = Mathf.Abs(masterUpperDx) > 0.001f ? localUpperDx / masterUpperDx : 0f;
+        float sYUpper = Mathf.Abs(masterUpperDy) > 0.001f ? localUpperDy / masterUpperDy : 0f;
 
         Vector3 masterU1Offset = bodyPlan.cachedU1 - bodyPlan.cachedU0;
         Vector3 masterU2Offset = bodyPlan.cachedU2 - bodyPlan.cachedU3;
@@ -299,6 +444,49 @@ public class FramingModel : MonoBehaviour
         Gizmos.DrawSphere(upperStemTop, 0.12f);
         Gizmos.DrawSphere(sternPostTop, 0.12f);
         if (sheerPlan.enableCounter) Gizmos.DrawSphere(OffsetX(sheerPlan.cachedCounterTopPoint, xOffset), 0.12f);
+    }
+
+    private void DrawFloorSweepsGuide()
+    {
+        if (bodyPlan == null || sheerPlan == null) return;
+
+        float hw = GetKeelHalfWidth();
+        Vector3 masterL1 = bodyPlan.cachedL1;
+        Vector3 masterLR = bodyPlan.cachedLR;
+
+        Vector3 bowEnd = new Vector3(hw, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
+        Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
+
+        Vector3 bowP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
+        Vector3 sternP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+
+        Vector3 bowP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
+        Vector3 sternP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
+
+        // Starboard Keel Arm Ribband (Yellow)
+        DrawQuadraticBezierCurve(masterL1, sternP1, sternEnd, Color.yellow);
+        DrawQuadraticBezierCurve(masterL1, bowP1, bowEnd, Color.yellow);
+
+        // Starboard Rising Line Ribband (Green)
+        DrawQuadraticBezierCurve(masterLR, sternP1_LR, sternEnd, Color.green);
+        DrawQuadraticBezierCurve(masterLR, bowP1_LR, bowEnd, Color.green);
+
+        // Port Ribbands
+        Vector3 mMasterL1 = new Vector3(-masterL1.x, masterL1.y, masterL1.z);
+        Vector3 mBowP1 = new Vector3(-bowP1.x, bowP1.y, bowP1.z);
+        Vector3 mSternP1 = new Vector3(-sternP1.x, sternP1.y, sternP1.z);
+        Vector3 mBowEnd = new Vector3(-hw, bowEnd.y, bowEnd.z);
+        Vector3 mSternEnd = new Vector3(-hw, sternEnd.y, sternEnd.z);
+
+        Vector3 mMasterLR = new Vector3(-masterLR.x, masterLR.y, masterLR.z);
+        Vector3 mBowP1_LR = new Vector3(-bowP1_LR.x, bowP1_LR.y, bowP1_LR.z);
+        Vector3 mSternP1_LR = new Vector3(-sternP1_LR.x, sternP1_LR.y, sternP1_LR.z);
+
+        DrawQuadraticBezierCurve(mMasterL1, mSternP1, mSternEnd, Color.yellow);
+        DrawQuadraticBezierCurve(mMasterL1, mBowP1, mBowEnd, Color.yellow);
+
+        DrawQuadraticBezierCurve(mMasterLR, mSternP1_LR, mSternEnd, Color.green);
+        DrawQuadraticBezierCurve(mMasterLR, mBowP1_LR, mBowEnd, Color.green);
     }
 
     private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 20)
