@@ -10,6 +10,12 @@ public class SheerPlan : MonoBehaviour
     [Header("Gizmo Settings")]
     public bool showLabels = true;
     public bool showControlArms = true;
+    [Tooltip("Draw a grey dashed line extending aft from the Keel Stern Point to the furthest aft Z coordinate.")]
+    public bool showProjectedAftKeelLine = true;
+    [Tooltip("Draw a grey dashed curve continuing the Stern Rising Line curve extending aft to the furthest aft Z coordinate.")]
+    public bool showProjectedSternRisingLine = true;
+    [Tooltip("Draw a grey dashed horizontal line extending from the furthest forward to furthest aft Z coordinates.")]
+    public bool showProjectedTopLine = true;
 
     [Header("Basic Dimensions")]
     [Tooltip("The basic length of the model between the Stem Rake and the Stern Post Rake.")]
@@ -192,11 +198,16 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedKeelSternPoint;
     [HideInInspector] public Vector3 cachedKeelBowPoint;
     [HideInInspector] public Vector3 cachedMidshipKeel;
+    [HideInInspector] public Vector3 cachedProjectedAftKeelEnd;
+    [HideInInspector] public Vector3 cachedProjectedTopLineStart;
+    [HideInInspector] public Vector3 cachedProjectedTopLineEnd;
     
     [HideInInspector] public Vector3 cachedBowRisingEnd;
     [HideInInspector] public Vector3 cachedBowP1Ctrl;
     [HideInInspector] public Vector3 cachedSternRisingEnd;
     [HideInInspector] public Vector3 cachedSternP1Ctrl;
+    [HideInInspector] public Vector3 cachedProjectedSternRisingEnd;
+    [HideInInspector] public float cachedSternRisingLineEndT = 1f;
 
     [HideInInspector] public Vector3 cachedStemTopPoint;
     [HideInInspector] public Vector3 cachedSternPostTopPoint;
@@ -664,6 +675,33 @@ public class SheerPlan : MonoBehaviour
         
         float sternControlZ = Mathf.Lerp(0f, maxSternControlZ, sternRisingLineControl);
         cachedSternP1Ctrl = new Vector3(0, cachedMidshipKeel.y, sternControlZ);
+
+        float aftMostZ = GetAftMostZ();
+        cachedProjectedAftKeelEnd = new Vector3(0, cachedKeelSternPoint.y, aftMostZ);
+
+        // Projected Stern Rising Line (continue quadratic Bezier curve aft to aftMostZ)
+        float tAftRising = 1.0f;
+        if (cachedSternRisingEnd.z > aftMostZ + 0.001f)
+        {
+            float minT = 1.0f;
+            float maxT = 10.0f;
+            for (int i = 0; i < 20; i++)
+            {
+                float midT = (minT + maxT) / 2f;
+                float midZ = CalculateQuadraticBezierPoint(midT, cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd).z;
+                if (midZ > aftMostZ) minT = midT;
+                else maxT = midT;
+            }
+            tAftRising = (minT + maxT) / 2f;
+        }
+        cachedSternRisingLineEndT = tAftRising;
+        cachedProjectedSternRisingEnd = CalculateQuadraticBezierPoint(tAftRising, cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd);
+
+        // Projected Top Line (Follows the pure continuous Sheer Curve from absolute furthest aft Z to absolute furthest forward Z)
+        float aftZ = GetAftMostZ();
+        float fwdZ = GetFwdMostZ();
+        cachedProjectedTopLineStart = new Vector3(0, GetPureSheerYAtZ(aftZ), aftZ);
+        cachedProjectedTopLineEnd = new Vector3(0, GetPureSheerYAtZ(fwdZ), fwdZ);
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
@@ -714,12 +752,73 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetAftMostZ()
     {
-        float baseZ = cachedSternPostTopPoint.z;
+        float minZ = cachedSternPostTopPoint.z;
+        minZ = Mathf.Min(minZ, cachedKeelSternPoint.z);
         if (enableCounter)
         {
-            baseZ = Mathf.Min(baseZ, cachedCounterTopPoint.z);
+            minZ = Mathf.Min(minZ, cachedCounterBasePoint.z);
+            minZ = Mathf.Min(minZ, cachedCounterTopPoint.z);
+            minZ = Mathf.Min(minZ, cachedCounterCp1.z);
+            minZ = Mathf.Min(minZ, cachedCounterCp2.z);
         }
-        return Mathf.Min(baseZ, cachedTransomTopPoint.z);
+        minZ = Mathf.Min(minZ, cachedTransomTopPoint.z);
+        minZ = Mathf.Min(minZ, cachedProjectedSternRisingEnd.z);
+        return minZ;
+    }
+
+    public virtual float GetFwdMostZ()
+    {
+        float maxZ = cachedUpperStemTopPoint.z;
+        maxZ = Mathf.Max(maxZ, cachedKeelBowPoint.z);
+        maxZ = Mathf.Max(maxZ, cachedStemTopPoint.z);
+
+        for (int i = 0; i <= 20; i++)
+        {
+            float t = i / 20f;
+            Vector3 pt = CalculateCubicBezierPoint(t, cachedKeelBowPoint, cachedStemP1, cachedStemP2, cachedStemTopPoint);
+            maxZ = Mathf.Max(maxZ, pt.z);
+        }
+
+        maxZ = Mathf.Max(maxZ, cachedTopTimberBowIntersect.z);
+        return maxZ;
+    }
+
+    public virtual float GetMaxY()
+    {
+        float maxY = cachedUpperStemTopPoint.y;
+        maxY = Mathf.Max(maxY, cachedStemTopPoint.y);
+        maxY = Mathf.Max(maxY, cachedSternPostTopPoint.y);
+        if (enableCounter)
+        {
+            maxY = Mathf.Max(maxY, cachedCounterBasePoint.y);
+            maxY = Mathf.Max(maxY, cachedCounterTopPoint.y);
+            maxY = Mathf.Max(maxY, cachedCounterCp1.y);
+            maxY = Mathf.Max(maxY, cachedCounterCp2.y);
+        }
+        maxY = Mathf.Max(maxY, cachedTransomTopPoint.y);
+        maxY = Mathf.Max(maxY, cachedTopTimberBowIntersect.y);
+        maxY = Mathf.Max(maxY, cachedTopTimberSternIntersect.y);
+        maxY = Mathf.Max(maxY, cachedTopTimberMidshipPoint.y);
+
+        float aftZ = GetAftMostZ();
+        float fwdZ = cachedUpperStemTopPoint.z;
+        int samples = 30;
+        for (int i = 0; i <= samples; i++)
+        {
+            float z = Mathf.Lerp(aftZ, fwdZ, i / (float)samples);
+            maxY = Mathf.Max(maxY, GetTopTimberYAtZ(z));
+        }
+
+        if (upperDecks != null)
+        {
+            foreach (var deck in upperDecks)
+            {
+                float deckTopY = GetBaseDeckYAtZ(0) + GetAbsoluteDeckHeight(deck) + deck.bulwarkHeight;
+                maxY = Mathf.Max(maxY, deckTopY);
+            }
+        }
+
+        return maxY;
     }
 
 
@@ -1158,7 +1257,7 @@ public class SheerPlan : MonoBehaviour
         }
         else
         {
-            if (z <= cachedSternRisingEnd.z) return cachedSternRisingEnd.y;
+            if (z <= cachedProjectedSternRisingEnd.z) return cachedProjectedSternRisingEnd.y;
             float t = GetBezierTAtZ(cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
             return CalculateQuadraticBezierPoint(t, cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd).y;
         }
@@ -1265,6 +1364,23 @@ public class SheerPlan : MonoBehaviour
         {
             DrawQuadraticBezierCurve(cachedMidshipKeel, new Vector3(0, 0, cachedKeelBowPoint.z / 2f), cachedKeelBowPoint, Color.blue);
             DrawQuadraticBezierCurve(cachedMidshipKeel, new Vector3(0, 0, cachedKeelSternPoint.z / 2f), cachedKeelSternPoint, Color.blue);
+        }
+
+        // Projected Aft Keel Line
+        if (showProjectedAftKeelLine && cachedKeelSternPoint.z > cachedProjectedAftKeelEnd.z + 0.001f)
+        {
+            DrawDashedLine(cachedKeelSternPoint, cachedProjectedAftKeelEnd, Color.gray, 20);
+        }
+
+        // Projected Top Line (Curved Sheer Profile)
+        if (showProjectedTopLine)
+        {
+            float aftZ = GetAftMostZ();
+            float fwdZ = GetFwdMostZ();
+            DrawDashedTopLineCurve(aftZ, fwdZ, Color.gray, 80);
+            Gizmos.color = Color.gray;
+            Gizmos.DrawSphere(cachedProjectedTopLineStart, 0.2f);
+            Gizmos.DrawSphere(cachedProjectedTopLineEnd, 0.2f);
         }
 
         // Keel Points
@@ -1495,6 +1611,12 @@ public class SheerPlan : MonoBehaviour
         DrawQuadraticBezierCurve(cachedMidshipKeel, cachedBowP1Ctrl, cachedBowRisingEnd, new Color(1f, 0.5f, 0f, 1f));
         DrawQuadraticBezierCurve(cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd, new Color(0.6f, 0.2f, 0.8f, 1f));
 
+        // Projected Stern Rising Line
+        if (showProjectedSternRisingLine && cachedSternRisingLineEndT > 1.001f)
+        {
+            DrawDashedQuadraticBezierCurve(cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd, 1f, cachedSternRisingLineEndT, Color.gray, 20);
+        }
+
         // Beakhead Bulwark Control Points
         if (enableBeakheadBulwark && curveBeakheadBulwark)
         {
@@ -1553,8 +1675,78 @@ public class SheerPlan : MonoBehaviour
             Handles.Label(cachedHobMidshipPoint, "HoB Midship", labelStyle);
             Handles.Label(cachedBowRisingEnd, "Bow Rising Line End", labelStyle);
             Handles.Label(cachedSternRisingEnd, "Stern Rising Line End", labelStyle);
+            if (showProjectedAftKeelLine && cachedKeelSternPoint.z > cachedProjectedAftKeelEnd.z + 0.001f)
+            {
+                Vector3 labelPos = Vector3.Lerp(cachedKeelSternPoint, cachedProjectedAftKeelEnd, 0.5f);
+                Handles.Label(labelPos, "Projected Aft Keel Line", labelStyle);
+            }
+            if (showProjectedSternRisingLine && cachedSternRisingLineEndT > 1.001f)
+            {
+                Vector3 labelPos = CalculateQuadraticBezierPoint((1f + cachedSternRisingLineEndT) / 2f, cachedMidshipKeel, cachedSternP1Ctrl, cachedSternRisingEnd);
+                Handles.Label(labelPos, "Projected Stern Rising Line", labelStyle);
+            }
+            if (showProjectedTopLine)
+            {
+                Vector3 labelPos = new Vector3(0, GetPureSheerYAtZ(0), 0);
+                Handles.Label(labelPos, "Top Line", labelStyle);
+            }
         }
 #endif
+    }
+
+    public virtual float GetPureSheerYAtZ(float z)
+    {
+        float totalUpperOffset = bulwarkHeight;
+        if (upperDecks != null && upperDecks.Count > 0)
+        {
+            totalUpperOffset += GetMaxDeckHeight();
+        }
+        return GetBaseDeckYAtZ(z) + totalUpperOffset;
+    }
+
+    protected void DrawDashedTopLineCurve(float startZ, float endZ, Color color, int dashCount = 80)
+    {
+        Gizmos.color = color;
+        Vector3 previousPoint = new Vector3(0, GetPureSheerYAtZ(startZ), startZ);
+        for (int i = 1; i <= dashCount; i++)
+        {
+            float zCurr = Mathf.Lerp(startZ, endZ, i / (float)dashCount);
+            Vector3 currentPoint = new Vector3(0, GetPureSheerYAtZ(zCurr), zCurr);
+            if (i % 2 != 0)
+            {
+                Gizmos.DrawLine(previousPoint, currentPoint);
+            }
+            previousPoint = currentPoint;
+        }
+    }
+
+    protected void DrawDashedLine(Vector3 start, Vector3 end, Color color, int dashCount = 20)
+    {
+        Gizmos.color = color;
+        for (int i = 0; i < dashCount; i++)
+        {
+            if (i % 2 != 0) continue;
+            float t1 = (float)i / dashCount;
+            float t2 = (float)(i + 1) / dashCount;
+            Gizmos.DrawLine(Vector3.Lerp(start, end, t1), Vector3.Lerp(start, end, t2));
+        }
+    }
+
+    protected void DrawDashedQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, float tStart, float tEnd, Color color, int segments = 20)
+    {
+        Gizmos.color = color;
+        Vector3 previousPoint = CalculateQuadraticBezierPoint(tStart, p0, p1, p2);
+        for (int i = 1; i <= segments; i++)
+        {
+            float tPrev = Mathf.Lerp(tStart, tEnd, (i - 1) / (float)segments);
+            float tCurr = Mathf.Lerp(tStart, tEnd, i / (float)segments);
+            Vector3 currentPoint = CalculateQuadraticBezierPoint(tCurr, p0, p1, p2);
+            if (i % 2 != 0)
+            {
+                Gizmos.DrawLine(previousPoint, currentPoint);
+            }
+            previousPoint = currentPoint;
+        }
     }
 
     private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 20)

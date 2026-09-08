@@ -65,19 +65,7 @@ public class BreadthPlan : MonoBehaviour
     [Range(0f, 90f)] public float topTimberSternArmAngle = 0f;
     [Range(0f, 1f)] public float topTimberSternArmLength = 1f;
 
-    [Header("Cut Breadth Dimensions")]
-    [HideInInspector] public float cutMaxBeam = 4f; 
-    [HideInInspector] public float cutTransomWidth = 0.5f;
 
-    [Header("Cut Breadth Forward Controls")]
-    [Range(0f, 90f)] public float cutBowArmAngle = 0f;
-    [Range(0f, 1f)] public float cutBowArmLength = 1f;
-    [Range(0f, 1f)] public float cutMidshipFwdArmLength = 0.5f;
-
-    [Header("Cut Breadth Aft Controls")]
-    [Range(0f, 1f)] public float cutMidshipAftArmLength = 0.5f;
-    [Range(0f, 90f)] public float cutSternArmAngle = 0f;
-    [Range(0f, 1f)] public float cutSternArmLength = 1f;
 
     // --- CACHED POINTS FOR FAST ACCESS ---
     [HideInInspector] public Vector3 cachedFwdP0;
@@ -101,17 +89,7 @@ public class BreadthPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedTTAftP2;
     [HideInInspector] public Vector3 cachedTTAftP3;
     [HideInInspector] public bool cachedIsTTAftCubic;
-    
-    [HideInInspector] public Vector3 cachedCutFwdP0;
-    [HideInInspector] public Vector3 cachedCutFwdP1;
-    [HideInInspector] public Vector3 cachedCutFwdP2;
-    [HideInInspector] public Vector3 cachedCutFwdP3;
-    
-    [HideInInspector] public Vector3 cachedCutAftP0;
-    [HideInInspector] public Vector3 cachedCutAftP1;
-    [HideInInspector] public Vector3 cachedCutAftP2;
-    [HideInInspector] public Vector3 cachedCutAftP3;
-    [HideInInspector] public bool cachedIsCutAftCubic;
+
 
     private void OnValidate()
     {
@@ -267,127 +245,6 @@ public class BreadthPlan : MonoBehaviour
         cachedTTFwdP0 = ttFwdP0; cachedTTFwdP1 = ttFwdP1; cachedTTFwdP2 = ttFwdP2; cachedTTFwdP3 = ttFwdP3;
         cachedTTAftP0 = ttAftP0; cachedTTAftP1 = ttAftP1; cachedTTAftP2 = ttAftP2; cachedTTAftP3 = ttAftP3;
         cachedIsTTAftCubic = isTTAftCubic;
-
-        // DYNAMIC CUT BREADTH CURVE
-        float cutBowZ = sheerPlan.cachedUpperStemTopPoint.z;
-        float cutSternZ = sheerPlan.cachedTransomTopPoint.z;
-        float cutBaseY = sheerPlan.cachedTransomTopPoint.y;
-        float targetY = sheerPlan.cachedTransomTopPoint.y;
-
-        // Calculate dynamic cut width at Midship (Z = 0)
-        float midTheoreticalHobY = sheerPlan.GetTheoreticalHobYAtZ(0);
-        float midVirtualMaxY = sheerPlan.GetBaseDeckYAtZ(0);
-        if (sheerPlan.upperDecks != null && sheerPlan.upperDecks.Count > 0) midVirtualMaxY += sheerPlan.GetMaxDeckHeight() + sheerPlan.GetGlobalSheerOffsetAtZ(0);
-        else midVirtualMaxY = sheerPlan.GetTopTimberYAtZ(0);
-
-        float midScaleY = (bodyPlan.cachedU3.y - bodyPlan.cachedU0.y) > 0.01f ? (midVirtualMaxY - midTheoreticalHobY) / (bodyPlan.cachedU3.y - bodyPlan.cachedU0.y) : 0f;
-        float midScaleX = bodyPlan.cachedU0.x > 0.01f ? maxBeam / bodyPlan.cachedU0.x : 0f;
-
-        Vector3 midP0 = new Vector3(maxBeam, midTheoreticalHobY, 0);
-        Vector3 midP3 = new Vector3(topTimberMaxBeam, midVirtualMaxY, 0);
-        Vector3 midU1Vec = bodyPlan.cachedU1 - bodyPlan.cachedU0;
-        Vector3 midU2Vec = bodyPlan.cachedU2 - bodyPlan.cachedU3;
-        Vector3 midP1 = midP0 + new Vector3(midU1Vec.x * midScaleX, midU1Vec.y * midScaleY, 0);
-        Vector3 midP2 = midP3 + new Vector3(midU2Vec.x * midScaleX, midU2Vec.y * midScaleY, 0);
-
-        float mMinT = 0f; float mMaxT = 1f;
-        for (int i = 0; i < 20; i++) {
-            float midT = (mMinT + mMaxT) / 2f;
-            float py = CalculateCubicBezierPoint(midT, midP0, midP1, midP2, midP3).y;
-            if (py < targetY) mMinT = midT; else mMaxT = midT;
-        }
-        float absoluteCutMaxBeam = CalculateCubicBezierPoint((mMinT + mMaxT)/2f, midP0, midP1, midP2, midP3).x;
-        if (targetY >= midVirtualMaxY - 0.01f) absoluteCutMaxBeam = topTimberMaxBeam;
-        cutMaxBeam = absoluteCutMaxBeam;
-
-
-        // Calculate dynamic cut width at Stern (Z = cutSternZ)
-        float sternTheoreticalHobY = sheerPlan.GetTheoreticalHobYAtZ(cutSternZ);
-        float sternVirtualMaxY = sheerPlan.GetBaseDeckYAtZ(cutSternZ);
-        if (sheerPlan.upperDecks != null && sheerPlan.upperDecks.Count > 0) sternVirtualMaxY += sheerPlan.GetMaxDeckHeight() + sheerPlan.GetGlobalSheerOffsetAtZ(cutSternZ);
-        else sternVirtualMaxY = sheerPlan.GetTopTimberYAtZ(cutSternZ);
-
-        float sternTheoreticalBreadth = GetTheoreticalBreadthXAtZ(cutSternZ);
-        float sternTopTimberBreadth = GetTopTimberXAtZ(cutSternZ);
-
-        float sternScaleY = (bodyPlan.cachedU3.y - bodyPlan.cachedU0.y) > 0.01f ? (sternVirtualMaxY - sternTheoreticalHobY) / (bodyPlan.cachedU3.y - bodyPlan.cachedU0.y) : 0f;
-        float sternScaleX = bodyPlan.cachedU0.x > 0.01f ? sternTheoreticalBreadth / bodyPlan.cachedU0.x : 0f;
-
-        Vector3 sternP0 = new Vector3(sternTheoreticalBreadth, sternTheoreticalHobY, 0);
-        Vector3 sternP3 = new Vector3(sternTopTimberBreadth, sternVirtualMaxY, 0);
-        Vector3 sternP1 = sternP0 + new Vector3(midU1Vec.x * sternScaleX, midU1Vec.y * sternScaleY, 0);
-        Vector3 sternP2 = sternP3 + new Vector3(midU2Vec.x * sternScaleX, midU2Vec.y * sternScaleY, 0);
-
-        mMinT = 0f; mMaxT = 1f;
-        for (int i = 0; i < 20; i++) {
-            float midT = (mMinT + mMaxT) / 2f;
-            float py = CalculateCubicBezierPoint(midT, sternP0, sternP1, sternP2, sternP3).y;
-            if (py < targetY) mMinT = midT; else mMaxT = midT;
-        }
-        float absoluteCutTransomWidth = CalculateCubicBezierPoint((mMinT + mMaxT)/2f, sternP0, sternP1, sternP2, sternP3).x;
-        if (targetY >= sternVirtualMaxY - 0.01f) absoluteCutTransomWidth = sternTopTimberBreadth;
-        cutTransomWidth = absoluteCutMaxBeam > 0.01f ? absoluteCutTransomWidth / absoluteCutMaxBeam : 0f;
-
-
-        // GENERATE CUT FORWARD CURVE
-        Vector3 cutFwdP0 = new Vector3(hw, cutBaseY, cutBowZ);
-        Vector3 cutFwdP3 = new Vector3(cutMaxBeam, cutBaseY, midshipZ);
-        Vector3 cutFwdP2 = cutFwdP3 + new Vector3(0, 0, halfLength * cutMidshipFwdArmLength);
-
-        float cutMaxFwdAngle = Mathf.Atan2(cutFwdP2.z - cutBowZ, cutMaxBeam) * Mathf.Rad2Deg;
-        float cutFwdAngleRad = Mathf.Lerp(0, cutMaxFwdAngle, cutBowArmAngle / 90f) * Mathf.Deg2Rad;
-        float cutFwdDirX = Mathf.Cos(cutFwdAngleRad);
-        float cutFwdDirZ = Mathf.Sin(cutFwdAngleRad);
-
-        float cutFwdMaxDist;
-        if (Mathf.Abs(cutFwdDirZ) < 0.0001f) cutFwdMaxDist = cutMaxBeam;
-        else if (Mathf.Abs(cutFwdDirX) < 0.0001f) cutFwdMaxDist = Mathf.Abs(cutBowZ - cutFwdP2.z);
-        else
-        {
-            float fwdDistX = cutMaxBeam / Mathf.Abs(cutFwdDirX);
-            float fwdDistZ = Mathf.Abs(cutBowZ - cutFwdP2.z) / Mathf.Abs(cutFwdDirZ);
-            cutFwdMaxDist = Mathf.Min(fwdDistX, fwdDistZ);
-        }
-
-        Vector3 cutFwdP1 = cutFwdP0 + new Vector3(cutFwdDirX, 0, cutFwdDirZ) * (cutFwdMaxDist * cutBowArmLength);
-
-        // GENERATE CUT AFT CURVE
-        Vector3 cutAftP0 = cutFwdP3;
-        Vector3 cutAftP1 = cutAftP0 + new Vector3(0, 0, -halfLength * cutMidshipAftArmLength);
-
-        Vector3 cutAftP2 = Vector3.zero;
-        Vector3 cutAftP3 = Vector3.zero;
-        bool isCutAftCubic = cutTransomWidth <= 0.001f;
-
-        if (isCutAftCubic)
-        {
-            cutAftP3 = new Vector3(hw, cutBaseY, cutSternZ);
-
-            float cutMaxAftAngle = Mathf.Atan2(cutAftP1.z - cutSternZ, cutMaxBeam) * Mathf.Rad2Deg;
-            float cutAftAngleRad = Mathf.Lerp(0, cutMaxAftAngle, cutSternArmAngle / 90f) * Mathf.Deg2Rad;
-            float cutAftDirX = Mathf.Cos(cutAftAngleRad);
-            float cutAftDirZ = Mathf.Sin(cutAftAngleRad);
-
-            float cutAftMaxDist;
-            if (Mathf.Abs(cutAftDirZ) < 0.0001f) cutAftMaxDist = cutMaxBeam;
-            else if (Mathf.Abs(cutAftDirX) < 0.0001f) cutAftMaxDist = Mathf.Abs(cutAftP1.z - cutSternZ);
-            else
-            {
-                float aftDistX = cutMaxBeam / Mathf.Abs(cutAftDirX);
-                float aftDistZ = Mathf.Abs(cutAftP1.z - cutSternZ) / Mathf.Abs(cutAftDirZ);
-                cutAftMaxDist = Mathf.Min(aftDistX, aftDistZ);
-            }
-
-            cutAftP2 = cutAftP3 + new Vector3(cutAftDirX, 0, cutAftDirZ) * (cutAftMaxDist * cutSternArmLength);
-        }
-        else
-        {
-            cutAftP2 = new Vector3(cutMaxBeam * cutTransomWidth, cutBaseY, cutSternZ);
-        }
-
-        cachedCutFwdP0 = cutFwdP0; cachedCutFwdP1 = cutFwdP1; cachedCutFwdP2 = cutFwdP2; cachedCutFwdP3 = cutFwdP3;
-        cachedCutAftP0 = cutAftP0; cachedCutAftP1 = cutAftP1; cachedCutAftP2 = cutAftP2; cachedCutAftP3 = cutAftP3;
-        cachedIsCutAftCubic = isCutAftCubic;
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
@@ -468,30 +325,7 @@ public class BreadthPlan : MonoBehaviour
         }
     }
 
-    public float GetCutBreadthXAtZ(float z)
-    {
-        if (z >= 0)
-        {
-            if (z >= cachedCutFwdP0.z) return cachedCutFwdP0.x;
-            float t = GetBezierTAtZ(cachedCutFwdP0, cachedCutFwdP1, cachedCutFwdP2, cachedCutFwdP3, z, false);
-            return CalculateCubicBezierPoint(t, cachedCutFwdP0, cachedCutFwdP1, cachedCutFwdP2, cachedCutFwdP3).x;
-        }
-        else
-        {
-            if (cachedIsCutAftCubic)
-            {
-                if (z <= cachedCutAftP3.z) return cachedCutAftP3.x;
-                float t = GetBezierTAtZ(cachedCutAftP0, cachedCutAftP1, cachedCutAftP2, cachedCutAftP3, z, false);
-                return CalculateCubicBezierPoint(t, cachedCutAftP0, cachedCutAftP1, cachedCutAftP2, cachedCutAftP3).x;
-            }
-            else
-            {
-                if (z <= cachedCutAftP2.z) return cachedCutAftP2.x;
-                float t = GetBezierTAtZ(cachedCutAftP0, cachedCutAftP1, cachedCutAftP2, Vector3.zero, z, false);
-                return CalculateQuadraticBezierPoint(t, cachedCutAftP0, cachedCutAftP1, cachedCutAftP2).x;
-            }
-        }
-    }
+
 
     // --- UTILITIES ---
 
@@ -563,19 +397,6 @@ public class BreadthPlan : MonoBehaviour
         if (cachedIsTTAftCubic) DrawCubicBezierCurve(MirrorX(cachedTTAftP0), MirrorX(cachedTTAftP1), MirrorX(cachedTTAftP2), MirrorX(cachedTTAftP3), Color.magenta);
         else DrawQuadraticBezierCurve(MirrorX(cachedTTAftP0), MirrorX(cachedTTAftP1), MirrorX(cachedTTAftP2), Color.magenta);
 
-        // Draw Cut Breadth Starboard Curve (Orange)
-        Color orangeColor = new Color(1f, 0.5f, 0f);
-        Gizmos.color = orangeColor;
-        DrawCubicBezierCurve(cachedCutFwdP0, cachedCutFwdP1, cachedCutFwdP2, cachedCutFwdP3, orangeColor);
-        if (cachedIsCutAftCubic) DrawCubicBezierCurve(cachedCutAftP0, cachedCutAftP1, cachedCutAftP2, cachedCutAftP3, orangeColor);
-        else DrawQuadraticBezierCurve(cachedCutAftP0, cachedCutAftP1, cachedCutAftP2, orangeColor);
-
-        // Draw Cut Breadth Port Curve (Mirrored X) (Orange)
-        Gizmos.color = orangeColor;
-        DrawCubicBezierCurve(MirrorX(cachedCutFwdP0), MirrorX(cachedCutFwdP1), MirrorX(cachedCutFwdP2), MirrorX(cachedCutFwdP3), orangeColor);
-        if (cachedIsCutAftCubic) DrawCubicBezierCurve(MirrorX(cachedCutAftP0), MirrorX(cachedCutAftP1), MirrorX(cachedCutAftP2), MirrorX(cachedCutAftP3), orangeColor);
-        else DrawQuadraticBezierCurve(MirrorX(cachedCutAftP0), MirrorX(cachedCutAftP1), MirrorX(cachedCutAftP2), orangeColor);
-
         // Draw Control Arms (Starboard only)
         Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
         Gizmos.DrawLine(cachedFwdP0, cachedFwdP1);
@@ -584,13 +405,6 @@ public class BreadthPlan : MonoBehaviour
         Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
         Gizmos.DrawLine(cachedAftP0, cachedAftP1);
         if (cachedIsAftCubic) Gizmos.DrawLine(cachedAftP3, cachedAftP2);
-
-        // Draw Cut Control Arms (Starboard only)
-        Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
-        Gizmos.DrawLine(cachedCutFwdP0, cachedCutFwdP1);
-        Gizmos.DrawLine(cachedCutFwdP3, cachedCutFwdP2);
-        Gizmos.DrawLine(cachedCutAftP0, cachedCutAftP1);
-        if (cachedIsCutAftCubic) Gizmos.DrawLine(cachedCutAftP3, cachedCutAftP2);
 
         // Draw Transom Line
         if (!cachedIsAftCubic)
@@ -612,24 +426,12 @@ public class BreadthPlan : MonoBehaviour
             Gizmos.DrawSphere(MirrorX(cachedTTAftP2), 0.15f);
         }
 
-        // Draw Cut Breadth Transom Line
-        if (!cachedIsCutAftCubic)
-        {
-            Gizmos.color = Color.white;
-            Gizmos.DrawLine(cachedCutAftP2, MirrorX(cachedCutAftP2));
-            Gizmos.color = orangeColor;
-            Gizmos.DrawSphere(cachedCutAftP2, 0.15f);
-            Gizmos.DrawSphere(MirrorX(cachedCutAftP2), 0.15f);
-        }
-
         // Draw Transom Side Connections
         if (!cachedIsAftCubic && !cachedIsTTAftCubic)
         {
             Gizmos.color = Color.white;
-            Gizmos.DrawLine(cachedAftP2, cachedCutAftP2);
-            Gizmos.DrawLine(cachedCutAftP2, cachedTTAftP2);
-            Gizmos.DrawLine(MirrorX(cachedAftP2), MirrorX(cachedCutAftP2));
-            Gizmos.DrawLine(MirrorX(cachedCutAftP2), MirrorX(cachedTTAftP2));
+            Gizmos.DrawLine(cachedAftP2, cachedTTAftP2);
+            Gizmos.DrawLine(MirrorX(cachedAftP2), MirrorX(cachedTTAftP2));
         }
 
         // Draw Nodes (Starboard)
@@ -656,16 +458,6 @@ public class BreadthPlan : MonoBehaviour
         Gizmos.DrawSphere(cachedTTFwdP3, 0.15f);
         if (cachedIsTTAftCubic) Gizmos.DrawSphere(cachedTTAftP3, 0.15f);
 
-        // Draw Cut Breadth Nodes (Starboard)
-        Gizmos.color = orangeColor;
-        Gizmos.DrawSphere(cachedCutFwdP1, 0.1f);
-        Gizmos.DrawSphere(cachedCutFwdP2, 0.1f);
-        Gizmos.DrawSphere(cachedCutAftP1, 0.1f);
-        if (cachedIsCutAftCubic) Gizmos.DrawSphere(cachedCutAftP2, 0.1f);
-        Gizmos.DrawSphere(cachedCutFwdP0, 0.15f);
-        Gizmos.DrawSphere(cachedCutFwdP3, 0.15f);
-        if (cachedIsCutAftCubic) Gizmos.DrawSphere(cachedCutAftP3, 0.15f);
-
 #if UNITY_EDITOR
         if (showLabels)
         {
@@ -678,9 +470,6 @@ public class BreadthPlan : MonoBehaviour
             Handles.Label(cachedFwdP3, "Max Beam", labelStyle);
             if (cachedIsAftCubic) Handles.Label(cachedAftP3, "Stern Post (Breadth)", labelStyle);
             else Handles.Label(cachedAftP2, "Transom Edge", labelStyle);
-            
-            // Just for cut
-            if (!cachedIsCutAftCubic) Handles.Label(cachedCutAftP2, "Cut Transom Edge", labelStyle);
         }
 #endif
     }

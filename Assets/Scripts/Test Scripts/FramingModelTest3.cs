@@ -1221,14 +1221,14 @@ public class FramingModelTest3 : MonoBehaviour
                 else
                 {
                     // Complete fallback
-                    float x = breadthPlan.GetCutBreadthXAtZ(z);
+                    float x = breadthPlan.GetTopTimberXAtZ(z);
                     currStbd = new Vector3(x, localTtY, z);
                     currPort = new Vector3(-x, localTtY, z);
                 }
             }
             else
             {
-                float x = breadthPlan.GetCutBreadthXAtZ(z);
+                float x = breadthPlan.GetTopTimberXAtZ(z);
                 float y = sheerPlan.GetTopTimberYAtZ(z);
                 currStbd = new Vector3(x, y, z);
                 currPort = new Vector3(-x, y, z);
