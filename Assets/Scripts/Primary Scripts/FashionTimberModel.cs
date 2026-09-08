@@ -20,9 +20,6 @@ public class FashionTimberModel : MonoBehaviour
     [Tooltip("Show Upper Mould segment (HoB to Transom Top).")]
     public bool showUpperMould = true;
 
-    [Tooltip("Show transverse counter lines across the hull at Counter Base and Counter Top.")]
-    public bool showCounterTransverseLines = true;
-
     public Color fashionColor = Color.magenta;
     public Color lowerMouldColor = new Color(1f, 0.4f, 0.7f);
     public Color upperMouldColor = Color.magenta;
@@ -119,25 +116,6 @@ public class FashionTimberModel : MonoBehaviour
             {
                 DrawFashionTimberSegment(hobIntersect, transomTop, upperMouldColor);
             }
-        }
-
-        // 3. Transverse Counter Lines (if counter enabled)
-        if (showCounterTransverseLines && sheerPlan.enableCounter)
-        {
-            Gizmos.color = fashionColor;
-
-            Vector3 counterBase = sheerPlan.cachedCounterBasePoint;
-            Vector3 counterTop = sheerPlan.cachedCounterTopPoint;
-
-            float baseX = GetNaturalHullXAtYZ(counterBase.y, counterBase.z);
-            Vector3 baseStbd = new Vector3(baseX, counterBase.y, counterBase.z);
-            Vector3 basePort = new Vector3(-baseX, counterBase.y, counterBase.z);
-            Gizmos.DrawLine(baseStbd, basePort);
-
-            float topX = GetNaturalHullXAtYZ(counterTop.y, counterTop.z);
-            Vector3 topStbd = new Vector3(topX, counterTop.y, counterTop.z);
-            Vector3 topPort = new Vector3(-topX, counterTop.y, counterTop.z);
-            Gizmos.DrawLine(topStbd, topPort);
         }
     }
 

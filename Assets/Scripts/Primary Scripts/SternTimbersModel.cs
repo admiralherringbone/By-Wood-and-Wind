@@ -8,17 +8,12 @@ using UnityEditor;
 [ExecuteInEditMode]
 public class SternTimbersModel : MonoBehaviour
 {
-    [Tooltip("Reference to the ModularSheerPlan.")]
+    [Header("Component References")]
     public SheerPlan sheerPlan;
-
-    [Tooltip("Reference to the ModularBreadthPlan.")]
+    public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
-
-    [Tooltip("Reference to the ModularBodyPlan.")]
-    public BodyPlanTest bodyPlan;
-
-    [Tooltip("Reference to the FashionTimberModelTest3.")]
-    public FashionTimberModelTest3 fashionTimberModel;
+    public FramingModel framingModel;
+    public FashionTimberModel fashionTimberModel;
 
     [Header("Stern Timber Settings")]
     [Range(1, 20)]
@@ -29,30 +24,54 @@ public class SternTimbersModel : MonoBehaviour
     [Tooltip("Number of segment samples along each stern timber curve.")]
     public int resolution = 40;
 
-    [Header("Visualization")]
+    [Header("Visualization Settings")]
     public bool showSternTimbers = true;
     public bool showLabels = true;
     public Color timberColor = Color.yellow;
 
+    private void Awake()
+    {
+        FindReferences();
+    }
+
     private void OnValidate()
     {
+        FindReferences();
         sternTimberCount = Mathf.Max(1, sternTimberCount);
         resolution = Mathf.Max(10, resolution);
     }
 
-    private void OnDrawGizmos()
+    public void FindReferences()
     {
-        AutoCacheReferences();
-        if (sheerPlan == null || breadthPlan == null || bodyPlan == null || fashionTimberModel == null) return;
-        DrawSternTimbers();
+        if (sheerPlan == null) sheerPlan = GetComponentInParent<SheerPlan>();
+        if (sheerPlan == null) sheerPlan = FindFirstObjectByType<SheerPlan>();
+
+        if (bodyPlan == null) bodyPlan = GetComponentInParent<BodyPlan>();
+        if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
+
+        if (breadthPlan == null) breadthPlan = GetComponentInParent<BreadthPlan>();
+        if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
+
+        if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
+        if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
+
+        if (fashionTimberModel == null) fashionTimberModel = GetComponentInParent<FashionTimberModel>();
+        if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
     }
 
-    private void AutoCacheReferences()
+    private void OnDrawGizmos()
     {
-        if (sheerPlan == null) sheerPlan = Object.FindObjectOfType<SheerPlan>();
-        if (breadthPlan == null) breadthPlan = Object.FindObjectOfType<BreadthPlan>();
-        if (bodyPlan == null) bodyPlan = Object.FindObjectOfType<BodyPlanTest>();
-        if (fashionTimberModel == null) fashionTimberModel = Object.FindObjectOfType<FashionTimberModelTest3>();
+        FindReferences();
+        if (sheerPlan == null || bodyPlan == null || breadthPlan == null || fashionTimberModel == null) return;
+
+        sheerPlan.UpdateCachedValues();
+        bodyPlan.UpdateCachedCurves();
+        breadthPlan.UpdateCachedCurves();
+
+        if (showSternTimbers)
+        {
+            DrawSternTimbers();
+        }
     }
 
     public void DrawSternTimbers()
@@ -61,7 +80,9 @@ public class SternTimbersModel : MonoBehaviour
 
         Gizmos.color = timberColor;
 
-        Vector3 startPoint = sheerPlan.cachedHobSternIntersect;
+        Vector3 startPoint = (sheerPlan.enableCounter && sheerPlan.cachedCounterBasePoint.y < sheerPlan.cachedHobSternIntersect.y)
+            ? sheerPlan.cachedCounterBasePoint
+            : sheerPlan.cachedHobSternIntersect;
         Vector3 endPoint = sheerPlan.cachedTransomTopPoint;
 
         int count = Mathf.Max(1, sternTimberCount);
@@ -69,10 +90,10 @@ public class SternTimbersModel : MonoBehaviour
 
         for (int k = 1; k <= count; k++)
         {
-            float ratio = (float)k / count;
+            float ratio = (float)k / (count + 1);
 
-            Vector3 prevStbd = Vector3.zero;
-            Vector3 prevPort = Vector3.zero;
+            Vector3? prevStbd = null;
+            Vector3? prevPort = null;
 
             for (int i = 0; i <= samples; i++)
             {
@@ -86,10 +107,10 @@ public class SternTimbersModel : MonoBehaviour
                 Vector3 currStbd = new Vector3(timberX, exactY, currZ);
                 Vector3 currPort = new Vector3(-timberX, exactY, currZ);
 
-                if (i > 0)
+                if (prevStbd.HasValue && prevPort.HasValue)
                 {
-                    Gizmos.DrawLine(prevStbd, currStbd);
-                    Gizmos.DrawLine(prevPort, currPort);
+                    Gizmos.DrawLine(prevStbd.Value, currStbd);
+                    Gizmos.DrawLine(prevPort.Value, currPort);
                 }
 
                 prevStbd = currStbd;
@@ -118,18 +139,20 @@ public class SternTimbersModel : MonoBehaviour
         }
     }
 
-    public List<Vector3> GetSternTimberPoints(int timberIndex, bool isStbd, int samplesOverride = 0)
+    public List<Vector3> GetSternTimbersPoints(int timberIndex, bool isStbd, int samplesOverride = 0)
     {
         List<Vector3> pts = new List<Vector3>();
-        AutoCacheReferences();
+        FindReferences();
         if (sheerPlan == null || fashionTimberModel == null) return pts;
 
-        Vector3 startPoint = sheerPlan.cachedHobSternIntersect;
+        Vector3 startPoint = (sheerPlan.enableCounter && sheerPlan.cachedCounterBasePoint.y < sheerPlan.cachedHobSternIntersect.y)
+            ? sheerPlan.cachedCounterBasePoint
+            : sheerPlan.cachedHobSternIntersect;
         Vector3 endPoint = sheerPlan.cachedTransomTopPoint;
 
         int samples = samplesOverride > 0 ? samplesOverride : Mathf.Max(10, resolution);
         int count = Mathf.Max(1, sternTimberCount);
-        float ratio = Mathf.Clamp01((float)timberIndex / count);
+        float ratio = Mathf.Clamp01((float)timberIndex / (count + 1));
 
         for (int i = 0; i <= samples; i++)
         {
