@@ -18,7 +18,6 @@ public class FramingModel : MonoBehaviour
     public bool showBackboneSideLines = true;
     public bool showMasterFrame = true;
     public bool showFrames = true;
-    public bool showFloorSweepsGuide = true;
 
     public Color starboardColor = Color.cyan;
     public Color portColor = Color.magenta;
@@ -188,12 +187,6 @@ public class FramingModel : MonoBehaviour
                 DrawFrameAtZ(z, c, isMaster);
             }
         }
-
-        // 3. FLOOR SWEEPS GUIDES (Yellow & Green 3D Ribbands)
-        if (showFloorSweepsGuide)
-        {
-            DrawFloorSweepsGuide();
-        }
     }
 
     private void DrawFrameAtZ(float z, Color color, bool isMaster = false)
@@ -345,14 +338,26 @@ public class FramingModel : MonoBehaviour
         DrawQuadraticBezierCurve(pLR, pL2, pL3, color, 15);
 
         // UPPER MOULD SEGMENT (HoB -> Top Line)
+        float maxSheerYAtZ = sheerPlan.GetBaseDeckYAtZ(z);
+        if (sheerPlan.upperDecks != null && sheerPlan.upperDecks.Count > 0)
+        {
+            maxSheerYAtZ += sheerPlan.GetMaxDeckHeight() + sheerPlan.GetGlobalSheerOffsetAtZ(z);
+        }
+        else
+        {
+            maxSheerYAtZ = sheerPlan.GetTopTimberYAtZ(z);
+        }
+
+        float localTopY = sheerPlan.GetTopTimberYAtZ(z);
+
         Vector3 pU0 = pL3;
-        Vector3 pU3 = new Vector3(side * xTop, yTop, z);
+        Vector3 pU3 = new Vector3(side * xTop, maxSheerYAtZ, z);
 
         float masterUpperDx = bodyPlan.cachedU3.x - bodyPlan.cachedU0.x;
         float masterUpperDy = bodyPlan.cachedU3.y - bodyPlan.cachedU0.y;
 
         float localUpperDx = xTop - hobBreadth;
-        float localUpperDy = yTop - hobY;
+        float localUpperDy = maxSheerYAtZ - hobY;
 
         float sXUpper = Mathf.Abs(masterUpperDx) > 0.001f ? localUpperDx / masterUpperDx : 0f;
         float sYUpper = Mathf.Abs(masterUpperDy) > 0.001f ? localUpperDy / masterUpperDy : 0f;
@@ -363,7 +368,23 @@ public class FramingModel : MonoBehaviour
         Vector3 pU1 = pU0 + new Vector3(side * masterU1Offset.x * sXUpper, masterU1Offset.y * sYUpper, 0);
         Vector3 pU2 = pU3 + new Vector3(side * masterU2Offset.x * sXUpper, masterU2Offset.y * sYUpper, 0);
 
-        DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15);
+        // CLIPPING LOGIC: Stop drawing when crossing local top height (deck / bulwark top)
+        float upperTopCutoffT = 1f;
+        if (maxSheerYAtZ > localTopY + 0.001f)
+        {
+            float minT = 0f;
+            float maxT = 1f;
+            for (int i = 0; i < 10; i++)
+            {
+                float midT = (minT + maxT) * 0.5f;
+                float py = CalculateCubicBezierPoint(midT, pU0, pU1, pU2, pU3).y;
+                if (py < localTopY) minT = midT;
+                else maxT = midT;
+            }
+            upperTopCutoffT = (minT + maxT) * 0.5f;
+        }
+
+        DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperTopCutoffT);
 
         // Gizmo Node Spheres for Master Frame
         if (isMaster)
@@ -372,7 +393,8 @@ public class FramingModel : MonoBehaviour
             Gizmos.DrawSphere(pL0, 0.12f);
             Gizmos.DrawSphere(pLR, 0.12f);
             Gizmos.DrawSphere(pL3, 0.12f);
-            Gizmos.DrawSphere(pU3, 0.12f);
+            Vector3 topSpherePt = CalculateCubicBezierPoint(upperTopCutoffT, pU0, pU1, pU2, pU3);
+            Gizmos.DrawSphere(topSpherePt, 0.12f);
         }
     }
 
@@ -446,49 +468,6 @@ public class FramingModel : MonoBehaviour
         if (sheerPlan.enableCounter) Gizmos.DrawSphere(OffsetX(sheerPlan.cachedCounterTopPoint, xOffset), 0.12f);
     }
 
-    private void DrawFloorSweepsGuide()
-    {
-        if (bodyPlan == null || sheerPlan == null) return;
-
-        float hw = GetKeelHalfWidth();
-        Vector3 masterL1 = bodyPlan.cachedL1;
-        Vector3 masterLR = bodyPlan.cachedLR;
-
-        Vector3 bowEnd = new Vector3(hw, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
-        Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
-
-        Vector3 bowP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
-        Vector3 sternP1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
-
-        Vector3 bowP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
-        Vector3 sternP1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
-
-        // Starboard Keel Arm Ribband (Yellow)
-        DrawQuadraticBezierCurve(masterL1, sternP1, sternEnd, Color.yellow);
-        DrawQuadraticBezierCurve(masterL1, bowP1, bowEnd, Color.yellow);
-
-        // Starboard Rising Line Ribband (Green)
-        DrawQuadraticBezierCurve(masterLR, sternP1_LR, sternEnd, Color.green);
-        DrawQuadraticBezierCurve(masterLR, bowP1_LR, bowEnd, Color.green);
-
-        // Port Ribbands
-        Vector3 mMasterL1 = new Vector3(-masterL1.x, masterL1.y, masterL1.z);
-        Vector3 mBowP1 = new Vector3(-bowP1.x, bowP1.y, bowP1.z);
-        Vector3 mSternP1 = new Vector3(-sternP1.x, sternP1.y, sternP1.z);
-        Vector3 mBowEnd = new Vector3(-hw, bowEnd.y, bowEnd.z);
-        Vector3 mSternEnd = new Vector3(-hw, sternEnd.y, sternEnd.z);
-
-        Vector3 mMasterLR = new Vector3(-masterLR.x, masterLR.y, masterLR.z);
-        Vector3 mBowP1_LR = new Vector3(-bowP1_LR.x, bowP1_LR.y, bowP1_LR.z);
-        Vector3 mSternP1_LR = new Vector3(-sternP1_LR.x, sternP1_LR.y, sternP1_LR.z);
-
-        DrawQuadraticBezierCurve(mMasterL1, mSternP1, mSternEnd, Color.yellow);
-        DrawQuadraticBezierCurve(mMasterL1, mBowP1, mBowEnd, Color.yellow);
-
-        DrawQuadraticBezierCurve(mMasterLR, mSternP1_LR, mSternEnd, Color.green);
-        DrawQuadraticBezierCurve(mMasterLR, mBowP1_LR, mBowEnd, Color.green);
-    }
-
     private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 20)
     {
         Gizmos.color = color;
@@ -502,13 +481,13 @@ public class FramingModel : MonoBehaviour
         }
     }
 
-    private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 20)
+    private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 20, float maxT = 1f)
     {
         Gizmos.color = color;
         Vector3 previousPoint = p0;
         for (int i = 1; i <= segments; i++)
         {
-            float t = i / (float)segments;
+            float t = (i / (float)segments) * maxT;
             Vector3 currentPoint = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;

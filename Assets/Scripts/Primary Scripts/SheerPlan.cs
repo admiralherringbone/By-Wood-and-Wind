@@ -984,7 +984,7 @@ public class SheerPlan : MonoBehaviour
 
         foreach (var deck in upperDecks)
         {
-            if (currentPercent >= deck.globalAftExtent && currentPercent <= deck.globalForeExtent)
+            if (currentPercent >= deck.globalAftExtent - 0.0001f && currentPercent <= deck.globalForeExtent + 0.0001f)
             {
                 float absH = GetAbsoluteDeckHeight(deck);
                 if (absH > maxAbsHeight)
