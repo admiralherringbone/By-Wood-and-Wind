@@ -195,7 +195,9 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
-  frameSpacing: 0.8
+  fashionTimberModel: {fileID: 900456903}
+  frameSpacing: 0.505
+  cutFramesAtFashionTimber: 1
   showLabels: 1
   showBackboneSideLines: 1
   showMasterFrame: 1
@@ -727,10 +729,10 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   breadthPlan: {fileID: 1109839672}
   showLabels: 1
-  keelArmAngle: 0
-  keelArmLength: 0.465
-  hobLowerArmLength: 0.5
-  risingLinePosition: 0.5
+  keelArmAngle: 72.5
+  keelArmLength: 0.26
+  hobLowerArmLength: 0.372
+  risingLinePosition: 0.424
   flareTumblehomePercentage: 0.8
   upperHobArmAngle: 0
   upperHobArmLength: 0.5
@@ -746,9 +748,9 @@ MonoBehaviour:
   innerKeelPosition: 0.5
   middleControlPosition: 0.5
   cachedL0: {x: 0.125, y: 0, z: 0}
-  cachedL1: {x: 1.461875, y: 0, z: 0}
-  cachedLR: {x: 2.2309375, y: 0.75, z: 0}
-  cachedL2: {x: 3, y: 1.5, z: 0}
+  cachedL1: {x: 0.37093306, y: 0.78, z: 0}
+  cachedLR: {x: 1.4856575, y: 1.248096, z: 0}
+  cachedL2: {x: 3, y: 1.884, z: 0}
   cachedL3: {x: 3, y: 3, z: 0}
   cachedU0: {x: 3, y: 3, z: 0}
   cachedU1: {x: 3, y: 4.5, z: 0}
@@ -832,6 +834,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e4e83e19b24146539789d37fb7c4bec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FashionTimberModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  showFashionTimbers: 1
+  showLowerMould: 1
+  showUpperMould: 1
+  fashionColor: {r: 1, g: 0, b: 1, a: 1}
+  lowerMouldColor: {r: 1, g: 0.4, b: 0.7, a: 1}
+  upperMouldColor: {r: 1, g: 0, b: 1, a: 1}
 --- !u!4 &900456904
 Transform:
   m_ObjectHideFlags: 0
@@ -842,6 +854,60 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 9.74904, y: -0, z: -20.20852}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &964694954
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 964694956}
+  - component: {fileID: 964694955}
+  m_Layer: 0
+  m_Name: SternTimbersModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &964694955
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 964694954}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a717306b581f457cadf280ba36078ed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SternTimbersModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  sternTimberCount: 3
+  resolution: 40
+  showSternTimbers: 1
+  showLabels: 1
+  timberColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+--- !u!4 &964694956
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 964694954}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -916,7 +982,7 @@ MonoBehaviour:
   cachedFwdP3: {x: 3, y: 3, z: 0}
   cachedAftP0: {x: 3, y: 3, z: 0}
   cachedAftP1: {x: 3, y: 3, z: -5}
-  cachedAftP2: {x: 1.8000001, y: 3, z: -10.200333}
+  cachedAftP2: {x: 1.8000001, y: 3, z: -10.156578}
   cachedAftP3: {x: 0, y: 0, z: 0}
   cachedIsAftCubic: 0
   cachedTTFwdP0: {x: 0.125, y: 6, z: 10}
@@ -925,7 +991,7 @@ MonoBehaviour:
   cachedTTFwdP3: {x: 2.4, y: 6, z: 0}
   cachedTTAftP0: {x: 2.4, y: 6, z: 0}
   cachedTTAftP1: {x: 2.4, y: 6, z: -5}
-  cachedTTAftP2: {x: 1.0944, y: 6, z: -11.313911}
+  cachedTTAftP2: {x: 1.0944, y: 6, z: -11.333021}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
 --- !u!43 &1250226744
@@ -1106,6 +1172,63 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &1459276880
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1459276882}
+  - component: {fileID: 1459276881}
+  m_Layer: 0
+  m_Name: TransomTimbersModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1459276881
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1459276880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 754c1a2012d554797a9c0a7fff59e216, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TransomTimbers
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  sternTimbersModel: {fileID: 964694955}
+  framingModelRibbands: {fileID: 2023851844}
+  showTransomTimbers: 1
+  showProfileTransomTimbers: 1
+  showRibbandTransomTimbers: 1
+  showLabels: 1
+  profileTransomColor: {r: 1, g: 0.8, b: 0.2, a: 1}
+  ribbandTransomColor: {r: 0.2, g: 0.9, b: 0.9, a: 1}
+--- !u!4 &1459276882
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1459276880}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1471959869
 GameObject:
   m_ObjectHideFlags: 0
@@ -1225,7 +1348,7 @@ MonoBehaviour:
   deadwoodTopControlZ: 1
   deadwoodTopControlY: 0.16
   enableCounter: 1
-  counterVerticalSlide: -0.18
+  counterVerticalSlide: -0.15
   counterLength: 1
   counterHeightRatio: 0.157
   counterCurveAngle: 0.214
@@ -1262,50 +1385,50 @@ MonoBehaviour:
   hobSternHeight: 3.5
   hobDropAft: 0
   hobCurveControlLength: 0.5
-  bowRisingLineEndPos: 0.7
-  bowRisingLineControl: 0.5
-  sternRisingLineEndPos: 1
+  bowRisingLineEndPos: 0.533
+  bowRisingLineControl: 0.675
+  sternRisingLineEndPos: 0.911
   sternRisingLineControl: 0.5
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
-  cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.376513}
-  cachedProjectedTopLineStart: {x: 0, y: 8.140011, z: -11.376513}
-  cachedProjectedTopLineEnd: {x: 0, y: 8, z: 10}
-  cachedBowRisingEnd: {x: 0, y: 2.4500005, z: 9.827471}
-  cachedBowP1Ctrl: {x: 0, y: -0, z: 4.5146646}
-  cachedSternRisingEnd: {x: 0, y: 2.84869, z: -9.813911}
+  cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.333021}
+  cachedProjectedTopLineStart: {x: 0, y: 6.6415157, z: -11.333021}
+  cachedProjectedTopLineEnd: {x: 0, y: 6.5, z: 10}
+  cachedBowRisingEnd: {x: 0, y: 1.8654983, z: 9.582247}
+  cachedBowP1Ctrl: {x: 0, y: -0, z: 5.816296}
+  cachedSternRisingEnd: {x: 0, y: 2.6560888, z: -9.7588825}
   cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
-  cachedProjectedSternRisingEnd: {x: 0, y: 3.7373793, z: -11.376513}
-  cachedSternRisingLineEndT: 1.1454101
+  cachedProjectedSternRisingEnd: {x: 0, y: 3.5009542, z: -11.332987}
+  cachedSternRisingLineEndT: 1.1480794
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
-  cachedSternPostTopPoint: {x: 0, y: 2.84869, z: -9.813911}
-  cachedCounterBasePoint: {x: 0, y: 2.84869, z: -9.813911}
-  cachedCounterTopPoint: {x: 0, y: 3.8691902, z: -10.813911}
-  cachedCounterCp1: {x: 0, y: 3.3756611, z: -9.994343}
-  cachedCounterCp2: {x: 0, y: 3.6850605, z: -10.297526}
+  cachedSternPostTopPoint: {x: 0, y: 2.915575, z: -9.833021}
+  cachedCounterBasePoint: {x: 0, y: 2.915575, z: -9.833021}
+  cachedCounterTopPoint: {x: 0, y: 3.9360752, z: -10.833021}
+  cachedCounterCp1: {x: 0, y: 3.4425461, z: -10.013453}
+  cachedCounterCp2: {x: 0, y: 3.7519455, z: -10.316636}
   cachedDeadwoodForePoint: {x: 0, y: 0, z: -7.7400002}
-  cachedDeadwoodAftPoint: {x: 0, y: 1.0255284, z: -9.293008}
+  cachedDeadwoodAftPoint: {x: 0, y: 1.049607, z: -9.299888}
   cachedDeadwoodP1: {x: 0, y: 0, z: -8.7858}
-  cachedDeadwoodP2: {x: 0, y: 0.16408454, z: -9.046882}
-  cachedBaseDeckSternIntersect: {x: 0, y: 3.5, z: -10.200333}
-  cachedBaseDeckSternCp: {x: 0, y: 3.5, z: -10.200333}
+  cachedDeadwoodP2: {x: 0, y: 0.16793713, z: -9.047982}
+  cachedBaseDeckSternIntersect: {x: 0, y: 3.5, z: -10.156578}
+  cachedBaseDeckSternCp: {x: 0, y: 3.5, z: -10.156578}
   cachedBaseDeckMidCpAft: {x: 0, y: 3, z: -6}
   cachedBaseDeckMidshipPoint: {x: 0, y: 3, z: 0}
   cachedBaseDeckMidCpFwd: {x: 0, y: 3, z: 6}
   cachedBaseDeckBowCp: {x: 0, y: 3.5, z: 10}
   cachedBaseDeckBowIntersect: {x: 0, y: 3.5, z: 10}
   cachedUpperStemTopPoint: {x: 0, y: 5, z: 10}
-  cachedTransomTopPoint: {x: 0, y: 6.5, z: -11.313911}
-  cachedTopTimberSternIntersect: {x: 0, y: 5, z: -11.313911}
-  cachedTopTimberSternCp: {x: 0, y: 5, z: -11.313911}
+  cachedTransomTopPoint: {x: 0, y: 6.5, z: -11.333021}
+  cachedTopTimberSternIntersect: {x: 0, y: 5, z: -11.333021}
+  cachedTopTimberSternCp: {x: 0, y: 5, z: -11.333021}
   cachedTopTimberMidCpAft: {x: 0, y: 4.5, z: -6}
   cachedTopTimberMidshipPoint: {x: 0, y: 4.5, z: 0}
   cachedTopTimberMidCpFwd: {x: 0, y: 4.5, z: 6}
   cachedTopTimberBowCp: {x: 0, y: 5, z: 10}
   cachedTopTimberBowIntersect: {x: 0, y: 5, z: 10}
-  cachedHobSternIntersect: {x: 0, y: 3.5, z: -10.200333}
-  cachedHobSternCp: {x: 0, y: 3.5, z: -10.200333}
+  cachedHobSternIntersect: {x: 0, y: 3.5, z: -10.156578}
+  cachedHobSternCp: {x: 0, y: 3.5, z: -10.156578}
   cachedHobMidCpAft: {x: 0, y: 3, z: -6}
   cachedHobMidshipPoint: {x: 0, y: 3, z: 0}
   cachedHobMidCpFwd: {x: 0, y: 3, z: 6}
@@ -1313,6 +1436,69 @@ MonoBehaviour:
   cachedHobBowIntersect: {x: 0, y: 3.5, z: 10}
   cachedStemP1: {x: 0, y: 0, z: 8.5}
   cachedStemP2: {x: 0, y: 1.75, z: 10}
+--- !u!1 &2023851843
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2023851845}
+  - component: {fileID: 2023851844}
+  m_Layer: 0
+  m_Name: FramingModelRibbands
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2023851844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023851843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 585207885960748b7bc66637054870b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FramingModelRibbands
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  showFloorSweepsGuide: 1
+  cutRibbandsAtFashionTimber: 1
+  showLowerDeckLines: 1
+  lowerDeckColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
+  showPrimaryDeckLine: 1
+  primaryDeckColor: {r: 0.020617366, g: 0, b: 1, a: 1}
+  showUpperDeckLines: 1
+  upperDeckColor: {r: 0.2, g: 0.6, b: 1, a: 1}
+  showTopTimberLine: 1
+  topTimberColor: {r: 0, g: 0.028357267, b: 1, a: 1}
+  showPlankingRibbands: 1
+  lowerPlankingCount: 6
+  upperPlankingCount: 6
+  plankingColor: {r: 0.8, g: 0.5, b: 0.2, a: 1}
+--- !u!4 &2023851845
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023851843}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1330,3 +1516,6 @@ SceneRoots:
   - {fileID: 395568341}
   - {fileID: 441537250}
   - {fileID: 303860433}
+  - {fileID: 2023851845}
+  - {fileID: 964694956}
+  - {fileID: 1459276882}

@@ -16,6 +16,7 @@ public class TransomTimbers : MonoBehaviour
     public FramingModel framingModel;
     public FashionTimberModel fashionTimberModel;
     public SternTimbersModel sternTimbersModel;
+    public FramingModelRibbands framingModelRibbands;
 
     [Header("Transom Timber Settings")]
     [Tooltip("Show transverse transom timbers at the stern.")]
@@ -73,6 +74,9 @@ public class TransomTimbers : MonoBehaviour
 
         if (sternTimbersModel == null) sternTimbersModel = GetComponentInParent<SternTimbersModel>();
         if (sternTimbersModel == null) sternTimbersModel = FindFirstObjectByType<SternTimbersModel>();
+
+        if (framingModelRibbands == null) framingModelRibbands = GetComponentInParent<FramingModelRibbands>();
+        if (framingModelRibbands == null) framingModelRibbands = FindFirstObjectByType<FramingModelRibbands>();
     }
 
     private void OnDrawGizmos()
@@ -225,6 +229,7 @@ public class TransomTimbers : MonoBehaviour
         {
             AddRibbandTransomLine(lines, z => sheerPlan.GetBaseDeckYAtZ(z) + hOffset + sheerPlan.GetGlobalSheerOffsetAtZ(z), $"Bulwark Ribband Transom {bulwarkIndex++}");
         }
+
 
         return lines;
     }

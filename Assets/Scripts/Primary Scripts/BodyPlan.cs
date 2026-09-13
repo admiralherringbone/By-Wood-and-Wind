@@ -139,6 +139,9 @@ public class BodyPlan : MonoBehaviour
         // This guarantees G1 tangent continuity at the join between the two quadratic segments
         cachedLR = Vector3.Lerp(cachedL1, cachedL2, risingLinePosition);
 
+        // Re-update SheerPlan cached values now that cachedLR is finalized
+        sheerPlan.UpdateCachedValues();
+
         // UPPER MOULD
         // Find the absolute highest part of the hull for the master Upper Mould
         float topTimberY = sheerPlan.cachedBaseDeckMidshipPoint.y;

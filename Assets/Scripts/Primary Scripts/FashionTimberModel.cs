@@ -319,13 +319,37 @@ public class FashionTimberModel : MonoBehaviour
             }
             Vector3 pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
 
-            if (keelY > originalKeelY + 0.001f && hobY > originalKeelY + 0.001f)
+            float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
+            float profileY = keelY;
+
+            if (sheerPlan != null)
             {
-                float scaleY = (hobY - keelY) / (hobY - originalKeelY);
-                pL1.y = keelY + (pL1.y - originalKeelY) * scaleY;
-                pLR.y = keelY + (pLR.y - originalKeelY) * scaleY;
-                pL2.y = keelY + (pL2.y - originalKeelY) * scaleY;
+                if (originalZ > sheerPlan.cachedKeelBowPoint.z)
+                {
+                    profileY = sheerPlan.GetStemProfileYAtZ(originalZ);
+                }
+                else if (originalZ <= sternRisingZ + 0.001f && sternRisingZ < -0.001f)
+                {
+                    profileY = targetLR_Y;
+                }
             }
+
+            Vector3 pPseudo = new Vector3(side * xBot, profileY, originalZ);
+
+            bool isBehindSternRisingEnd = (originalZ <= sternRisingZ + 0.001f && sternRisingZ < -0.001f);
+            if (profileY >= targetLR_Y - 0.001f || isBehindSternRisingEnd)
+            {
+                pL1 = pPseudo;
+                pLR = pPseudo;
+                pL2.y = Mathf.Max(pL2.y, profileY);
+            }
+            else
+            {
+                pL1.y = Mathf.Clamp(pL1.y, profileY, pLR.y);
+                pL2.y = Mathf.Max(pL2.y, pLR.y);
+            }
+
+            pL0 = pPseudo;
 
             float minT = 0f;
             float maxT = 1f;
