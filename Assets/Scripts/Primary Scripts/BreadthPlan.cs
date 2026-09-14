@@ -65,6 +65,19 @@ public class BreadthPlan : MonoBehaviour
     [Range(0f, 90f)] public float topTimberSternArmAngle = 0f;
     [Range(0f, 1f)] public float topTimberSternArmLength = 1f;
 
+    [Header("Floor Line Controls")]
+    [Tooltip("Show the Floor Line curves in Scene view gizmos.")]
+    public bool showFloorLine = true;
+
+    [Tooltip("Color of the Floor Line curves.")]
+    public Color floorLineColor = new Color(1f, 0.85f, 0.2f, 0.9f);
+
+    [Tooltip("Control arm bias for the forward Floor Line quadratic curve (0 = straight/narrow, 1 = full width/curve).")]
+    [Range(0f, 1f)] public float floorBowControl = 0.5f;
+
+    [Tooltip("Control arm bias for the aft Floor Line quadratic curve (0 = straight/narrow, 1 = full width/curve).")]
+    [Range(0f, 1f)] public float floorSternControl = 0.5f;
+
 
 
     // --- CACHED POINTS FOR FAST ACCESS ---
@@ -89,6 +102,12 @@ public class BreadthPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedTTAftP2;
     [HideInInspector] public Vector3 cachedTTAftP3;
     [HideInInspector] public bool cachedIsTTAftCubic;
+
+    [HideInInspector] public Vector3 cachedFloorBowPoint;
+    [HideInInspector] public Vector3 cachedFloorBowCp;
+    [HideInInspector] public Vector3 cachedFloorMidshipPoint;
+    [HideInInspector] public Vector3 cachedFloorSternCp;
+    [HideInInspector] public Vector3 cachedFloorSternPoint;
 
 
     private void OnValidate()
@@ -245,6 +264,28 @@ public class BreadthPlan : MonoBehaviour
         cachedTTFwdP0 = ttFwdP0; cachedTTFwdP1 = ttFwdP1; cachedTTFwdP2 = ttFwdP2; cachedTTFwdP3 = ttFwdP3;
         cachedTTAftP0 = ttAftP0; cachedTTAftP1 = ttAftP1; cachedTTAftP2 = ttAftP2; cachedTTAftP3 = ttAftP3;
         cachedIsTTAftCubic = isTTAftCubic;
+
+        // FLOOR LINE (QUADRATIC BEZIERS FOR BOW AND AFT CURVES - FLAT 2D PLANE AT KEEL CONTROL Y)
+        float floorBowZ = sheerPlan.cachedBowRisingEnd.z;
+        float floorSternZ = sheerPlan.cachedSternRisingEnd.z;
+        float floorMaxBeam = (bodyPlan != null) ? bodyPlan.cachedL1.x : (maxBeam * 0.5f);
+        float floorBaseY = (bodyPlan != null) ? bodyPlan.cachedL1.y : sheerPlan.GetKeelYAtZ(0f);
+
+        Vector3 floorBowPoint = new Vector3(hw, floorBaseY, floorBowZ);
+        Vector3 floorMidshipPoint = new Vector3(floorMaxBeam, floorBaseY, midshipZ);
+        Vector3 floorSternPoint = new Vector3(hw, floorBaseY, floorSternZ);
+
+        float floorBowControlZ = Mathf.Lerp(midshipZ, floorBowZ, floorBowControl);
+        Vector3 floorBowCp = new Vector3(floorMaxBeam, floorBaseY, floorBowControlZ);
+
+        float floorSternControlZ = Mathf.Lerp(midshipZ, floorSternZ, floorSternControl);
+        Vector3 floorSternCp = new Vector3(floorMaxBeam, floorBaseY, floorSternControlZ);
+
+        cachedFloorBowPoint = floorBowPoint;
+        cachedFloorBowCp = floorBowCp;
+        cachedFloorMidshipPoint = floorMidshipPoint;
+        cachedFloorSternCp = floorSternCp;
+        cachedFloorSternPoint = floorSternPoint;
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
@@ -322,6 +363,22 @@ public class BreadthPlan : MonoBehaviour
                 float t = GetBezierTAtZ(cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, Vector3.zero, z, false);
                 return CalculateQuadraticBezierPoint(t, cachedTTAftP0, cachedTTAftP1, cachedTTAftP2).x;
             }
+        }
+    }
+
+    public float GetFloorLineXAtZ(float z)
+    {
+        if (z >= 0)
+        {
+            if (z >= cachedFloorBowPoint.z) return cachedFloorBowPoint.x;
+            float t = GetBezierTAtZ(cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint, Vector3.zero, z, false);
+            return CalculateQuadraticBezierPoint(t, cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint).x;
+        }
+        else
+        {
+            if (z <= cachedFloorSternPoint.z) return cachedFloorSternPoint.x;
+            float t = GetBezierTAtZ(cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint, Vector3.zero, z, false);
+            return CalculateQuadraticBezierPoint(t, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint).x;
         }
     }
 
@@ -458,6 +515,30 @@ public class BreadthPlan : MonoBehaviour
         Gizmos.DrawSphere(cachedTTFwdP3, 0.15f);
         if (cachedIsTTAftCubic) Gizmos.DrawSphere(cachedTTAftP3, 0.15f);
 
+        // Draw Floor Line Curves (Starboard & Port Mirrored)
+        if (showFloorLine)
+        {
+            Gizmos.color = floorLineColor;
+            DrawQuadraticBezierCurve(cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint, floorLineColor);
+            DrawQuadraticBezierCurve(cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint, floorLineColor);
+
+            DrawQuadraticBezierCurve(MirrorX(cachedFloorBowPoint), MirrorX(cachedFloorBowCp), MirrorX(cachedFloorMidshipPoint), floorLineColor);
+            DrawQuadraticBezierCurve(MirrorX(cachedFloorMidshipPoint), MirrorX(cachedFloorSternCp), MirrorX(cachedFloorSternPoint), floorLineColor);
+
+            Gizmos.color = new Color(floorLineColor.r, floorLineColor.g, floorLineColor.b, 0.4f);
+            Gizmos.DrawLine(cachedFloorMidshipPoint, cachedFloorBowCp);
+            Gizmos.DrawLine(cachedFloorBowCp, cachedFloorBowPoint);
+            Gizmos.DrawLine(cachedFloorMidshipPoint, cachedFloorSternCp);
+            Gizmos.DrawLine(cachedFloorSternCp, cachedFloorSternPoint);
+
+            Gizmos.color = floorLineColor;
+            Gizmos.DrawSphere(cachedFloorBowPoint, 0.12f);
+            Gizmos.DrawSphere(cachedFloorBowCp, 0.08f);
+            Gizmos.DrawSphere(cachedFloorMidshipPoint, 0.12f);
+            Gizmos.DrawSphere(cachedFloorSternCp, 0.08f);
+            Gizmos.DrawSphere(cachedFloorSternPoint, 0.12f);
+        }
+
 #if UNITY_EDITOR
         if (showLabels)
         {
@@ -470,6 +551,18 @@ public class BreadthPlan : MonoBehaviour
             Handles.Label(cachedFwdP3, "Max Beam", labelStyle);
             if (cachedIsAftCubic) Handles.Label(cachedAftP3, "Stern Post (Breadth)", labelStyle);
             else Handles.Label(cachedAftP2, "Transom Edge", labelStyle);
+
+            if (showFloorLine)
+            {
+                GUIStyle floorLabelStyle = new GUIStyle();
+                floorLabelStyle.normal.textColor = floorLineColor;
+                floorLabelStyle.alignment = TextAnchor.LowerCenter;
+                floorLabelStyle.contentOffset = new Vector2(0, -10);
+
+                Handles.Label(cachedFloorBowPoint, "Floor Line Bow End", floorLabelStyle);
+                Handles.Label(cachedFloorMidshipPoint, "Floor Line Midship", floorLabelStyle);
+                Handles.Label(cachedFloorSternPoint, "Floor Line Stern End", floorLabelStyle);
+            }
         }
 #endif
     }

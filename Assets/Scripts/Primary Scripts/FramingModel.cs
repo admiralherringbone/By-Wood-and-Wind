@@ -47,7 +47,7 @@ public class FramingModel : MonoBehaviour
     public bool showAngledFrameLabels = true;
 
     [Header("Control Point Visualization Settings")]
-    [Tooltip("Show key control points (Keel Point, Rising Line Point, HOB Point) on each frame.")]
+    [Tooltip("Show key control points (Keel Point, Connection Point, HOB Point) on each frame.")]
     public bool showFrameControlPoints = true;
 
     [Tooltip("Show red marking points on forward frames along the Projected Bow Rising Line.")]
@@ -65,8 +65,15 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Color of the Pseudo Keel Point (pPseudo) climbing the stem line or stern post / deadwood line.")]
     public Color pseudoKeelPointColor = Color.gray;
 
-    [Tooltip("Color of the Rising Line Point (pLR) on the floor sweep.")]
-    public Color risingLinePointColor = Color.green;
+    [Tooltip("Color of the Connection Point (pLR) on the floor sweep.")]
+    public Color connectionPointColor = Color.green;
+
+    [System.Obsolete("Use connectionPointColor instead.")]
+    public Color risingLinePointColor
+    {
+        get => connectionPointColor;
+        set => connectionPointColor = value;
+    }
 
     [Tooltip("Color of the marking point on forward frames for the Projected Bow Rising Line.")]
     public Color projectedRisingMarkColor = Color.red;
@@ -90,10 +97,22 @@ public class FramingModel : MonoBehaviour
     public bool showMasterFrame = true;
     public bool showFrames = true;
 
+    [Tooltip("Overlay a grey projection guide line tracing the Rising Line points (pLR) across all frames.")]
+    public bool showRisingLineGuide = true;
+
+    [Tooltip("Overlay a guide line tracing the Keel Control Arm points (pL1) across all frames.")]
+    public bool showKeelControlGuide = true;
+
     public Color starboardColor = Color.cyan;
     public Color portColor = Color.magenta;
     public Color masterFrameColor = Color.yellow;
     public Color frameColor = new Color(0.2f, 0.8f, 1f, 0.7f);
+
+    [Tooltip("Color of the grey projection guide line tracing the Rising Line points (pLR).")]
+    public Color risingLineGuideColor = Color.gray;
+
+    [Tooltip("Color of the guide line tracing the Keel Control Arm points (pL1).")]
+    public Color keelControlGuideColor = new Color(1f, 0.8f, 0.2f, 0.9f);
 
     private List<List<Vector3>> cachedAngledFrameLines = new List<List<Vector3>>();
     private bool isAngledFrameCacheDirty = true;
@@ -370,9 +389,17 @@ public class FramingModel : MonoBehaviour
         float hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(z);
 
         profileY = keelY;
-        if (z > sheerPlan.cachedKeelBowPoint.z)
+        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
+        if (sheerPlan != null)
         {
-            profileY = sheerPlan.GetStemProfileYAtZ(z);
+            if (z > sheerPlan.cachedKeelBowPoint.z)
+            {
+                profileY = sheerPlan.GetStemProfileYAtZ(z);
+            }
+            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sternRisingZ - 0.001f)
+            {
+                profileY = sheerPlan.GetDeadwoodYAtZ(z);
+            }
         }
 
         projY = sheerPlan.GetProjectedBowRisingYAtZ(z);
@@ -380,7 +407,7 @@ public class FramingModel : MonoBehaviour
         Vector3 masterL1 = bodyPlan.cachedL1;
         Vector3 masterLR = bodyPlan.cachedLR;
 
-        float targetL1_X = hw;
+        float targetL1_X = breadthPlan.GetFloorLineXAtZ(z);
         float targetL1_Y = originalKeelY;
         float targetLR_X = hw;
         float targetLR_Y = originalKeelY;
@@ -396,38 +423,68 @@ public class FramingModel : MonoBehaviour
                 Vector3 p0_L1 = masterL1;
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                 Vector3 p2_L1 = bowEnd;
-                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                 targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+            }
+        }
+        else
+        {
+            float sternZ = sheerPlan.cachedSternRisingEnd.z;
+            if (sternZ < -0.001f)
+            {
+                Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
 
-                Vector3 p0_LR = masterLR;
-                Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedBowP1Ctrl.z);
-                Vector3 p2_LR = bowEnd;
-                targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
-                targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
+                Vector3 p0_L1 = masterL1;
+                Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
+                Vector3 p2_L1 = sternEnd;
+
+                if (z < sternZ)
+                {
+                    float dzL1 = p2_L1.z - p1_L1.z;
+                    if (Mathf.Abs(dzL1) > 0.0001f)
+                    {
+                        float ratio = (z - p2_L1.z) / dzL1;
+                        targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
+                    }
+                    else
+                    {
+                        targetL1_Y = p2_L1.y;
+                    }
+                }
+                else
+                {
+                    float t = sheerPlan.GetRisingLineTAtZ(z);
+                    targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
+                }
             }
         }
 
-        targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
-        targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
+        float effectiveBottomY = profileY;
+        targetL1_Y = Mathf.Max(targetL1_Y, effectiveBottomY);
+        targetLR_Y = Mathf.Max(targetLR_Y, effectiveBottomY);
 
         pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
-        float currentBoxHeight = hobY - originalKeelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
-        float dx = Mathf.Abs(pL2.x - pL1.x);
-        float lrPosRatio = bodyPlan.risingLinePosition;
-        if (dx > 0.0001f) lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
-        pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
+        pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(z));
 
-        Vector3 pPseudo = new Vector3(side * hw, profileY, z);
-        if (profileY >= targetLR_Y - 0.001f)
+        if (z < sternRisingZ - 0.001f)
         {
-            pL1 = pPseudo;
-            pLR = pPseudo;
-            pL2.y = Mathf.Max(pL2.y, profileY);
+            pL0_curve = pL1;
         }
-        pL0_curve = pPseudo;
+        else
+        {
+            Vector3 backboneKeelPoint = new Vector3(side * hw, profileY, z);
+            if (profileY >= pLR.y - 0.001f)
+            {
+                pL1 = backboneKeelPoint;
+                pLR = backboneKeelPoint;
+                pL2.y = Mathf.Max(pL2.y, profileY);
+            }
+            pL0_curve = backboneKeelPoint;
+        }
+
         pL3 = new Vector3(side * hobBreadth, hobY, z);
         return true;
     }
@@ -450,45 +507,75 @@ public class FramingModel : MonoBehaviour
         if (numSegments < 1) return points;
 
         float hw = GetKeelHalfWidth();
-        Vector3 startMark = new Vector3(side * hw, projY, z);
-        float dVert = Mathf.Max(0f, profileY - projY);
+        float bowRisingZ = (sheerPlan != null) ? sheerPlan.cachedBowRisingEnd.z : 0f;
 
+        // 1. STEM PROFILE SEGMENT (from Bow End of Rising Line up to frame station z)
+        const int stemSamples = 50;
+        float dStem = 0f;
+        float[] stemCumDistances = new float[stemSamples + 1];
+        Vector3[] sampledStemPts = new Vector3[stemSamples + 1];
+
+        if (z > bowRisingZ + 0.0001f && sheerPlan != null)
+        {
+            Vector3 prevStemPt = new Vector3(side * hw, sheerPlan.cachedBowRisingEnd.y, bowRisingZ);
+            sampledStemPts[0] = prevStemPt;
+            stemCumDistances[0] = 0f;
+
+            for (int i = 1; i <= stemSamples; i++)
+            {
+                float sampleZ = Mathf.Lerp(bowRisingZ, z, (float)i / stemSamples);
+                float sampleY = sheerPlan.GetStemProfileYAtZ(sampleZ);
+                Vector3 currStemPt = new Vector3(side * hw, sampleY, sampleZ);
+                sampledStemPts[i] = currStemPt;
+
+                float dist = Vector3.Distance(prevStemPt, currStemPt);
+                dStem += dist;
+                stemCumDistances[i] = dStem;
+                prevStemPt = currStemPt;
+            }
+        }
+        else
+        {
+            Vector3 startPt = new Vector3(side * hw, profileY, z);
+            sampledStemPts[0] = startPt;
+            stemCumDistances[0] = 0f;
+        }
+
+        // 2. FRAME MOULD CURVE SEGMENT (at station z, from Stem profile u=0.25 to HOB u=0.50)
         Vector3 GetCurvePt(float uVal)
         {
-            uVal = Mathf.Clamp(uVal, 0f, 0.5f);
-            if (uVal <= 0.25f)
-            {
-                float t = uVal * 4f;
-                return CalculateQuadraticBezierPoint(t, pL0_curve, pL1, pLR);
-            }
-            else
-            {
-                float t = (uVal - 0.25f) * 4f;
-                return CalculateQuadraticBezierPoint(t, pLR, pL2, pL3);
-            }
+            uVal = Mathf.Clamp(uVal, 0.25f, 0.5f);
+            float t = (uVal - 0.25f) * 4f;
+            return CalculateQuadraticBezierPoint(t, pLR, pL2, pL3);
         }
 
-        // Sample lower mould curve from u=0 to u=0.5 (pL3 / HOB)
-        const int samples = 100;
-        float dCurve = 0f;
-        float[] cumDistances = new float[samples + 1];
-        cumDistances[0] = 0f;
+        const int frameSamples = 50;
+        float dFrame = 0f;
+        float[] frameCumDistances = new float[frameSamples + 1];
+        Vector3[] sampledFramePts = new Vector3[frameSamples + 1];
 
-        Vector3 prevPt = GetCurvePt(0f);
-        for (int i = 1; i <= samples; i++)
+        Vector3 prevFramePt = GetCurvePt(0.25f);
+        sampledFramePts[0] = prevFramePt;
+        frameCumDistances[0] = 0f;
+
+        for (int i = 1; i <= frameSamples; i++)
         {
-            float u = 0.5f * (float)i / samples;
-            Vector3 currPt = GetCurvePt(u);
-            float dist = Vector3.Distance(prevPt, currPt);
-            dCurve += dist;
-            cumDistances[i] = dCurve;
-            prevPt = currPt;
+            float u = Mathf.Lerp(0.25f, 0.5f, (float)i / frameSamples);
+            Vector3 currFramePt = GetCurvePt(u);
+            sampledFramePts[i] = currFramePt;
+
+            float dist = Vector3.Distance(prevFramePt, currFramePt);
+            dFrame += dist;
+            frameCumDistances[i] = dFrame;
+            prevFramePt = currFramePt;
         }
 
-        float totalDist = dVert + dCurve;
+        // 3. COMBINED PATH ARC LENGTH
+        float totalDist = dStem + dFrame;
         if (totalDist <= 0.0001f)
         {
-            points.Add(startMark);
+            Vector3 pStart = sampledStemPts[0];
+            for (int k = 0; k <= numSegments; k++) points.Add(pStart);
             return points;
         }
 
@@ -496,32 +583,39 @@ public class FramingModel : MonoBehaviour
         for (int k = 0; k <= numSegments; k++)
         {
             float targetDist = k * stepDist;
-            if (targetDist <= dVert)
+
+            if (targetDist <= dStem && dStem > 0.0001f)
             {
-                // Point lies on the vertical keel/stem axis
-                points.Add(new Vector3(side * hw, projY + targetDist, z));
-            }
-            else
-            {
-                // Point lies on the actual lower mould frame curve
-                float targetCurveDist = targetDist - dVert;
+                // Point lies on the Stem profile segment
                 int low = 0;
-                int high = samples;
+                int high = stemSamples;
                 while (low < high - 1)
                 {
                     int mid = (low + high) / 2;
-                    if (cumDistances[mid] <= targetCurveDist) low = mid;
+                    if (stemCumDistances[mid] <= targetDist) low = mid;
                     else high = mid;
                 }
 
-                float segLen = cumDistances[high] - cumDistances[low];
-                float fraction = (segLen > 0.00001f) ? (targetCurveDist - cumDistances[low]) / segLen : 0f;
-                float tLow = (float)low / samples;
-                float tHigh = (float)high / samples;
-                float lerpVal = Mathf.Lerp(tLow, tHigh, fraction);
-                float u = 0.5f * lerpVal;
+                float segLen = stemCumDistances[high] - stemCumDistances[low];
+                float fraction = (segLen > 0.00001f) ? (targetDist - stemCumDistances[low]) / segLen : 0f;
+                points.Add(Vector3.Lerp(sampledStemPts[low], sampledStemPts[high], fraction));
+            }
+            else
+            {
+                // Point lies on the frame mould curve segment at station z
+                float targetFrameDist = targetDist - dStem;
+                int low = 0;
+                int high = frameSamples;
+                while (low < high - 1)
+                {
+                    int mid = (low + high) / 2;
+                    if (frameCumDistances[mid] <= targetFrameDist) low = mid;
+                    else high = mid;
+                }
 
-                points.Add(GetCurvePt(u));
+                float segLen = frameCumDistances[high] - frameCumDistances[low];
+                float fraction = (segLen > 0.00001f) ? (targetFrameDist - frameCumDistances[low]) / segLen : 0f;
+                points.Add(Vector3.Lerp(sampledFramePts[low], sampledFramePts[high], fraction));
             }
         }
 
@@ -544,25 +638,25 @@ public class FramingModel : MonoBehaviour
 
         float originalKeelY = keelY;
         float profileY = keelY;
+        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
         if (sheerPlan != null)
         {
             if (z > sheerPlan.cachedKeelBowPoint.z)
             {
                 profileY = sheerPlan.GetStemProfileYAtZ(z);
             }
-            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedSternPostTopPoint.z)
+            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sternRisingZ - 0.001f)
             {
                 profileY = sheerPlan.GetDeadwoodYAtZ(z);
             }
         }
 
-        pL0 = new Vector3(side * hw, profileY, z);
         pL3 = new Vector3(side * hobBreadth, hobY, z);
 
         Vector3 masterL1 = bodyPlan.cachedL1;
         Vector3 masterLR = bodyPlan.cachedLR;
 
-        float targetL1_X = hw;
+        float targetL1_X = breadthPlan.GetFloorLineXAtZ(z);
         float targetL1_Y = originalKeelY;
         float targetLR_X = hw;
         float targetLR_Y = originalKeelY;
@@ -578,7 +672,6 @@ public class FramingModel : MonoBehaviour
                 Vector3 p0_L1 = masterL1;
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                 Vector3 p2_L1 = bowEnd;
-                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                 targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                 Vector3 p0_LR = masterLR;
@@ -599,66 +692,55 @@ public class FramingModel : MonoBehaviour
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedSternP1Ctrl.z);
                 Vector3 p2_L1 = sternEnd;
 
-                Vector3 p0_LR = masterLR;
-                Vector3 p1_LR = new Vector3(masterLR.x, masterLR.y, sheerPlan.cachedSternP1Ctrl.z);
-                Vector3 p2_LR = sternEnd;
-
                 if (z < sternZ)
                 {
                     float dzL1 = p2_L1.z - p1_L1.z;
                     if (Mathf.Abs(dzL1) > 0.0001f)
                     {
                         float ratio = (z - p2_L1.z) / dzL1;
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
                     }
                     else
                     {
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y;
-                    }
-
-                    float dzLR = p2_LR.z - p1_LR.z;
-                    if (Mathf.Abs(dzLR) > 0.0001f)
-                    {
-                        float ratio = (z - p2_LR.z) / dzLR;
-                        targetLR_X = p2_LR.x;
-                        targetLR_Y = p2_LR.y + (p2_LR.y - p1_LR.y) * ratio;
-                    }
-                    else
-                    {
-                        targetLR_X = p2_LR.x;
-                        targetLR_Y = p2_LR.y;
                     }
                 }
                 else
                 {
                     float t = sheerPlan.GetRisingLineTAtZ(z);
-                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                     targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
-
-                    targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
-                    targetLR_Y = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
                 }
             }
         }
 
-        targetL1_Y = Mathf.Max(targetL1_Y, profileY);
-        targetLR_Y = Mathf.Max(targetLR_Y, profileY);
+        float effectiveBottomY = profileY;
+        targetL1_Y = Mathf.Max(targetL1_Y, effectiveBottomY);
+        targetLR_Y = Mathf.Max(targetLR_Y, effectiveBottomY);
 
         pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
+        pL0 = pL1;
 
-        float currentBoxHeight = hobY - originalKeelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
-        float dx = Mathf.Abs(pL2.x - pL1.x);
-        float lrPosRatio = bodyPlan.risingLinePosition;
-        if (dx > 0.0001f)
+        pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(z));
+
+        if (z < sternRisingZ - 0.001f)
         {
-            lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
+            pL0 = pL1;
         }
-        pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
+        else
+        {
+            Vector3 backboneKeelPoint = new Vector3(side * hw, profileY, z);
+            if (profileY >= pLR.y - 0.001f)
+            {
+                pL1 = backboneKeelPoint;
+                pLR = backboneKeelPoint;
+                pL2.y = Mathf.Max(pL2.y, profileY);
+            }
+            pL0 = backboneKeelPoint;
+        }
 
         pU0 = pL3;
         pU3 = new Vector3(side * xTop, yTop, z);
@@ -865,6 +947,103 @@ public class FramingModel : MonoBehaviour
         {
             DrawAngledFramesOverlay();
         }
+
+        // 4. RISING LINE PROJECTION GUIDES (pLR & pL1 Curves)
+        if (showRisingLineGuide || showKeelControlGuide)
+        {
+            DrawRisingLineGuide();
+        }
+    }
+
+    private void DrawRisingLineGuide()
+    {
+        if (sheerPlan == null || bodyPlan == null) return;
+
+        float aftZ = sheerPlan.cachedSternRisingEnd.z;
+        float bowZ = sheerPlan.cachedBowRisingEnd.z;
+
+        if (aftZ > bowZ)
+        {
+            float temp = aftZ;
+            aftZ = bowZ;
+            bowZ = temp;
+        }
+
+        const int steps = 100;
+        Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;
+        Vector3 pL1_port, pLR_port;
+
+        // 1. Draw Rising Line Guide (pLR)
+        if (showRisingLineGuide)
+        {
+            Gizmos.color = risingLineGuideColor;
+
+            // Starboard (+1)
+            Vector3 prevStbd = Vector3.zero;
+            if (GetFrameControlPointsAtZ(aftZ, 1f, out pL0, out pL1_stbd, out prevStbd, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    float z = Mathf.Lerp(aftZ, bowZ, (float)i / steps);
+                    if (GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1_stbd, out pLR_stbd, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                    {
+                        Gizmos.DrawLine(prevStbd, pLR_stbd);
+                        prevStbd = pLR_stbd;
+                    }
+                }
+            }
+
+            // Port (-1)
+            Vector3 prevPort = Vector3.zero;
+            if (GetFrameControlPointsAtZ(aftZ, -1f, out pL0, out pL1_port, out prevPort, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    float z = Mathf.Lerp(aftZ, bowZ, (float)i / steps);
+                    if (GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1_port, out pLR_port, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                    {
+                        Gizmos.DrawLine(prevPort, pLR_port);
+                        prevPort = pLR_port;
+                    }
+                }
+            }
+        }
+
+        // 2. Draw Keel Control Guide (pL1)
+        if (showKeelControlGuide)
+        {
+            Gizmos.color = keelControlGuideColor;
+
+            // Starboard (+1)
+            Vector3 prevStbdL1 = Vector3.zero;
+            if (GetFrameControlPointsAtZ(aftZ, 1f, out pL0, out prevStbdL1, out pLR_stbd, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    float z = Mathf.Lerp(aftZ, bowZ, (float)i / steps);
+                    if (GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1_stbd, out pLR_stbd, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                    {
+                        Gizmos.DrawLine(prevStbdL1, pL1_stbd);
+                        prevStbdL1 = pL1_stbd;
+                    }
+                }
+            }
+
+            // Port (-1)
+            Vector3 prevPortL1 = Vector3.zero;
+            if (GetFrameControlPointsAtZ(aftZ, -1f, out pL0, out prevPortL1, out pLR_port, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    float z = Mathf.Lerp(aftZ, bowZ, (float)i / steps);
+                    if (GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1_port, out pLR_port, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                    {
+                        Gizmos.DrawLine(prevPortL1, pL1_port);
+                        prevPortL1 = pL1_port;
+                    }
+                }
+            }
+        }
     }
 
     private void RebuildAngledFrameCache()
@@ -946,7 +1125,7 @@ public class FramingModel : MonoBehaviour
         Vector3 masterL1 = bodyPlan.cachedL1;
         Vector3 masterLR = bodyPlan.cachedLR;
 
-        float targetL1_X = hw;
+        float targetL1_X = breadthPlan.GetFloorLineXAtZ(z);
         float targetL1_Y = originalKeelY;
 
         float targetLR_X = hw;
@@ -964,7 +1143,6 @@ public class FramingModel : MonoBehaviour
                 Vector3 p0_L1 = masterL1;
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                 Vector3 p2_L1 = bowEnd;
-                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                 targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                 // Swept curve for LR (Rising Line Point)
@@ -997,12 +1175,10 @@ public class FramingModel : MonoBehaviour
                     if (Mathf.Abs(dzL1) > 0.0001f)
                     {
                         float ratio = (z - p2_L1.z) / dzL1;
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
                     }
                     else
                     {
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y;
                     }
 
@@ -1022,7 +1198,6 @@ public class FramingModel : MonoBehaviour
                 else
                 {
                     float t = sheerPlan.GetRisingLineTAtZ(z);
-                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                     targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                     targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
@@ -1031,30 +1206,9 @@ public class FramingModel : MonoBehaviour
             }
         }
 
-        targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
-        targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
-
-        Vector3 pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
-        Vector3 pL1_raw = pL1;
-
-        // 3. HOB DOWNWARD ARM (pL2)
-        float currentBoxHeight = hobY - originalKeelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
-
-        // 4. RISING LINE POINT (pLR)
-        float dx = Mathf.Abs(pL2.x - pL1.x);
-        float lrPosRatio = bodyPlan.risingLinePosition;
-        if (dx > 0.0001f)
-        {
-            lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
-        }
-        Vector3 pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
-        Vector3 pLR_raw = pLR;
-
-        // 5. RISING LINE COMPLIANCE & PSEUDO KEEL POINT (STEM & STERN CLIMB)
-        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
+        // 3. STEM & STERN PROFILE Y
         float profileY = keelY;
+        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
 
         if (sheerPlan != null)
         {
@@ -1062,38 +1216,46 @@ public class FramingModel : MonoBehaviour
             {
                 profileY = sheerPlan.GetStemProfileYAtZ(z);
             }
-            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedSternPostTopPoint.z)
+            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sternRisingZ - 0.001f)
             {
-                // Deadwood & Stern Post climb for frames attached to Deadwood / Stern Post
                 profileY = sheerPlan.GetDeadwoodYAtZ(z);
-            }
-            else if (z <= sternRisingZ + 0.001f && sternRisingZ < -0.001f)
-            {
-                // Behind Stern End of Rising Line: Pseudo Keel sits strictly on the Rising Line projection line (NO Counter!)
-                profileY = targetLR_Y;
             }
         }
 
-        Vector3 pPseudo = new Vector3(side * xBot, profileY, z);
+        float effectiveBottomY = profileY;
+        targetL1_Y = Mathf.Max(targetL1_Y, effectiveBottomY);
 
-        bool isBehindSternRisingEnd = (z <= sternRisingZ + 0.001f && sternRisingZ < -0.001f);
-        if (profileY >= targetLR_Y - 0.001f || isBehindSternRisingEnd)
+        Vector3 pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
+        Vector3 pL1_raw = pL1;
+
+        // 4. HOB DOWNWARD ARM (pL2)
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+        Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
+
+        // 5. RISING LINE POINT (pLR)
+        Vector3 pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(z));
+        Vector3 pLR_raw = pLR;
+
+        Vector3 pL0_curve;
+
+        if (z < sternRisingZ - 0.001f)
         {
-            // Pseudo Keel sits on Rising Line projection line: ZERO control arm length!
-            pL1 = pPseudo;
-            pLR = pPseudo;
-            pL2.y = Mathf.Max(pL2.y, profileY);
+            // Behind Stern End of Rising Line: Keel point sits directly on projection line
+            pL0_curve = pL1;
         }
         else
         {
-            // Pseudo Keel is below Rising Line: pLR stays 100% on the Rising Line at targetLR_Y!
-            // Keel control arm pL1 stays between profileY and pLR.y
-            pL1.y = Mathf.Clamp(pL1.y, profileY, pLR.y);
-            pL2.y = Mathf.Max(pL2.y, pLR.y);
+            // Between Bow and Stern ends of Rising Line: Keel point sits on backbone (Stem, Keel, Deadwood)
+            Vector3 backboneKeelPoint = new Vector3(side * xBot, profileY, z);
+            if (profileY >= pLR.y - 0.001f)
+            {
+                pL1 = backboneKeelPoint;
+                pLR = backboneKeelPoint;
+                pL2.y = Mathf.Max(pL2.y, profileY);
+            }
+            pL0_curve = backboneKeelPoint;
         }
-
-        // Anchor lower mould curve to Pseudo Keel Point on Stem or Deadwood / Stern Post
-        Vector3 pL0_curve = pPseudo;
 
         // BOTTOM CUTOFF HEIGHT (STEM PROFILE AT BOW, FASHION TIMBER AT STERN)
         float yCutoff = keelY;
@@ -1120,12 +1282,7 @@ public class FramingModel : MonoBehaviour
             }
         }
 
-        // DRAW VERTICAL HEEL DROP TO TRUE KEEL POINT (pL0) IF UNCUT FRAMES OR BELOW PROFILE
-        if (profileY > keelY + 0.001f && (disableFrameCutoffs || yCutoff <= keelY + 0.001f))
-        {
-            Gizmos.color = color;
-            Gizmos.DrawLine(pL0, pPseudo);
-        }
+
 
         // DRAW LOWER MOULD SEGMENTS (IF NOT COMPLETELY CUT BELOW FASHION TIMBER)
         if (yCutoff < hobY - 0.001f)
@@ -1216,39 +1373,30 @@ public class FramingModel : MonoBehaviour
             DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperMinT, upperTopCutoffT);
         }
 
-        // CONTROL POINT VISUALIZATION (Keel Point, Marking Point on Curve, Rising Line Point, HOB Point)
+        // CONTROL POINT VISUALIZATION (Keel Point, Connection Point, HOB Point)
         if (showFrameControlPoints)
         {
-            // 1. Keel Point (pL0)
-            if (yCutoff <= pL0.y + 0.001f)
+            // 1. Keel Point (pL0_curve)
+            if (yCutoff <= pL0_curve.y + 0.001f)
             {
                 Gizmos.color = keelPointColor;
-                Gizmos.DrawSphere(pL0, controlPointRadius);
+                Gizmos.DrawSphere(pL0_curve, controlPointRadius);
             }
 
-            // 3. Pseudo Keel Point (pPseudo)
-            if (profileY > originalKeelY + 0.001f && yCutoff <= pPseudo.y + 0.001f)
+            // 2. Connection Point (pLR) - Only draw if distinct from Keel Point
+            if (yCutoff <= pLR.y + 0.001f && Vector3.Distance(pLR, pL0_curve) > 0.005f)
             {
-                Gizmos.color = pseudoKeelPointColor;
-                Gizmos.DrawSphere(pPseudo, controlPointRadius);
-            }
-
-            // 4. Rising Line Point (pLR) - Only draw if distinct from Pseudo Keel Point
-            if (yCutoff <= pLR.y + 0.001f && Vector3.Distance(pLR, pPseudo) > 0.005f)
-            {
-                Gizmos.color = risingLinePointColor;
+                Gizmos.color = connectionPointColor;
                 Gizmos.DrawSphere(pLR, controlPointRadius);
             }
 
-            // 5. HOB Point (pL3)
+            // 3. HOB Point (pL3)
             if (yCutoff <= pL3.y + 0.001f)
             {
                 Gizmos.color = hobPointColor;
                 Gizmos.DrawSphere(pL3, controlPointRadius);
             }
         }
-
-
 
         // CONTROL ARM VISUALIZATION (Bezier Control Polygons & Control Handles)
         if (showFrameControlArms)
@@ -1263,7 +1411,7 @@ public class FramingModel : MonoBehaviour
                 Gizmos.DrawLine(pL2, pL3);
 
                 Gizmos.color = controlArmPointColor;
-                if (yCutoff <= pL1.y + 0.001f && Vector3.Distance(pL1, pPseudo) > 0.005f) Gizmos.DrawSphere(pL1, controlPointRadius * 0.8f);
+                if (yCutoff <= pL1.y + 0.001f && Vector3.Distance(pL1, pL0_curve) > 0.005f) Gizmos.DrawSphere(pL1, controlPointRadius * 0.8f);
                 if (yCutoff <= pL2.y + 0.001f) Gizmos.DrawSphere(pL2, controlPointRadius * 0.8f);
             }
 

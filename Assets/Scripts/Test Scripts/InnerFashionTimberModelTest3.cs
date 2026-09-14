@@ -68,7 +68,8 @@ public class InnerFashionTimberModelTest3 : MonoBehaviour
         float exactX = 0f;
 
         float keelY = sheerPlan.GetKeelYAtZ(originalZ);
-        if (sheerPlan.showDeadwoodRake && originalZ < sheerPlan.cachedDeadwoodForePoint.z && originalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
+        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
+        if (originalZ < sternRisingZ - 0.001f && sheerPlan.showDeadwoodRake && originalZ < sheerPlan.cachedDeadwoodForePoint.z && originalZ >= sheerPlan.cachedDeadwoodAftPoint.z)
         {
             keelY = sheerPlan.GetDeadwoodYAtZ(originalZ);
         }

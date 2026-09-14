@@ -29,10 +29,45 @@ public class BodyPlanTest : MonoBehaviour
     [Range(0f, 1f)]
     public float hobLowerArmLength = 0.5f;
 
-    [Header("Rising Line Point")]
-    [Tooltip("Position of the Rising Line Point along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Header("Connection Point")]
+    [Tooltip("Position of the Connection Point at Master Frame along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
     [Range(0f, 1f)]
-    public float risingLinePosition = 0.5f;
+    public float connectionPointPosition = 0.5f;
+
+    [Tooltip("Position of the Connection Point at the Bow End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float bowConnectionPointPosition = 0.5f;
+
+    [Tooltip("Position of the Connection Point at the Stern End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float sternConnectionPointPosition = 0.5f;
+
+    [System.Obsolete("Use connectionPointPosition instead.")]
+    public float risingLinePosition
+    {
+        get => connectionPointPosition;
+        set => connectionPointPosition = value;
+    }
+
+    public float GetConnectionPointPositionAtZ(float z)
+    {
+        if (sheerPlan == null) return connectionPointPosition;
+
+        if (z >= 0f)
+        {
+            float bowZ = sheerPlan.cachedBowRisingEnd.z;
+            if (bowZ <= 0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / bowZ);
+            return Mathf.Lerp(connectionPointPosition, bowConnectionPointPosition, t);
+        }
+        else
+        {
+            float sternZ = sheerPlan.cachedSternRisingEnd.z;
+            if (sternZ >= -0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / sternZ);
+            return Mathf.Lerp(connectionPointPosition, sternConnectionPointPosition, t);
+        }
+    }
 
     [Header("Upper Mould Controls")]
     [Tooltip("The maximum half-width of the ship at the Top Timber line as a percentage of the Primary Max Beam. 1.0 = Straight. < 1.0 = Tumblehome. > 1.0 = Flare (Max 2.0 = 50% further out).")]
@@ -66,6 +101,11 @@ public class BodyPlanTest : MonoBehaviour
     public float topFrameThickness = 0.15f;
     public bool showInnerFrame = true;
     public Color innerFrameColor = Color.magenta;
+
+    [Header("Guide Lines Settings")]
+    [Tooltip("Draw a grey dashed guide line from the Rising Line point to the centerline at the HoB height.")]
+    public bool showRisingToHobGuide = true;
+    public Color risingToHobGuideColor = Color.gray;
 
 
     // --- CACHED POINTS ---
@@ -130,7 +170,7 @@ public class BodyPlanTest : MonoBehaviour
 
         // Rising Line Point — constrained to lie on the line from L1 to L2
         // This guarantees G1 tangent continuity at the join between the two quadratic segments
-        cachedLR = Vector3.Lerp(cachedL1, cachedL2, risingLinePosition);
+        cachedLR = Vector3.Lerp(cachedL1, cachedL2, connectionPointPosition);
 
         // UPPER MOULD
         // Find the absolute highest part of the hull for the master Upper Mould
@@ -328,6 +368,13 @@ public class BodyPlanTest : MonoBehaviour
         Gizmos.DrawLine(u0, u1);
         Gizmos.DrawLine(u3, u2);
 
+        // Draw Grey Dashed Line: Rising Line point -> Centerline at HoB height
+        if (showRisingToHobGuide)
+        {
+            Vector3 centerlineHob = new Vector3(0f, m3.y, 0f);
+            DrawDashedLine(mR, centerlineHob, risingToHobGuideColor, 0.15f);
+        }
+
         // Draw Nodes
         Gizmos.color = Color.green;
         Gizmos.DrawSphere(m1, 0.1f);
@@ -348,7 +395,7 @@ public class BodyPlanTest : MonoBehaviour
             labelStyle.normal.textColor = Color.white;
             
             Handles.Label(m0, " Keel", labelStyle);
-            Handles.Label(mR, " Rising Line", labelStyle);
+            Handles.Label(mR, " Connection Point", labelStyle);
             Handles.Label(m3, " HoB Midship", labelStyle);
             Handles.Label(u3, " Top Timber Midship", labelStyle);
             Handles.Label(m1, " Keel Control", labelStyle);
@@ -382,6 +429,23 @@ public class BodyPlanTest : MonoBehaviour
             Vector3 point = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, point);
             previousPoint = point;
+        }
+    }
+
+    protected void DrawDashedLine(Vector3 pA, Vector3 pB, Color color, float dashLength = 0.15f)
+    {
+        Gizmos.color = color;
+        float totalDist = Vector3.Distance(pA, pB);
+        if (totalDist <= 0.0001f) return;
+
+        int stepCount = Mathf.CeilToInt(totalDist / dashLength);
+        for (int i = 0; i < stepCount; i += 2)
+        {
+            float tStart = (float)i / stepCount;
+            float tEnd = Mathf.Min(1f, (float)(i + 1) / stepCount);
+            Vector3 pt1 = Vector3.Lerp(pA, pB, tStart);
+            Vector3 pt2 = Vector3.Lerp(pA, pB, tEnd);
+            Gizmos.DrawLine(pt1, pt2);
         }
     }
 

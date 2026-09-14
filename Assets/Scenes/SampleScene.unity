@@ -196,16 +196,37 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   fashionTimberModel: {fileID: 900456903}
-  frameSpacing: 0.505
+  frameSpacingMode: 1
+  frameSpacing: 0.25
   cutFramesAtFashionTimber: 1
+  disableFrameCutoffs: 0
+  showAngledFrames: 0
+  angledFrameAngleStep: 15
+  angledFrameResolution: 150
+  angledFrameColor: {r: 1, g: 0.9, b: 0.2, a: 0.9}
+  showAngledFrameLabels: 1
+  showFrameControlPoints: 1
+  showProjectedRisingMarkPoints: 1
+  showFrameControlArms: 0
+  controlPointRadius: 0.05
+  keelPointColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  pseudoKeelPointColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  risingLinePointColor: {r: 0, g: 1, b: 0, a: 1}
+  projectedRisingMarkColor: {r: 1, g: 0, b: 0, a: 1}
+  projectedRisingMarkSegments: 4
+  hobPointColor: {r: 0, g: 1, b: 1, a: 1}
+  controlArmColor: {r: 1, g: 0.5, b: 0, a: 0.8}
+  controlArmPointColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   showLabels: 1
   showBackboneSideLines: 1
   showMasterFrame: 1
   showFrames: 1
+  showRisingLineGuide: 1
   starboardColor: {r: 0, g: 1, b: 1, a: 1}
   portColor: {r: 1, g: 0, b: 1, a: 1}
   masterFrameColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   frameColor: {r: 0.2, g: 0.8, b: 1, a: 0.7}
+  risingLineGuideColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -729,10 +750,10 @@ MonoBehaviour:
   sheerPlan: {fileID: 1972862976}
   breadthPlan: {fileID: 1109839672}
   showLabels: 1
-  keelArmAngle: 72.5
-  keelArmLength: 0.26
-  hobLowerArmLength: 0.372
-  risingLinePosition: 0.424
+  keelArmAngle: 39
+  keelArmLength: 0.231
+  hobLowerArmLength: 0.528
+  risingLinePosition: 0.433
   flareTumblehomePercentage: 0.8
   upperHobArmAngle: 0
   upperHobArmLength: 0.5
@@ -748,9 +769,9 @@ MonoBehaviour:
   innerKeelPosition: 0.5
   middleControlPosition: 0.5
   cachedL0: {x: 0.125, y: 0, z: 0}
-  cachedL1: {x: 0.37093306, y: 0.78, z: 0}
-  cachedLR: {x: 1.4856575, y: 1.248096, z: 0}
-  cachedL2: {x: 3, y: 1.884, z: 0}
+  cachedL1: {x: 0.7891251, y: 0.53779787, z: 0}
+  cachedLR: {x: 1.746434, y: 0.9180594, z: 0}
+  cachedL2: {x: 3, y: 1.416, z: 0}
   cachedL3: {x: 3, y: 3, z: 0}
   cachedU0: {x: 3, y: 3, z: 0}
   cachedU1: {x: 3, y: 4.5, z: 0}
@@ -905,6 +926,59 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 964694954}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1013374576
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1013374578}
+  - component: {fileID: 1013374577}
+  m_Layer: 0
+  m_Name: FramingModelWaterlines
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1013374577
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1013374576}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d72db8d3a4d8a49f29b9adf77ad8c46b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FramingModelWaterlines
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  showWaterlines: 1
+  waterlineSpacing: 0.25
+  waterlineColor: {r: 0, g: 0.05335331, b: 1, a: 0.8}
+  cutWaterlinesAtFashionTimber: 1
+--- !u!4 &1013374578
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1013374576}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1172,6 +1246,142 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &1300153758
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1300153760}
+  - component: {fileID: 1300153759}
+  m_Layer: 0
+  m_Name: BodyPlanTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1300153759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1300153758}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92884b1d9ce654cdc874cfdb8ee4eae5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BodyPlanTest
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  showLabels: 1
+  keelArmAngle: 18.7
+  keelArmLength: 0.504
+  hobLowerArmLength: 0.5
+  risingLinePosition: 0.433
+  flareTumblehomePercentage: 0.8
+  upperHobArmAngle: 0
+  upperHobArmLength: 0.5
+  topTimberArmAngle: 0
+  topTimberArmLength: 0.5
+  keelWidth: 0.5
+  baseFrameThickness: 0.3
+  topFrameThickness: 0.15
+  showInnerFrame: 1
+  innerFrameColor: {r: 1, g: 0, b: 1, a: 1}
+  cachedL0: {x: 0.25, y: 0, z: 0}
+  cachedL1: {x: 1.636, y: 0.46913514, z: 0}
+  cachedLR: {x: 2.226612, y: 0.9154996, z: 0}
+  cachedL2: {x: 3, y: 1.5, z: 0}
+  cachedL3: {x: 3, y: 3, z: 0}
+  cachedU0: {x: 3, y: 3, z: 0}
+  cachedU1: {x: 3, y: 4.5, z: 0}
+  cachedU2: {x: 2.4, y: 4.5, z: 0}
+  cachedU3: {x: 2.4, y: 6, z: 0}
+--- !u!4 &1300153760
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1300153758}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1450877195
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1450877197}
+  - component: {fileID: 1450877196}
+  m_Layer: 0
+  m_Name: StrakesModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1450877196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450877195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5828aca1be4248a8bb7492cd2ea66cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StrakesModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  showStrakes: 1
+  show2DProfileGuides: 1
+  cutStrakesToSheerPlan: 1
+  profilePlaneXOffset: 0
+  floorGarboardStrakeCount: 3
+  bilgeStrakeCount: 3
+  bottomTopsidesStrakeCount: 4
+  upperTopsidesStrakeCount: 4
+  showFramePerpendiculars: 0
+  strakeCount: 10
+  plankThickness: 0.1
+  perpendicularLength: 2
+  floorGarboardColor: {r: 1, g: 0.8, b: 0.2, a: 0.9}
+  bilgeColor: {r: 1, g: 0.5, b: 0, a: 0.9}
+  bottomTopsidesColor: {r: 0.2, g: 0.8, b: 1, a: 0.9}
+  upperTopsidesColor: {r: 1, g: 0.3, b: 0.8, a: 0.9}
+  perpendicularColor: {r: 0, g: 1, b: 0, a: 1}
+--- !u!4 &1450877197
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450877195}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1459276880
 GameObject:
   m_ObjectHideFlags: 0
@@ -1273,6 +1483,62 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1566078699
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1566078701}
+  - component: {fileID: 1566078700}
+  m_Layer: 0
+  m_Name: StrakesModelTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1566078700
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1566078699}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 848d011ec58c7449d8fa02903a41544e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StrakesModelTest
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  waterlines: {fileID: 1013374577}
+  strakeSizingMode: 1
+  targetSpacing: 0.25
+  anchorFromTop: 0
+  drawStarboard: 1
+  showStrakePoints: 1
+  showForwardPointsOnly: 1
+  strakePointRadius: 0.04
+--- !u!4 &1566078701
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1566078699}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -1317,10 +1583,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 808d8a7e1d88f4ed89173e04f4c39635, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SheerPlan
-  showLabels: 1
+  showLabels: 0
   showControlArms: 1
   showProjectedAftKeelLine: 1
   showProjectedSternRisingLine: 1
+  showProjectedBowRisingLine: 1
   showProjectedTopLine: 1
   lengthBetweenPerpendiculars: 20
   lowerHullHeight: 3
@@ -1385,21 +1652,25 @@ MonoBehaviour:
   hobSternHeight: 3.5
   hobDropAft: 0
   hobCurveControlLength: 0.5
-  bowRisingLineEndPos: 0.533
-  bowRisingLineControl: 0.675
+  bodyPlan: {fileID: 722911565}
+  bowRisingLineEndPos: 0.454
+  bowRisingLineControl: 0.737
   sternRisingLineEndPos: 0.911
   sternRisingLineControl: 0.5
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
+  cachedMidshipRisingPoint: {x: 0, y: 0.53779787, z: 0}
   cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.333021}
   cachedProjectedTopLineStart: {x: 0, y: 6.6415157, z: -11.333021}
   cachedProjectedTopLineEnd: {x: 0, y: 6.5, z: 10}
-  cachedBowRisingEnd: {x: 0, y: 1.8654983, z: 9.582247}
-  cachedBowP1Ctrl: {x: 0, y: -0, z: 5.816296}
+  cachedBowRisingEnd: {x: 0, y: 1.5890002, z: 9.425062}
+  cachedBowP1Ctrl: {x: 0, y: 0.53779787, z: 6.2184157}
+  cachedBowRisingLineEndT: 9.999996
+  cachedProjectedBowRisingEnd: {x: 0, y: 1.7774762, z: 10}
   cachedSternRisingEnd: {x: 0, y: 2.6560888, z: -9.7588825}
-  cachedSternP1Ctrl: {x: 0, y: -0, z: -4.5}
-  cachedProjectedSternRisingEnd: {x: 0, y: 3.5009542, z: -11.332987}
+  cachedSternP1Ctrl: {x: 0, y: 0.53779787, z: -4.5}
+  cachedProjectedSternRisingEnd: {x: 0, y: 3.329888, z: -11.332987}
   cachedSternRisingLineEndT: 1.1480794
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 2.915575, z: -9.833021}
@@ -1475,15 +1746,16 @@ MonoBehaviour:
   showLowerDeckLines: 1
   lowerDeckColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
   showPrimaryDeckLine: 1
-  primaryDeckColor: {r: 0.020617366, g: 0, b: 1, a: 1}
-  showUpperDeckLines: 1
-  upperDeckColor: {r: 0.2, g: 0.6, b: 1, a: 1}
+  primaryDeckColor: {r: 1, g: 0.45881796, b: 0, a: 1}
+  showUpperDeckLines: 0
+  upperDeckColor: {r: 1, g: 0.6948916, b: 0.19999999, a: 1}
   showTopTimberLine: 1
-  topTimberColor: {r: 0, g: 0.028357267, b: 1, a: 1}
-  showPlankingRibbands: 1
-  lowerPlankingCount: 6
-  upperPlankingCount: 6
-  plankingColor: {r: 0.8, g: 0.5, b: 0.2, a: 1}
+  topTimberColor: {r: 0, g: 1, b: 0.9550952, a: 1}
+  showPlankingStrakes: 0
+  plankingStrakeCount: 8
+  plankingColor: {r: 1, g: 0.7, b: 0.2, a: 0.9}
+  showDiagonalsGuide: 0
+  diagonalsColor: {r: 1, g: 0, b: 1, a: 1}
 --- !u!4 &2023851845
 Transform:
   m_ObjectHideFlags: 0
@@ -1519,3 +1791,7 @@ SceneRoots:
   - {fileID: 2023851845}
   - {fileID: 964694956}
   - {fileID: 1459276882}
+  - {fileID: 1013374578}
+  - {fileID: 1450877197}
+  - {fileID: 1566078701}
+  - {fileID: 1300153760}

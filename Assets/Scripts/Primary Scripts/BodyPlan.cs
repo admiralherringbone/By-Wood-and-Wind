@@ -29,10 +29,45 @@ public class BodyPlan : MonoBehaviour
     [Range(0f, 1f)]
     public float hobLowerArmLength = 0.5f;
 
-    [Header("Rising Line Point")]
-    [Tooltip("Position of the Rising Line Point along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Header("Connection Point")]
+    [Tooltip("Position of the Connection Point at Master Frame along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
     [Range(0f, 1f)]
-    public float risingLinePosition = 0.5f;
+    public float connectionPointPosition = 0.5f;
+
+    [Tooltip("Position of the Connection Point at the Bow End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float bowConnectionPointPosition = 0.5f;
+
+    [Tooltip("Position of the Connection Point at the Stern End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float sternConnectionPointPosition = 0.5f;
+
+    [System.Obsolete("Use connectionPointPosition instead.")]
+    public float risingLinePosition
+    {
+        get => connectionPointPosition;
+        set => connectionPointPosition = value;
+    }
+
+    public float GetConnectionPointPositionAtZ(float z)
+    {
+        if (sheerPlan == null) return connectionPointPosition;
+
+        if (z >= 0f)
+        {
+            float bowZ = sheerPlan.cachedBowRisingEnd.z;
+            if (bowZ <= 0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / bowZ);
+            return Mathf.Lerp(connectionPointPosition, bowConnectionPointPosition, t);
+        }
+        else
+        {
+            float sternZ = sheerPlan.cachedSternRisingEnd.z;
+            if (sternZ >= -0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / sternZ);
+            return Mathf.Lerp(connectionPointPosition, sternConnectionPointPosition, t);
+        }
+    }
 
     [Header("Upper Mould Controls")]
     [Tooltip("The maximum half-width of the ship at the Top Timber line as a percentage of the Primary Max Beam. 1.0 = Straight. < 1.0 = Tumblehome. > 1.0 = Flare (Max 2.0 = 50% further out).")]
@@ -126,18 +161,18 @@ public class BodyPlan : MonoBehaviour
         }
 
         // Cache Lower Mould points
-        // Segment 1: Keel (L0) → Keel Control (L1) → Rising Line Point (LR)
+        // Segment 1: Keel (L0) → Keel Control (L1) → Connection Point (LR)
         cachedL0 = new Vector3(keelHalfWidth, keelY, 0);
         cachedL1 = cachedL0 + new Vector3(keelDirX, keelDirY, 0) * (keelMaxDist * keelArmLength);
 
-        // Segment 2: Rising Line Point (LR) → HoB Control (L2) → HoB (L3)
+        // Segment 2: Connection Point (LR) → HoB Control (L2) → HoB (L3)
         float hobDrop = boxHeight * hobLowerArmLength;
         cachedL3 = new Vector3(maxBeam, hobY, 0);
         cachedL2 = new Vector3(maxBeam, hobY - hobDrop, 0);
 
-        // Rising Line Point — constrained to lie on the line from L1 to L2
+        // Connection Point — constrained to lie on the line from L1 to L2
         // This guarantees G1 tangent continuity at the join between the two quadratic segments
-        cachedLR = Vector3.Lerp(cachedL1, cachedL2, risingLinePosition);
+        cachedLR = Vector3.Lerp(cachedL1, cachedL2, connectionPointPosition);
 
         // Re-update SheerPlan cached values now that cachedLR is finalized
         sheerPlan.UpdateCachedValues();
@@ -218,7 +253,7 @@ public class BodyPlan : MonoBehaviour
 
     /// <summary>
     /// Evaluates the lower mould at a unified t parameter [0, 1] spanning both quadratic segments.
-    /// t [0, 0.5] = Segment 1 (Keel → Rising Line), t [0.5, 1] = Segment 2 (Rising Line → HoB).
+    /// t [0, 0.5] = Segment 1 (Keel → Connection Point), t [0.5, 1] = Segment 2 (Connection Point → HoB).
     /// </summary>
     public Vector3 EvaluateLowerMouldAtT(float t)
     {
@@ -358,7 +393,7 @@ public class BodyPlan : MonoBehaviour
             labelStyle.normal.textColor = Color.white;
             
             Handles.Label(m0, " Keel", labelStyle);
-            Handles.Label(mR, " Rising Line", labelStyle);
+            Handles.Label(mR, " Connection Point", labelStyle);
             Handles.Label(m3, " HoB Midship", labelStyle);
             Handles.Label(u3, " Top Timber Midship", labelStyle);
             Handles.Label(m1, " Keel Control", labelStyle);

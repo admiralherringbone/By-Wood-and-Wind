@@ -38,11 +38,11 @@ public class StrakesModel : MonoBehaviour
     public int floorGarboardStrakeCount = 3;
 
     [Range(1, 15)]
-    [Tooltip("Number of strakes in Bilge Belt (orange pFloorMark Midpoint -> green pLR Rising Line).")]
+    [Tooltip("Number of strakes in Bilge Belt (orange pFloorMark Midpoint -> green pLR Connection Point).")]
     public int bilgeStrakeCount = 3;
 
     [Range(1, 15)]
-    [Tooltip("Number of strakes in Bottom Topsides Belt (green pLR Rising Line -> cyan pL3 HOB).")]
+    [Tooltip("Number of strakes in Bottom Topsides Belt (green pLR Connection Point -> cyan pL3 HOB).")]
     public int bottomTopsidesStrakeCount = 4;
 
     [Range(1, 15)]
@@ -204,7 +204,7 @@ public class StrakesModel : MonoBehaviour
         Vector3 masterL1 = bodyPlan.cachedL1;
         Vector3 masterLR = bodyPlan.cachedLR;
 
-        float targetL1_X = hw;
+        float targetL1_X = breadthPlan.GetFloorLineXAtZ(z);
         float targetL1_Y = originalKeelY;
         float targetLR_X = hw;
         float targetLR_Y = originalKeelY;
@@ -220,7 +220,6 @@ public class StrakesModel : MonoBehaviour
                 Vector3 p0_L1 = masterL1;
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                 Vector3 p2_L1 = bowEnd;
-                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                 targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                 Vector3 p0_LR = masterLR;
@@ -251,12 +250,10 @@ public class StrakesModel : MonoBehaviour
                     if (Mathf.Abs(dzL1) > 0.0001f)
                     {
                         float ratio = (z - p2_L1.z) / dzL1;
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
                     }
                     else
                     {
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y;
                     }
 
@@ -276,7 +273,6 @@ public class StrakesModel : MonoBehaviour
                 else
                 {
                     float t = sheerPlan.GetRisingLineTAtZ(z);
-                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                     targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                     targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
@@ -285,22 +281,22 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
-        targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
-        targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
+        float effectiveBottomY = GetFrameBottomYAtZ(z);
+        if (sheerPlan != null && z > sheerPlan.cachedKeelBowPoint.z)
+        {
+            effectiveBottomY = Mathf.Max(effectiveBottomY, sheerPlan.GetStemProfileYAtZ(z));
+        }
+
+        targetL1_Y = Mathf.Max(targetL1_Y, effectiveBottomY);
+        targetLR_Y = Mathf.Max(targetLR_Y, effectiveBottomY);
 
         pL1_raw = new Vector3(side * targetL1_X, targetL1_Y, z);
 
-        float currentBoxHeight = hobY - originalKeelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
-        float dx = Mathf.Abs(pL2.x - pL1_raw.x);
-        float lrPosRatio = bodyPlan.risingLinePosition;
-        if (dx > 0.0001f)
-        {
-            lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
-        }
-        pLR_raw = Vector3.Lerp(pL1_raw, pL2, lrPosRatio);
+        pLR_raw = Vector3.Lerp(pL1_raw, pL2, bodyPlan.GetConnectionPointPositionAtZ(z));
 
         // Floor Mark Point (50% arc length between yellow pL0 and green pLR_raw)
         pFloorMark = GetQuadraticBezierPointByArcLength(0.5f, pL0, pL1_raw, pLR_raw);

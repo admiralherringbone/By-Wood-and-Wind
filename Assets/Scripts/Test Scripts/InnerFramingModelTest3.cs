@@ -175,7 +175,8 @@ public class InnerFramingModelTest3 : MonoBehaviour
                 Vector3 framePlaneNormal = Vector3.Cross(uAxis, vAxis).normalized;
 
                 float keelY = sheerPlan.GetKeelYAtZ(z);
-                if (sheerPlan.showDeadwoodRake && z < sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedDeadwoodAftPoint.z)
+                float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
+                if (z < sternRisingZ - 0.001f && sheerPlan.showDeadwoodRake && z < sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedDeadwoodAftPoint.z)
                 {
                     keelY = sheerPlan.GetDeadwoodYAtZ(z);
                 }

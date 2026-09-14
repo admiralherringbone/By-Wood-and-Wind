@@ -157,6 +157,11 @@ public class FashionTimberModel : MonoBehaviour
 
     public float GetNaturalHullXAtYZ(float targetY, float originalZ)
     {
+        if (framingModel != null)
+        {
+            return Mathf.Abs(framingModel.GetTransverseFramePointAtY(originalZ, 1f, targetY).x);
+        }
+
         if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return 0f;
 
         float side = 1f; // Starboard half-breadth
@@ -222,7 +227,7 @@ public class FashionTimberModel : MonoBehaviour
             Vector3 masterL1 = bodyPlan.cachedL1;
             Vector3 masterLR = bodyPlan.cachedLR;
 
-            float targetL1_X = hw;
+            float targetL1_X = breadthPlan.GetFloorLineXAtZ(originalZ);
             float targetL1_Y = originalKeelY;
             float targetLR_X = hw;
             float targetLR_Y = originalKeelY;
@@ -238,7 +243,6 @@ public class FashionTimberModel : MonoBehaviour
                     Vector3 p0_L1 = masterL1;
                     Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                     Vector3 p2_L1 = bowEnd;
-                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                     targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                     Vector3 p0_LR = masterLR;
@@ -269,12 +273,10 @@ public class FashionTimberModel : MonoBehaviour
                         if (Mathf.Abs(dzL1) > 0.0001f)
                         {
                             float ratio = (originalZ - p2_L1.z) / dzL1;
-                            targetL1_X = p2_L1.x;
                             targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
                         }
                         else
                         {
-                            targetL1_X = p2_L1.x;
                             targetL1_Y = p2_L1.y;
                         }
 
@@ -294,7 +296,6 @@ public class FashionTimberModel : MonoBehaviour
                     else
                     {
                         float t = sheerPlan.GetRisingLineTAtZ(originalZ);
-                        targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                         targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                         targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
@@ -307,20 +308,14 @@ public class FashionTimberModel : MonoBehaviour
             targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
 
             Vector3 pL1 = new Vector3(side * targetL1_X, targetL1_Y, originalZ);
-            float currentBoxHeight = hobY - originalKeelY;
-            float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-            Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), originalZ);
+            float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+            float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+            Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), originalZ);
 
-            float dx = Mathf.Abs(pL2.x - pL1.x);
-            float lrPosRatio = bodyPlan.risingLinePosition;
-            if (dx > 0.0001f)
-            {
-                lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
-            }
-            Vector3 pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
+            Vector3 pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(originalZ));
 
-            float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
             float profileY = keelY;
+            float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
 
             if (sheerPlan != null)
             {
@@ -328,16 +323,15 @@ public class FashionTimberModel : MonoBehaviour
                 {
                     profileY = sheerPlan.GetStemProfileYAtZ(originalZ);
                 }
-                else if (originalZ <= sternRisingZ + 0.001f && sternRisingZ < -0.001f)
+                else if (originalZ < sternRisingZ - 0.001f && sheerPlan.showDeadwoodRake && originalZ <= sheerPlan.cachedDeadwoodForePoint.z && originalZ >= sheerPlan.cachedSternPostTopPoint.z)
                 {
-                    profileY = targetLR_Y;
+                    profileY = sheerPlan.GetDeadwoodYAtZ(originalZ);
                 }
             }
 
             Vector3 pPseudo = new Vector3(side * xBot, profileY, originalZ);
 
-            bool isBehindSternRisingEnd = (originalZ <= sternRisingZ + 0.001f && sternRisingZ < -0.001f);
-            if (profileY >= targetLR_Y - 0.001f || isBehindSternRisingEnd)
+            if (profileY >= pLR.y - 0.001f)
             {
                 pL1 = pPseudo;
                 pLR = pPseudo;

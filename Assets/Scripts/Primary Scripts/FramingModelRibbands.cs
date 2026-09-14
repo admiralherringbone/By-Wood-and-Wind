@@ -435,7 +435,7 @@ public class FramingModelRibbands : MonoBehaviour
         Vector3 masterL1 = bodyPlan.cachedL1;
         Vector3 masterLR = bodyPlan.cachedLR;
 
-        float targetL1_X = hw;
+        float targetL1_X = breadthPlan.GetFloorLineXAtZ(z);
         float targetL1_Y = originalKeelY;
         float targetLR_X = hw;
         float targetLR_Y = originalKeelY;
@@ -451,7 +451,6 @@ public class FramingModelRibbands : MonoBehaviour
                 Vector3 p0_L1 = masterL1;
                 Vector3 p1_L1 = new Vector3(masterL1.x, masterL1.y, sheerPlan.cachedBowP1Ctrl.z);
                 Vector3 p2_L1 = bowEnd;
-                targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                 targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                 Vector3 p0_LR = masterLR;
@@ -482,12 +481,10 @@ public class FramingModelRibbands : MonoBehaviour
                     if (Mathf.Abs(dzL1) > 0.0001f)
                     {
                         float ratio = (z - p2_L1.z) / dzL1;
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y + (p2_L1.y - p1_L1.y) * ratio;
                     }
                     else
                     {
-                        targetL1_X = p2_L1.x;
                         targetL1_Y = p2_L1.y;
                     }
 
@@ -507,7 +504,6 @@ public class FramingModelRibbands : MonoBehaviour
                 else
                 {
                     float t = sheerPlan.GetRisingLineTAtZ(z);
-                    targetL1_X = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).x;
                     targetL1_Y = CalculateQuadraticBezierPoint(t, p0_L1, p1_L1, p2_L1).y;
 
                     targetLR_X = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).x;
@@ -519,21 +515,14 @@ public class FramingModelRibbands : MonoBehaviour
         targetL1_Y = Mathf.Max(targetL1_Y, originalKeelY);
         targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
 
-        pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
-        float currentBoxHeight = hobY - originalKeelY;
-        float hobDrop = currentBoxHeight * bodyPlan.hobLowerArmLength;
-        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetLR_Y), z);
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
+        pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
-        float dx = Mathf.Abs(pL2.x - pL1.x);
-        float lrPosRatio = bodyPlan.risingLinePosition;
-        if (dx > 0.0001f)
-        {
-            lrPosRatio = Mathf.Clamp01((targetLR_X - targetL1_X) / dx);
-        }
-        pLR = Vector3.Lerp(pL1, pL2, lrPosRatio);
+        pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(z));
 
-        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
         float profileY = keelY;
+        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
 
         if (sheerPlan != null)
         {
@@ -541,16 +530,15 @@ public class FramingModelRibbands : MonoBehaviour
             {
                 profileY = sheerPlan.GetStemProfileYAtZ(z);
             }
-            else if (z <= sternRisingZ + 0.001f && sternRisingZ < -0.001f)
+            else if (z < sternRisingZ - 0.001f && sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedSternPostTopPoint.z)
             {
-                profileY = targetLR_Y;
+                profileY = sheerPlan.GetDeadwoodYAtZ(z);
             }
         }
 
         Vector3 pPseudo = new Vector3(side * xBot, profileY, z);
 
-        bool isBehindSternRisingEnd = (z <= sternRisingZ + 0.001f && sternRisingZ < -0.001f);
-        if (profileY >= targetLR_Y - 0.001f || isBehindSternRisingEnd)
+        if (profileY >= pLR.y - 0.001f)
         {
             pL1 = pPseudo;
             pLR = pPseudo;
