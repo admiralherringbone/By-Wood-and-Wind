@@ -319,7 +319,7 @@ public class FramingModel : MonoBehaviour
     public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
     {
         float minU = 0f;
-        float maxU = 0.5f;
+        float maxU = 1.0f;
 
         Vector3 minPt = GetTransverseFramePointAtU(z, side, minU);
         Vector3 maxPt = GetTransverseFramePointAtU(z, side, maxU);
