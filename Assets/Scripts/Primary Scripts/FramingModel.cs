@@ -355,22 +355,6 @@ public class FramingModel : MonoBehaviour
 
     public int GetStrakeSegmentCount()
     {
-        StrakesModelTest testScript = FindFirstObjectByType<StrakesModelTest>();
-        if (testScript != null)
-        {
-            float masterArcLength = CalculateMasterFrameLowerMouldArcLength();
-            if (masterArcLength > 0.0001f && testScript.targetSpacing > 0.0001f)
-            {
-                return Mathf.Max(1, Mathf.RoundToInt(masterArcLength / testScript.targetSpacing));
-            }
-        }
-
-        StrakesModel prodScript = FindFirstObjectByType<StrakesModel>();
-        if (prodScript != null)
-        {
-            return Mathf.Max(1, prodScript.bottomTopsidesStrakeCount);
-        }
-
         return projectedRisingMarkSegments;
     }
 
@@ -463,7 +447,9 @@ public class FramingModel : MonoBehaviour
         targetLR_Y = Mathf.Max(targetLR_Y, effectiveBottomY);
 
         pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
-        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float risingRise = Mathf.Max(0f, targetL1_Y - masterL1.y);
+        float effectiveKeelY = originalKeelY + risingRise;
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - effectiveKeelY);
         float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
         pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
@@ -720,7 +706,9 @@ public class FramingModel : MonoBehaviour
         pL1 = new Vector3(side * targetL1_X, targetL1_Y, z);
         pL0 = pL1;
 
-        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float risingRise = Mathf.Max(0f, targetL1_Y - masterL1.y);
+        float effectiveKeelY = originalKeelY + risingRise;
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - effectiveKeelY);
         float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
         pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 
@@ -1229,7 +1217,9 @@ public class FramingModel : MonoBehaviour
         Vector3 pL1_raw = pL1;
 
         // 4. HOB DOWNWARD ARM (pL2)
-        float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+        float risingRise = Mathf.Max(0f, targetL1_Y - masterL1.y);
+        float effectiveKeelY = originalKeelY + risingRise;
+        float availableLowerHeight = Mathf.Max(0.001f, hobY - effectiveKeelY);
         float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
         Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), z);
 

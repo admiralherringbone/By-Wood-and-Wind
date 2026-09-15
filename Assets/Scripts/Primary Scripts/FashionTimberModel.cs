@@ -308,7 +308,9 @@ public class FashionTimberModel : MonoBehaviour
             targetLR_Y = Mathf.Max(targetLR_Y, originalKeelY);
 
             Vector3 pL1 = new Vector3(side * targetL1_X, targetL1_Y, originalZ);
-            float availableLowerHeight = Mathf.Max(0.001f, hobY - targetL1_Y);
+            float risingRise = Mathf.Max(0f, targetL1_Y - masterL1.y);
+            float effectiveKeelY = originalKeelY + risingRise;
+            float availableLowerHeight = Mathf.Max(0.001f, hobY - effectiveKeelY);
             float hobDrop = availableLowerHeight * bodyPlan.hobLowerArmLength;
             Vector3 pL2 = new Vector3(side * hobBreadth, Mathf.Max(hobY - hobDrop, targetL1_Y), originalZ);
 
