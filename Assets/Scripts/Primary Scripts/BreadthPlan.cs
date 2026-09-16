@@ -78,6 +78,16 @@ public class BreadthPlan : MonoBehaviour
     [Tooltip("Control arm bias for the aft Floor Line quadratic curve (0 = straight/narrow, 1 = full width/curve).")]
     [Range(0f, 1f)] public float floorSternControl = 0.5f;
 
+    [Header("Connection Point Inbetween Guide Controls")]
+    [Tooltip("Show the blended inbetween shape guide curve in gizmos at the level of the Connection Point (BodyPlan.cachedLR.y).")]
+    public bool showConnectionGuide = true;
+
+    [Tooltip("Color of the Connection Point inbetween guide curve.")]
+    public Color connectionGuideColor = new Color(0.1f, 1f, 0.4f, 0.9f);
+
+    [Tooltip("Reference to FramingModel to get connection point blend settings.")]
+    public FramingModel framingModel;
+
 
 
     // --- CACHED POINTS FOR FAST ACCESS ---
@@ -289,6 +299,39 @@ public class BreadthPlan : MonoBehaviour
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
+
+    public float GetConnectionPointXAtZ(float z)
+    {
+        if (bodyPlan == null || sheerPlan == null) return (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
+
+        float hw = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
+        float bowZ = sheerPlan.cachedBowRisingEnd.z;
+        float sternZ = sheerPlan.cachedSternRisingEnd.z;
+
+        float masterL1_X = bodyPlan.cachedL1.x;
+        float masterLR_X = bodyPlan.cachedLR.x;
+        float masterPrimary_X = maxBeam;
+
+        float floorX = GetFloorLineXAtZ(z);
+        float primaryX = GetTheoreticalBreadthXAtZ(z);
+
+        float normFloor = (masterL1_X > hw + 0.0001f) ? Mathf.Clamp01((floorX - hw) / (masterL1_X - hw)) : 0f;
+        float normPrimary = (masterPrimary_X > hw + 0.0001f) ? Mathf.Clamp01((primaryX - hw) / (masterPrimary_X - hw)) : 0f;
+
+        float blendRatio = (framingModel != null) ? framingModel.GetConnectionPointBlendAtZ(z) : 0.5f;
+        float normBlend = Mathf.Lerp(normFloor, normPrimary, blendRatio);
+
+        if (z >= 0f)
+        {
+            if (bowZ <= 0.001f || z >= bowZ) return hw;
+            return hw + (masterLR_X - hw) * normBlend;
+        }
+        else
+        {
+            if (sternZ >= -0.001f || z <= sternZ) return hw;
+            return hw + (masterLR_X - hw) * normBlend;
+        }
+    }
 
     public float GetBreadthXAtZ(float z)
     {
@@ -539,6 +582,45 @@ public class BreadthPlan : MonoBehaviour
             Gizmos.DrawSphere(cachedFloorSternPoint, 0.12f);
         }
 
+        if (showConnectionGuide)
+        {
+            if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
+            if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
+
+            if (bodyPlan == null) bodyPlan = GetComponentInParent<BodyPlan>();
+            if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
+
+            float guideY = (bodyPlan != null) ? bodyPlan.cachedLR.y : 0f;
+            float aftZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : -10f;
+            float fwdZ = (sheerPlan != null) ? sheerPlan.cachedBowRisingEnd.z : 10f;
+
+            Gizmos.color = connectionGuideColor;
+            const int steps = 100;
+
+            for (int sideSign = -1; sideSign <= 1; sideSign += 2)
+            {
+                float side = sideSign;
+                Vector3 prevPt = Vector3.zero;
+                bool first = true;
+
+                for (int i = 0; i <= steps; i++)
+                {
+                    float t = i / (float)steps;
+                    float z = Mathf.Lerp(aftZ, fwdZ, t);
+
+                    float targetX = GetConnectionPointXAtZ(z);
+
+                    Vector3 pt = new Vector3(side * targetX, guideY, z);
+                    if (!first)
+                    {
+                        Gizmos.DrawLine(prevPt, pt);
+                    }
+                    prevPt = pt;
+                    first = false;
+                }
+            }
+        }
+
 #if UNITY_EDITOR
         if (showLabels)
         {
@@ -562,6 +644,17 @@ public class BreadthPlan : MonoBehaviour
                 Handles.Label(cachedFloorBowPoint, "Floor Line Bow End", floorLabelStyle);
                 Handles.Label(cachedFloorMidshipPoint, "Floor Line Midship", floorLabelStyle);
                 Handles.Label(cachedFloorSternPoint, "Floor Line Stern End", floorLabelStyle);
+            }
+
+            if (showConnectionGuide && bodyPlan != null)
+            {
+                GUIStyle guideLabelStyle = new GUIStyle();
+                guideLabelStyle.normal.textColor = connectionGuideColor;
+                guideLabelStyle.alignment = TextAnchor.LowerCenter;
+                guideLabelStyle.contentOffset = new Vector2(0, -10);
+
+                Vector3 midGuidePt = new Vector3(bodyPlan.cachedLR.x, bodyPlan.cachedLR.y, 0f);
+                Handles.Label(midGuidePt, "Connection Point Guide", guideLabelStyle);
             }
         }
 #endif
