@@ -260,6 +260,8 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedStemP1;
     [HideInInspector] public Vector3 cachedStemP2;
 
+    private bool isUpdatingValues = false;
+
     private void OnValidate()
     {
         // 1. Calculate sum of lower deck tiers
@@ -315,7 +317,11 @@ public class SheerPlan : MonoBehaviour
 
     public virtual void UpdateCachedValues()
     {
-        float halfLength = lengthBetweenPerpendiculars / 2f;
+        if (isUpdatingValues) return;
+        isUpdatingValues = true;
+        try
+        {
+            float halfLength = lengthBetweenPerpendiculars / 2f;
         float sternRakeLength = lengthBetweenPerpendiculars * sternPostRakePercentage;
         float stemRakeLength = lengthBetweenPerpendiculars * stemRakePercentage;
 
@@ -631,7 +637,8 @@ public class SheerPlan : MonoBehaviour
         // --- Rising Lines ---
         if (bodyPlan == null)
         {
-            bodyPlan = FindFirstObjectByType<BodyPlan>();
+            bodyPlan = GetComponentInParent<BodyPlan>();
+            if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
         }
         float risingLineMidshipY = (bodyPlan != null) ? bodyPlan.cachedL1.y : cachedMidshipKeel.y;
         cachedMidshipRisingPoint = new Vector3(0, risingLineMidshipY, 0);
@@ -738,6 +745,11 @@ public class SheerPlan : MonoBehaviour
         float fwdZ = GetFwdMostZ();
         cachedProjectedTopLineStart = new Vector3(0, GetPureSheerYAtZ(aftZ), aftZ);
         cachedProjectedTopLineEnd = new Vector3(0, GetPureSheerYAtZ(fwdZ), fwdZ);
+        }
+        finally
+        {
+            isUpdatingValues = false;
+        }
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---

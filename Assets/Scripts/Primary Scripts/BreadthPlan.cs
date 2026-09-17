@@ -88,6 +88,9 @@ public class BreadthPlan : MonoBehaviour
     [Tooltip("Reference to FramingModel to get connection point blend settings.")]
     public FramingModel framingModel;
 
+    [Tooltip("Reference to ConnectionGuideShape to get connection point guide curve.")]
+    public ConnectionGuideShape connectionGuideShape;
+
 
 
     // --- CACHED POINTS FOR FAST ACCESS ---
@@ -119,6 +122,14 @@ public class BreadthPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedFloorSternCp;
     [HideInInspector] public Vector3 cachedFloorSternPoint;
 
+    [HideInInspector] public Vector3 cachedConnBowPoint;
+    [HideInInspector] public Vector3 cachedConnBowCp;
+    [HideInInspector] public Vector3 cachedConnMidshipPoint;
+    [HideInInspector] public Vector3 cachedConnSternCp;
+    [HideInInspector] public Vector3 cachedConnSternPoint;
+    [HideInInspector] public float cachedConnectionBlendWeight = 0.5f;
+
+    private bool isUpdatingCurves = false;
 
     private void OnValidate()
     {
@@ -127,9 +138,22 @@ public class BreadthPlan : MonoBehaviour
 
     public virtual void UpdateCachedCurves()
     {
+        if (isUpdatingCurves) return;
         if (sheerPlan == null) return;
 
-        sheerPlan.UpdateCachedValues(); // Ensure sheer plan is up to date
+        isUpdatingCurves = true;
+        try
+        {
+            if (bodyPlan == null) bodyPlan = GetComponentInParent<BodyPlan>();
+            if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
+
+            sheerPlan.UpdateCachedValues(); // Ensure sheer plan is up to date
+
+        float masterL1_X = (bodyPlan != null) ? bodyPlan.cachedL1.x : (maxBeam * 0.5f);
+        float masterLR_X = (bodyPlan != null) ? bodyPlan.cachedLR.x : (maxBeam * 0.75f);
+        float masterPrimary_X = maxBeam;
+        float masterDenom = masterPrimary_X - masterL1_X;
+        cachedConnectionBlendWeight = (masterDenom > 0.0001f) ? Mathf.Clamp01((masterLR_X - masterL1_X) / masterDenom) : 0.5f;
 
         float halfLength = sheerPlan.lengthBetweenPerpendiculars / 2f;
         float midshipZ = 0f;
@@ -296,41 +320,135 @@ public class BreadthPlan : MonoBehaviour
         cachedFloorMidshipPoint = floorMidshipPoint;
         cachedFloorSternCp = floorSternCp;
         cachedFloorSternPoint = floorSternPoint;
+
+        // CONNECTION GUIDE LINE
+        if (connectionGuideShape == null) connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
+        if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
+
+        float connBowZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : sheerPlan.cachedBowRisingEnd.z;
+        float connSternZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : sheerPlan.cachedSternRisingEnd.z;
+
+        float connMaxBeam = masterLR_X;
+        float connBaseY = (bodyPlan != null) ? bodyPlan.cachedLR.y : 0f;
+
+        Vector3 connBowPoint = new Vector3(hw, connBaseY, connBowZ);
+        Vector3 connMidshipPoint = new Vector3(connMaxBeam, connBaseY, midshipZ);
+        Vector3 connSternPoint = new Vector3(hw, connBaseY, connSternZ);
+
+        float connBowControlZ = Mathf.Lerp(midshipZ, connBowZ, floorBowControl);
+        Vector3 connBowCp = new Vector3(connMaxBeam, connBaseY, connBowControlZ);
+
+        float connSternControlZ = Mathf.Lerp(midshipZ, connSternZ, floorSternControl);
+        Vector3 connSternCp = new Vector3(connMaxBeam, connBaseY, connSternControlZ);
+
+        cachedConnBowPoint = connBowPoint;
+        cachedConnBowCp = connBowCp;
+        cachedConnMidshipPoint = connMidshipPoint;
+        cachedConnSternCp = connSternCp;
+        cachedConnSternPoint = connSternPoint;
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
 
     public float GetConnectionPointXAtZ(float z)
     {
+        if (connectionGuideShape == null) connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
+        if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
+
+        if (connectionGuideShape != null && connectionGuideShape.enabled)
+        {
+            return connectionGuideShape.GetConnectionGuideXAtZ(z);
+        }
+
+        if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
+        if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
+
+        if (framingModel != null)
+        {
+            Vector3 pL0, pL1, pLR, pL2, pL3;
+            float profY, projY;
+            if (framingModel.GetAdjustedFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out profY, out projY))
+            {
+                return pLR.x;
+            }
+        }
+
         if (bodyPlan == null || sheerPlan == null) return (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
 
-        float hw = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
-        float bowZ = sheerPlan.cachedBowRisingEnd.z;
-        float sternZ = sheerPlan.cachedSternRisingEnd.z;
-
-        float masterL1_X = bodyPlan.cachedL1.x;
-        float masterLR_X = bodyPlan.cachedLR.x;
-        float masterPrimary_X = maxBeam;
-
         float floorX = GetFloorLineXAtZ(z);
-        float primaryX = GetTheoreticalBreadthXAtZ(z);
+        float hobX = GetTheoreticalBreadthXAtZ(z);
+        float connRatio = (bodyPlan != null) ? bodyPlan.GetConnectionPointPositionAtZ(z) : 0.5f;
 
-        float normFloor = (masterL1_X > hw + 0.0001f) ? Mathf.Clamp01((floorX - hw) / (masterL1_X - hw)) : 0f;
-        float normPrimary = (masterPrimary_X > hw + 0.0001f) ? Mathf.Clamp01((primaryX - hw) / (masterPrimary_X - hw)) : 0f;
+        return Mathf.Lerp(floorX, hobX, connRatio);
+    }
 
-        float blendRatio = (framingModel != null) ? framingModel.GetConnectionPointBlendAtZ(z) : 0.5f;
-        float normBlend = Mathf.Lerp(normFloor, normPrimary, blendRatio);
+    private float EvaluateConnectionPointForward(float targetZ, float hw, float masterL1_X, float masterLR_X, float masterPrimary_X)
+    {
+        float minU = 0f;
+        float maxU = 1f;
+        float bestU = 0f;
 
-        if (z >= 0f)
+        for (int i = 0; i < 20; i++)
         {
-            if (bowZ <= 0.001f || z >= bowZ) return hw;
-            return hw + (masterLR_X - hw) * normBlend;
+            float midU = (minU + maxU) / 2f;
+            Vector3 ptFloor = CalculateQuadraticBezierPoint(midU, cachedFloorMidshipPoint, cachedFloorBowCp, cachedFloorBowPoint);
+            Vector3 ptPrimary = CalculateCubicBezierPoint(midU, cachedFwdP3, cachedFwdP2, cachedFwdP1, cachedFwdP0);
+
+            float zMid = Mathf.Lerp(ptFloor.z, ptPrimary.z, cachedConnectionBlendWeight);
+            if (zMid < targetZ) minU = midU;
+            else maxU = midU;
+            bestU = midU;
         }
-        else
+
+        Vector3 pFloor = CalculateQuadraticBezierPoint(bestU, cachedFloorMidshipPoint, cachedFloorBowCp, cachedFloorBowPoint);
+        Vector3 pPrimary = CalculateCubicBezierPoint(bestU, cachedFwdP3, cachedFwdP2, cachedFwdP1, cachedFwdP0);
+
+        float pPrimaryEnd = cachedFwdP0.x; // Bow endpoint X (hw)
+
+        float normFloor = (masterL1_X > hw + 0.0001f) ? Mathf.Clamp01((pFloor.x - hw) / (masterL1_X - hw)) : 0f;
+        float normPrimary = (masterPrimary_X > pPrimaryEnd + 0.0001f) ? Mathf.Clamp01((pPrimary.x - pPrimaryEnd) / (masterPrimary_X - pPrimaryEnd)) : 0f;
+
+        float normBlend = Mathf.Lerp(normFloor, normPrimary, cachedConnectionBlendWeight);
+        return hw + (masterLR_X - hw) * normBlend;
+    }
+
+    private float EvaluateConnectionPointAft(float targetZ, float hw, float masterL1_X, float masterLR_X, float masterPrimary_X)
+    {
+        float minU = 0f;
+        float maxU = 1f;
+        float bestU = 0f;
+
+        for (int i = 0; i < 20; i++)
         {
-            if (sternZ >= -0.001f || z <= sternZ) return hw;
-            return hw + (masterLR_X - hw) * normBlend;
+            float midU = (minU + maxU) / 2f;
+            Vector3 ptFloor = CalculateQuadraticBezierPoint(midU, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint);
+            Vector3 ptPrimary = cachedIsAftCubic
+                ? CalculateCubicBezierPoint(midU, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                : CalculateQuadraticBezierPoint(midU, cachedAftP0, cachedAftP1, cachedAftP2);
+
+            float zMid = Mathf.Lerp(ptFloor.z, ptPrimary.z, cachedConnectionBlendWeight);
+            if (zMid > targetZ) minU = midU;
+            else maxU = midU;
+            bestU = midU;
         }
+
+        Vector3 pFloor = CalculateQuadraticBezierPoint(bestU, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint);
+        Vector3 pPrimary = cachedIsAftCubic
+            ? CalculateCubicBezierPoint(bestU, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+            : CalculateQuadraticBezierPoint(bestU, cachedAftP0, cachedAftP1, cachedAftP2);
+
+        float pPrimaryEnd = cachedIsAftCubic ? cachedAftP3.x : cachedAftP2.x; // Stern endpoint X
+
+        float normFloor = (masterL1_X > hw + 0.0001f) ? Mathf.Clamp01((pFloor.x - hw) / (masterL1_X - hw)) : 0f;
+        float normPrimary = (masterPrimary_X > pPrimaryEnd + 0.0001f) ? Mathf.Clamp01((pPrimary.x - pPrimaryEnd) / (masterPrimary_X - pPrimaryEnd)) : 0f;
+
+        float normBlend = Mathf.Lerp(normFloor, normPrimary, cachedConnectionBlendWeight);
+        return hw + (masterLR_X - hw) * normBlend;
     }
 
     public float GetBreadthXAtZ(float z)
@@ -584,18 +702,12 @@ public class BreadthPlan : MonoBehaviour
 
         if (showConnectionGuide)
         {
-            if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
-            if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
-
-            if (bodyPlan == null) bodyPlan = GetComponentInParent<BodyPlan>();
-            if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
-
             float guideY = (bodyPlan != null) ? bodyPlan.cachedLR.y : 0f;
-            float aftZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : -10f;
-            float fwdZ = (sheerPlan != null) ? sheerPlan.cachedBowRisingEnd.z : 10f;
+            float bowZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : cachedConnBowPoint.z;
+            float sternZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : cachedConnSternPoint.z;
 
             Gizmos.color = connectionGuideColor;
-            const int steps = 100;
+            const int steps = 150;
 
             for (int sideSign = -1; sideSign <= 1; sideSign += 2)
             {
@@ -606,8 +718,7 @@ public class BreadthPlan : MonoBehaviour
                 for (int i = 0; i <= steps; i++)
                 {
                     float t = i / (float)steps;
-                    float z = Mathf.Lerp(aftZ, fwdZ, t);
-
+                    float z = Mathf.Lerp(sternZ, bowZ, t);
                     float targetX = GetConnectionPointXAtZ(z);
 
                     Vector3 pt = new Vector3(side * targetX, guideY, z);
@@ -619,6 +730,22 @@ public class BreadthPlan : MonoBehaviour
                     first = false;
                 }
             }
+
+            Vector3 bowPt = new Vector3(GetConnectionPointXAtZ(bowZ), guideY, bowZ);
+            Vector3 midPt = new Vector3((bodyPlan != null) ? bodyPlan.cachedLR.x : 0f, guideY, 0f);
+            Vector3 sternPt = new Vector3(GetConnectionPointXAtZ(sternZ), guideY, sternZ);
+
+            Gizmos.DrawSphere(bowPt, 0.10f);
+            Gizmos.DrawSphere(midPt, 0.12f);
+            Gizmos.DrawSphere(sternPt, 0.10f);
+
+            Vector3 portBowPt = MirrorX(bowPt);
+            Vector3 portMidPt = MirrorX(midPt);
+            Vector3 portSternPt = MirrorX(sternPt);
+
+            Gizmos.DrawSphere(portBowPt, 0.10f);
+            Gizmos.DrawSphere(portMidPt, 0.12f);
+            Gizmos.DrawSphere(portSternPt, 0.10f);
         }
 
 #if UNITY_EDITOR

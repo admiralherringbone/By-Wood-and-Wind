@@ -125,6 +125,8 @@ public class FramingModel : MonoBehaviour
 
     private List<List<Vector3>> cachedAngledFrameLines = new List<List<Vector3>>();
     private bool isAngledFrameCacheDirty = true;
+    private List<float> cachedStationList = new List<float>();
+    private bool isStationListDirty = true;
 
     private void Awake()
     {
@@ -134,22 +136,35 @@ public class FramingModel : MonoBehaviour
     private void OnValidate()
     {
         isAngledFrameCacheDirty = true;
+        isStationListDirty = true;
         FindReferences();
     }
 
     public void FindReferences()
     {
-        if (sheerPlan == null) sheerPlan = GetComponentInParent<SheerPlan>();
-        if (sheerPlan == null) sheerPlan = FindFirstObjectByType<SheerPlan>();
+        if (sheerPlan == null)
+        {
+            sheerPlan = GetComponentInParent<SheerPlan>();
+            if (sheerPlan == null) sheerPlan = FindFirstObjectByType<SheerPlan>();
+        }
 
-        if (bodyPlan == null) bodyPlan = GetComponentInParent<BodyPlan>();
-        if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
+        if (bodyPlan == null)
+        {
+            bodyPlan = GetComponentInParent<BodyPlan>();
+            if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
+        }
 
-        if (breadthPlan == null) breadthPlan = GetComponentInParent<BreadthPlan>();
-        if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
+        if (breadthPlan == null)
+        {
+            breadthPlan = GetComponentInParent<BreadthPlan>();
+            if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
+        }
 
-        if (fashionTimberModel == null) fashionTimberModel = GetComponentInParent<FashionTimberModel>();
-        if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
+        if (fashionTimberModel == null)
+        {
+            fashionTimberModel = GetComponentInParent<FashionTimberModel>();
+            if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
+        }
     }
 
     public float GetKeelHalfWidth()
@@ -186,6 +201,11 @@ public class FramingModel : MonoBehaviour
 
     public List<float> CalculateFrameStations()
     {
+        if (!isStationListDirty && cachedStationList != null && cachedStationList.Count > 0)
+        {
+            return cachedStationList;
+        }
+
         List<float> stations = new List<float>();
         if (sheerPlan == null) return stations;
 
@@ -205,7 +225,7 @@ public class FramingModel : MonoBehaviour
         {
             breadthPlan.UpdateCachedCurves();
 
-            float dZ = 0.001f;
+            float dZ = 0.02f;
 
             // Forward Stations (Z > 0)
             float curZ = 0f;
@@ -314,7 +334,9 @@ public class FramingModel : MonoBehaviour
             }
         }
 
-        return uniqueStations;
+        cachedStationList = uniqueStations;
+        isStationListDirty = false;
+        return cachedStationList;
     }
 
     public Vector3 GetTransverseFramePointAtU(float z, float side, float u)
@@ -421,107 +443,57 @@ public class FramingModel : MonoBehaviour
 
         projY = sheerPlan.GetProjectedBowRisingYAtZ(z);
 
-        // --- CONNECTION POINT (pLR) INBETWEEN SHAPE BETWEEN FLOOR BREADTH LINE AND PRIMARY MAX BEAM ---
-        float targetRisingX = breadthPlan.GetConnectionPointXAtZ(z);
+        Vector3 backboneKeelPoint = new Vector3(side * hw, profileY, z);
+        pL0_curve = backboneKeelPoint;
 
-        float targetRisingY = profileY;
-        if (z >= 0f)
+        // --- KEEL CONTROL POINT (pL1) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
+        float floorX = breadthPlan.GetFloorLineXAtZ(z);
+        float risingY = sheerPlan.GetRisingLineYAtZ(z);
+
+        float pL1_Y = Mathf.Max(risingY, profileY);
+        pL1 = new Vector3(side * floorX, pL1_Y, z);
+
+        if (profileY >= risingY - 0.001f)
         {
-            float bowZ = sheerPlan.cachedBowRisingEnd.z;
-            if (bowZ > 0.001f)
-            {
-                if (z >= bowZ)
-                {
-                    targetRisingX = hw;
-                    targetRisingY = sheerPlan.GetStemProfileYAtZ(z);
-                }
-                else
-                {
-                    float t = sheerPlan.GetRisingLineTAtZ(z);
-                    Vector3 bowEnd = new Vector3(hw, sheerPlan.cachedBowRisingEnd.y, sheerPlan.cachedBowRisingEnd.z);
-                    Vector3 p0_LR = bodyPlan.cachedLR;
-                    Vector3 p1_LR = new Vector3(bodyPlan.cachedLR.x, bodyPlan.cachedLR.y, sheerPlan.cachedBowP1Ctrl.z);
-                    Vector3 p2_LR = bowEnd;
-                    targetRisingY = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
-                }
-            }
-        }
-        else
-        {
-            if (sternRisingZ < -0.001f)
-            {
-                if (z <= sternRisingZ)
-                {
-                    targetRisingX = hw;
-                    if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z)
-                    {
-                        targetRisingY = sheerPlan.GetDeadwoodYAtZ(z);
-                    }
-                    else
-                    {
-                        targetRisingY = sheerPlan.GetSternProfileYAtZ(z);
-                    }
-                }
-                else
-                {
-                    float t = sheerPlan.GetRisingLineTAtZ(z);
-                    Vector3 sternEnd = new Vector3(hw, sheerPlan.cachedSternRisingEnd.y, sheerPlan.cachedSternRisingEnd.z);
-                    Vector3 p0_LR = bodyPlan.cachedLR;
-                    Vector3 p1_LR = new Vector3(bodyPlan.cachedLR.x, bodyPlan.cachedLR.y, sheerPlan.cachedSternP1Ctrl.z);
-                    Vector3 p2_LR = sternEnd;
-                    targetRisingY = CalculateQuadraticBezierPoint(t, p0_LR, p1_LR, p2_LR).y;
-                }
-            }
+            pL1 = backboneKeelPoint;
         }
 
-        targetRisingY = Mathf.Max(targetRisingY, profileY);
-        pLR = new Vector3(side * targetRisingX, targetRisingY, z);
-
-        // --- HOB LOWER CONTROL POINT (pL2) PROPORTIONALLY REDUCED IN RELATION TO RISING LINE ---
+        // --- HOB (pL3) AND HOB LOWER CONTROL POINT (pL2) ---
         float masterHobY = bodyPlan.cachedL3.y;
-        float masterLR_Y = bodyPlan.cachedLR.y;
+        float masterL1_Y = bodyPlan.cachedL1.y;
         float masterL2_Y = bodyPlan.cachedL2.y;
 
-        float masterAvailHeight = Mathf.Max(0.001f, masterHobY - masterLR_Y);
+        float masterAvailHeight = Mathf.Max(0.001f, masterHobY - masterL1_Y);
         float masterArmDrop = masterHobY - masterL2_Y;
         float armRatio = masterArmDrop / masterAvailHeight;
 
-        float localAvailHeight = Mathf.Max(0f, hobY - targetRisingY);
+        float localAvailHeight = Mathf.Max(0f, hobY - pL1_Y);
         float pL2_Y = hobY - (localAvailHeight * armRatio);
         pL2 = new Vector3(side * hobBreadth, Mathf.Clamp(pL2_Y, profileY, hobY), z);
         pL3 = new Vector3(side * hobBreadth, hobY, z);
 
-        // --- KEEL CONTROL POINT (pL1) LIFTS TO MAINTAIN TANGENT ALIGNMENT WITH pLR -> pL2 ---
-        float tSlide = Mathf.Clamp(bodyPlan.GetConnectionPointPositionAtZ(z), 0.01f, 0.99f);
-        float k = tSlide / (1f - tSlide);
-
-        Vector3 rayDir = pLR - pL2;
-        Vector3 solvedL1 = pLR + k * rayDir;
-        solvedL1.z = z;
-
-        Vector3 backboneKeelPoint = new Vector3(side * hw, profileY, z);
-        pL0_curve = backboneKeelPoint;
-
-        // If solvedL1 extends inward past the keel backbone (X = side * hw), clamp along ray to preserve tangent
-        if (side * solvedL1.x < hw)
+        if (profileY >= risingY - 0.001f)
         {
-            float dxRay = rayDir.x;
-            if (Mathf.Abs(dxRay) > 0.0001f)
-            {
-                float kMax = (side * hw - pLR.x) / dxRay;
-                solvedL1 = pLR + kMax * rayDir;
-                solvedL1.z = z;
-            }
-        }
-
-        pL1 = solvedL1;
-
-        if (profileY >= pLR.y - 0.001f)
-        {
-            pL1 = backboneKeelPoint;
-            pLR = backboneKeelPoint;
             pL2.y = Mathf.Max(pL2.y, profileY);
         }
+
+        // --- CONNECTION POINT (pLR) SLIDES ALONG pL1 -> pL2 STRICTLY DRIVEN BY BREADTH PLAN / CONNECTION GUIDE SHAPE ---
+        float targetConnX = breadthPlan.GetConnectionPointXAtZ(z);
+        float pL1_X_abs = Mathf.Abs(pL1.x);
+        float pL2_X_abs = Mathf.Abs(pL2.x);
+        float denomX = pL2_X_abs - pL1_X_abs;
+
+        float connRatio;
+        if (denomX > 0.0001f)
+        {
+            connRatio = Mathf.Clamp01((targetConnX - pL1_X_abs) / denomX);
+        }
+        else
+        {
+            connRatio = bodyPlan.GetConnectionPointPositionAtZ(z);
+        }
+        pLR = Vector3.Lerp(pL1, pL2, connRatio);
+
         return true;
     }
 
@@ -752,7 +724,7 @@ public class FramingModel : MonoBehaviour
         float minZ = zHeel;
         float maxZ = zFwd;
 
-        for (int iter = 0; iter < 16; iter++)
+        for (int iter = 0; iter < 8; iter++)
         {
             float midZ = (minZ + maxZ) * 0.5f;
             Vector3 midPt = GetTransverseFramePointAtU(midZ, side, u);
@@ -789,12 +761,11 @@ public class FramingModel : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        FindReferences();
-        if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
-
-        sheerPlan.UpdateCachedValues();
-        bodyPlan.UpdateCachedCurves();
-        breadthPlan.UpdateCachedCurves();
+        if (sheerPlan == null || bodyPlan == null || breadthPlan == null)
+        {
+            FindReferences();
+            if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
+        }
 
         float hw = GetKeelHalfWidth();
 
@@ -887,12 +858,13 @@ public class FramingModel : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
-
         float aftZ = sheerPlan.cachedSternRisingEnd.z;
         float fwdZ = sheerPlan.cachedBowRisingEnd.z;
 
-        const int steps = 120;
+        float connAftZ = (breadthPlan != null) ? breadthPlan.cachedConnSternPoint.z : aftZ;
+        float connFwdZ = (breadthPlan != null) ? breadthPlan.cachedConnBowPoint.z : fwdZ;
+
+        const int steps = 40;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;
         Vector3 pL1_port, pLR_port;
 
@@ -910,7 +882,7 @@ public class FramingModel : MonoBehaviour
                 for (int i = 0; i <= steps; i++)
                 {
                     float t = i / (float)steps;
-                    float z = Mathf.Lerp(aftZ, fwdZ, t);
+                    float z = Mathf.Lerp(connAftZ, connFwdZ, t);
 
                     float profY, projY;
                     if (GetAdjustedFrameControlPointsAtZ(z, side, out pL0, out pL1_stbd, out pLR_stbd, out pL2, out pL3, out profY, out projY))
@@ -1088,7 +1060,7 @@ public class FramingModel : MonoBehaviour
             {
                 float minT = 0f;
                 float maxT = 1f;
-                for (int i = 0; i < 15; i++)
+                for (int i = 0; i < 8; i++)
                 {
                     float midT = (minT + maxT) * 0.5f;
                     Vector3 pt = midT <= 0.5f ? CalculateQuadraticBezierPoint(midT * 2f, pL0_curve, pL1, pLR) : CalculateQuadraticBezierPoint((midT - 0.5f) * 2f, pLR, pL2, pL3);
@@ -1119,7 +1091,7 @@ public class FramingModel : MonoBehaviour
         {
             float minT = 0f;
             float maxT = 1f;
-            for (int i = 0; i < 15; i++)
+            for (int i = 0; i < 8; i++)
             {
                 float midT = (minT + maxT) * 0.5f;
                 float py = CalculateCubicBezierPoint(midT, pU0, pU1, pU2, pU3).y;
@@ -1134,7 +1106,7 @@ public class FramingModel : MonoBehaviour
         {
             float minT = 0f;
             float maxT = 1f;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 8; i++)
             {
                 float midT = (minT + maxT) * 0.5f;
                 float py = CalculateCubicBezierPoint(midT, pU0, pU1, pU2, pU3).y;

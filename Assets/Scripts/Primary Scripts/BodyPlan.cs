@@ -122,6 +122,8 @@ public class BodyPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedU2;
     [HideInInspector] public Vector3 cachedU3;
 
+    private bool isUpdatingCurves = false;
+
     private void OnValidate()
     {
         UpdateCachedCurves();
@@ -129,14 +131,18 @@ public class BodyPlan : MonoBehaviour
 
     public virtual void UpdateCachedCurves()
     {
+        if (isUpdatingCurves) return;
         if (sheerPlan == null || breadthPlan == null) return;
-        
-        // Push the Flare/Tumblehome value to the Breadth Plan BEFORE it calculates its curves
-        breadthPlan.topTimberMaxBeam = breadthPlan.maxBeam * flareTumblehomePercentage;
-        
-        // Ensure dependent plans are updated
-        sheerPlan.UpdateCachedValues();
-        breadthPlan.UpdateCachedCurves();
+
+        isUpdatingCurves = true;
+        try
+        {
+            // Push the Flare/Tumblehome value to the Breadth Plan BEFORE it calculates its curves
+            breadthPlan.topTimberMaxBeam = breadthPlan.maxBeam * flareTumblehomePercentage;
+            
+            // Ensure dependent plans are updated
+            sheerPlan.UpdateCachedValues();
+            breadthPlan.UpdateCachedCurves();
 
         float keelY = sheerPlan.GetKeelYAtZ(0f);
         float hobY = sheerPlan.cachedHobMidshipPoint.y;
@@ -226,6 +232,11 @@ public class BodyPlan : MonoBehaviour
             u2MaxDist = Mathf.Min(distToBot, distToSide);
         }
         cachedU2 = cachedU3 + new Vector3(u2DirX, u2DirY, 0) * (u2MaxDist * topTimberArmLength);
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
