@@ -640,7 +640,7 @@ public class SheerPlan : MonoBehaviour
             bodyPlan = GetComponentInParent<BodyPlan>();
             if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
         }
-        float risingLineMidshipY = (bodyPlan != null) ? bodyPlan.cachedL1.y : cachedMidshipKeel.y;
+        float risingLineMidshipY = (bodyPlan != null) ? bodyPlan.cachedLR.y : cachedMidshipKeel.y;
         cachedMidshipRisingPoint = new Vector3(0, risingLineMidshipY, 0);
 
         float targetBowY = Mathf.Lerp(cachedKeelBowPoint.y, cachedHobBowIntersect.y, bowRisingLineEndPos);
