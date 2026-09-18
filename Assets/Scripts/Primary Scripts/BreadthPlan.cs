@@ -365,19 +365,6 @@ public class BreadthPlan : MonoBehaviour
             return connectionGuideShape.GetConnectionGuideXAtZ(z);
         }
 
-        if (framingModel == null) framingModel = GetComponentInParent<FramingModel>();
-        if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
-
-        if (framingModel != null)
-        {
-            Vector3 pL0, pL1, pLR, pL2, pL3;
-            float profY, projY;
-            if (framingModel.GetAdjustedFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out profY, out projY))
-            {
-                return pLR.x;
-            }
-        }
-
         if (bodyPlan == null || sheerPlan == null) return (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
 
         float floorX = GetFloorLineXAtZ(z);

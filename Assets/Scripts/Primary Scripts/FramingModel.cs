@@ -15,6 +15,7 @@ public class FramingModel : MonoBehaviour
     public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
     public FashionTimberModel fashionTimberModel;
+    public ConnectionGuideShape connectionGuideShape;
 
     [Header("Frame Layout Settings")]
     [Tooltip("Method for spacing transverse frames along the hull (Uniform Z vs. Primary Breadth curve).")]
@@ -164,6 +165,12 @@ public class FramingModel : MonoBehaviour
         {
             fashionTimberModel = GetComponentInParent<FashionTimberModel>();
             if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
+        }
+
+        if (connectionGuideShape == null)
+        {
+            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
+            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
         }
     }
 
@@ -339,12 +346,8 @@ public class FramingModel : MonoBehaviour
         return cachedStationList;
     }
 
-    public Vector3 GetTransverseFramePointAtU(float z, float side, float u)
+    public Vector3 EvaluateFramePointFromControlPoints(float u, Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3, Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3)
     {
-        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-            return Vector3.zero;
-
         u = Mathf.Clamp01(u);
         if (u <= 0.5f)
         {
@@ -367,26 +370,119 @@ public class FramingModel : MonoBehaviour
         }
     }
 
+    public Vector3 GetTransverseFramePointAtU(float z, float side, float u)
+    {
+        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            return Vector3.zero;
+
+        return EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+    }
+
     public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
     {
+        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            return Vector3.zero;
+
         float minU = 0f;
         float maxU = 1.0f;
 
-        Vector3 minPt = GetTransverseFramePointAtU(z, side, minU);
-        Vector3 maxPt = GetTransverseFramePointAtU(z, side, maxU);
+        Vector3 minPt = EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+        Vector3 maxPt = EvaluateFramePointFromControlPoints(maxU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
 
         if (targetY <= minPt.y) return minPt;
         if (targetY >= maxPt.y) return maxPt;
 
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 10; i++)
         {
             float midU = (minU + maxU) * 0.5f;
-            Vector3 midPt = GetTransverseFramePointAtU(z, side, midU);
+            Vector3 midPt = EvaluateFramePointFromControlPoints(midU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
             if (midPt.y < targetY) minU = midU;
             else maxU = midU;
         }
 
-        return GetTransverseFramePointAtU(z, side, (minU + maxU) * 0.5f);
+        return EvaluateFramePointFromControlPoints((minU + maxU) * 0.5f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+    }
+
+    public List<Vector3> GetAllTransverseFramePointsAtX(float z, float side, float targetX)
+    {
+        List<Vector3> results = new List<Vector3>();
+        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            return results;
+
+        float absTargetX = Mathf.Abs(targetX);
+        float sign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        float fixedX = sign * absTargetX;
+
+        const int samples = 50;
+        float prevU = 0f;
+        Vector3 prevPt = EvaluateFramePointFromControlPoints(prevU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+        float prevX = Mathf.Abs(prevPt.x);
+
+        for (int i = 1; i <= samples; i++)
+        {
+            float currU = (float)i / samples;
+            Vector3 currPt = EvaluateFramePointFromControlPoints(currU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+            float currX = Mathf.Abs(currPt.x);
+
+            // Check if absTargetX falls between prevX and currX
+            if ((prevX <= absTargetX && absTargetX <= currX) || (currX <= absTargetX && absTargetX <= prevX))
+            {
+                float minU = prevU;
+                float maxU = currU;
+
+                for (int b = 0; b < 10; b++)
+                {
+                    float midU = (minU + maxU) * 0.5f;
+                    Vector3 midPt = EvaluateFramePointFromControlPoints(midU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                    Vector3 minPt = EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                    Vector3 maxPt = EvaluateFramePointFromControlPoints(maxU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+
+                    if (Mathf.Abs(maxPt.x - minPt.x) < 0.0001f) break;
+
+                    if ((Mathf.Abs(midPt.x) < absTargetX && Mathf.Abs(minPt.x) <= Mathf.Abs(maxPt.x)) ||
+                        (Mathf.Abs(midPt.x) > absTargetX && Mathf.Abs(minPt.x) > Mathf.Abs(maxPt.x)))
+                    {
+                        minU = midU;
+                    }
+                    else
+                    {
+                        maxU = midU;
+                    }
+                }
+
+                Vector3 solvedPt = EvaluateFramePointFromControlPoints((minU + maxU) * 0.5f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                Vector3 finalPt = new Vector3(fixedX, solvedPt.y, z);
+
+                if (results.Count == 0 || Vector3.Distance(results[results.Count - 1], finalPt) > 0.005f)
+                {
+                    results.Add(finalPt);
+                }
+            }
+
+            prevU = currU;
+            prevX = currX;
+        }
+
+        if (results.Count == 0)
+        {
+            Vector3 minPt = EvaluateFramePointFromControlPoints(0f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+            Vector3 maxPt = EvaluateFramePointFromControlPoints(1f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+
+            if (absTargetX <= Mathf.Abs(minPt.x)) results.Add(new Vector3(fixedX, minPt.y, z));
+            else if (absTargetX >= Mathf.Abs(maxPt.x)) results.Add(new Vector3(fixedX, maxPt.y, z));
+        }
+
+        return results;
+    }
+
+    public Vector3 GetTransverseFramePointAtX(float z, float side, float targetX)
+    {
+        List<Vector3> pts = GetAllTransverseFramePointsAtX(z, side, targetX);
+        if (pts.Count > 0) return pts[0];
+        return Vector3.zero;
     }
 
     public float CalculateMasterFrameLowerMouldArcLength()
@@ -438,6 +534,10 @@ public class FramingModel : MonoBehaviour
             else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sternRisingZ - 0.001f)
             {
                 profileY = sheerPlan.GetDeadwoodYAtZ(z);
+            }
+            else if (z < sternRisingZ - 0.001f)
+            {
+                profileY = sheerPlan.GetRisingLineYAtZ(z);
             }
         }
 
@@ -858,13 +958,23 @@ public class FramingModel : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        float aftZ = sheerPlan.cachedSternRisingEnd.z;
-        float fwdZ = sheerPlan.cachedBowRisingEnd.z;
+        if (connectionGuideShape == null && breadthPlan != null)
+        {
+            connectionGuideShape = breadthPlan.connectionGuideShape;
+        }
+        if (connectionGuideShape == null)
+        {
+            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
+            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
+        }
 
-        float connAftZ = (breadthPlan != null) ? breadthPlan.cachedConnSternPoint.z : aftZ;
-        float connFwdZ = (breadthPlan != null) ? breadthPlan.cachedConnBowPoint.z : fwdZ;
+        float aftZ = sheerPlan.cachedProjectedSternRisingEnd.z;
+        float fwdZ = sheerPlan.cachedProjectedBowRisingEnd.z;
 
-        const int steps = 40;
+        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : ((breadthPlan != null) ? breadthPlan.cachedConnSternPoint.z : aftZ);
+        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : ((breadthPlan != null) ? breadthPlan.cachedConnBowPoint.z : fwdZ);
+
+        const int steps = 100;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;
         Vector3 pL1_port, pLR_port;
 
@@ -948,6 +1058,8 @@ public class FramingModel : MonoBehaviour
 
     private void RebuildAngledFrameCache()
     {
+        if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
+
         cachedAngledFrameLines.Clear();
         float step = Mathf.Max(1f, angledFrameAngleStep);
         int steps = Mathf.Max(10, angledFrameResolution);

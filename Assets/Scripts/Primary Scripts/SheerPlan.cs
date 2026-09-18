@@ -1308,7 +1308,9 @@ public class SheerPlan : MonoBehaviour
         else
         {
             if (z <= cachedProjectedSternRisingEnd.z) return cachedProjectedSternRisingEnd.y;
-            float t = GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
+            float t = (z <= cachedSternRisingEnd.z)
+                ? GetBezierTAtZExt(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, z, 1.0f, cachedSternRisingLineEndT)
+                : GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
             return CalculateQuadraticBezierPoint(t, cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd).y;
         }
     }
@@ -1333,9 +1335,28 @@ public class SheerPlan : MonoBehaviour
         }
         else
         {
-            if (z <= cachedSternRisingEnd.z) return 1f;
+            if (z <= cachedProjectedSternRisingEnd.z) return cachedSternRisingLineEndT;
+            if (z <= cachedSternRisingEnd.z)
+            {
+                return GetBezierTAtZExt(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, z, 1.0f, cachedSternRisingLineEndT);
+            }
             return GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
         }
+    }
+
+    private float GetBezierTAtZExt(Vector3 p0, Vector3 p1, Vector3 p2, float targetZ, float minT, float maxT)
+    {
+        float min = minT;
+        float max = maxT;
+        for (int i = 0; i < 20; i++)
+        {
+            float mid = (min + max) / 2f;
+            float z = CalculateQuadraticBezierPoint(mid, p0, p1, p2).z;
+            
+            if (z > targetZ) min = mid;
+            else max = mid;
+        }
+        return (min + max) / 2f;
     }
 
     // --- UTILITIES ---

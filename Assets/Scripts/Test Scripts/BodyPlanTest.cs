@@ -8,10 +8,10 @@ using UnityEditor;
 public class BodyPlanTest : MonoBehaviour
 {
     [Tooltip("Reference to the ModularSheerPlan to get hull heights.")]
-    public SheerPlan sheerPlan;
+    public SheerPlanTest sheerPlan;
 
     [Tooltip("Reference to the ModularBreadthPlan to get max beam.")]
-    public BreadthPlan breadthPlan;
+    public BreadthPlanTest breadthPlan;
 
     [Header("Gizmo Settings")]
     public bool showLabels = true;
@@ -30,24 +30,43 @@ public class BodyPlanTest : MonoBehaviour
     public float hobLowerArmLength = 0.5f;
 
     [Header("Connection Point")]
-    [Tooltip("X-position of the Connection Point (0 = at Keel Half-Width, 1 = at Max Beam).")]
+    [Tooltip("Position of the Connection Point at Master Frame along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
     [Range(0f, 1f)]
-    public float connectionPointX = 0.5f;
+    public float connectionPointPosition = 0.5f;
 
-    [Tooltip("Y-position of the Connection Point (0 = at Keel Y, 1 = at HoB Y).")]
+    [Tooltip("Position of the Connection Point at the Bow End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
     [Range(0f, 1f)]
-    public float connectionPointY = 0.5f;
+    public float bowConnectionPointPosition = 0.5f;
+
+    [Tooltip("Position of the Connection Point at the Stern End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
+    [Range(0f, 1f)]
+    public float sternConnectionPointPosition = 0.5f;
+
+    [System.Obsolete("Use connectionPointPosition instead.")]
+    public float risingLinePosition
+    {
+        get => connectionPointPosition;
+        set => connectionPointPosition = value;
+    }
 
     public float GetConnectionPointPositionAtZ(float z)
     {
-        return connectionPointY;
-    }
+        if (sheerPlan == null) return connectionPointPosition;
 
-    public Vector3 GetConnectionPointVectorAtZ(float z, float keelHalfWidth, float maxBeam, float keelY, float hobY)
-    {
-        float x = Mathf.Lerp(keelHalfWidth, maxBeam, connectionPointX);
-        float y = Mathf.Lerp(keelY, hobY, connectionPointY);
-        return new Vector3(x, y, z);
+        if (z >= 0f)
+        {
+            float bowZ = sheerPlan.cachedBowRisingEnd.z;
+            if (bowZ <= 0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / bowZ);
+            return Mathf.Lerp(connectionPointPosition, bowConnectionPointPosition, t);
+        }
+        else
+        {
+            float sternZ = sheerPlan.cachedSternRisingEnd.z;
+            if (sternZ >= -0.001f) return connectionPointPosition;
+            float t = Mathf.Clamp01(z / sternZ);
+            return Mathf.Lerp(connectionPointPosition, sternConnectionPointPosition, t);
+        }
     }
 
     [Header("Upper Mould Controls")]
@@ -83,10 +102,12 @@ public class BodyPlanTest : MonoBehaviour
     public bool showInnerFrame = true;
     public Color innerFrameColor = Color.magenta;
 
-    [Header("Guide Lines Settings")]
-    [Tooltip("Draw a grey dashed guide line from the Rising Line point to the centerline at the HoB height.")]
-    public bool showRisingToHobGuide = true;
-    public Color risingToHobGuideColor = Color.gray;
+
+    // --- BACKWARD COMPATIBILITY FIELDS (for legacy reference scripts) ---
+    [HideInInspector] public bool useQuarticBezier = false;
+    [HideInInspector] public bool useQuinticBezier = false;
+    [HideInInspector] public float innerKeelPosition = 0.5f;
+    [HideInInspector] public float middleControlPosition = 0.5f;
 
 
     // --- CACHED POINTS ---
@@ -101,6 +122,8 @@ public class BodyPlanTest : MonoBehaviour
     [HideInInspector] public Vector3 cachedU2;
     [HideInInspector] public Vector3 cachedU3;
 
+    private bool isUpdatingCurves = false;
+
     private void OnValidate()
     {
         UpdateCachedCurves();
@@ -108,73 +131,57 @@ public class BodyPlanTest : MonoBehaviour
 
     public virtual void UpdateCachedCurves()
     {
+        if (isUpdatingCurves) return;
         if (sheerPlan == null || breadthPlan == null) return;
-        
-        // Push the Flare/Tumblehome value to the Breadth Plan BEFORE it calculates its curves
-        breadthPlan.topTimberMaxBeam = breadthPlan.maxBeam * flareTumblehomePercentage;
-        
-        // Ensure dependent plans are updated
-        sheerPlan.UpdateCachedValues();
-        breadthPlan.UpdateCachedCurves();
+
+        isUpdatingCurves = true;
+        try
+        {
+            // Push the Flare/Tumblehome value to the Breadth Plan BEFORE it calculates its curves
+            breadthPlan.topTimberMaxBeam = breadthPlan.maxBeam * flareTumblehomePercentage;
+            
+            // Ensure dependent plans are updated
+            sheerPlan.UpdateCachedValues();
+            breadthPlan.UpdateCachedCurves();
 
         float keelY = sheerPlan.GetKeelYAtZ(0f);
         float hobY = sheerPlan.cachedHobMidshipPoint.y;
         float maxBeam = breadthPlan.maxBeam;
         float boxHeight = hobY - keelY;
 
+        float keelAngleRad = keelArmAngle * Mathf.Deg2Rad;
+        float keelDirX = Mathf.Cos(keelAngleRad);
+        float keelDirY = Mathf.Sin(keelAngleRad);
+
         float keelHalfWidth = keelWidth / 2f;
         float availableBeam = maxBeam - keelHalfWidth;
 
-        // Cache Lower Mould points
-        cachedL0 = new Vector3(keelHalfWidth, keelY, 0);
-        cachedL3 = new Vector3(maxBeam, hobY, 0);
-
-        // 1. Calculate Connection Point (LR)
-        float lrX = Mathf.Lerp(keelHalfWidth, maxBeam, connectionPointX);
-        float lrY = Mathf.Lerp(keelY, hobY, connectionPointY);
-        cachedLR = new Vector3(lrX, lrY, 0);
-
-        // 2. Master "Setter" position for HoB Lower Control Arm (L2) from hobLowerArmLength slider
-        float baseL2_Y = hobY - (boxHeight * hobLowerArmLength);
-
-        // 3. Drive L2 vertically when connectionPointY moves LR vertically (clamped so L2.y >= cachedLR.y)
-        float lrYShift = lrY - Mathf.Lerp(keelY, hobY, 0.5f);
-        float targetL2_Y = Mathf.Clamp(baseL2_Y + lrYShift, cachedLR.y, hobY);
-
-        // 4. Tangent line slope m passing through L2 and Connection Point (LR)
-        float dx = maxBeam - cachedLR.x;
-        float dy = targetL2_Y - cachedLR.y;
-        float m = (dx > 0.0001f) ? (dy / dx) : 0f;
-        float keelIntersectY = cachedLR.y - m * (cachedLR.x - keelHalfWidth);
-
-        // 5. Keel Point Baseline Floor Hinge: When Keel arm is at the Keel Point (keelIntersectY <= keelY),
-        // adjusting HoB lower control arm hinges around (keelHalfWidth, keelY) and moves Connection Point Y!
-        if (keelIntersectY <= keelY + 0.001f)
+        float keelMaxDist;
+        if (keelArmAngle >= 89.999f) keelMaxDist = boxHeight;
+        else if (keelArmAngle <= 0.001f) keelMaxDist = availableBeam;
+        else
         {
-            keelIntersectY = keelY; // Clamped at Keel Point floor
-            float dxFull = maxBeam - keelHalfWidth;
-            float dyFull = baseL2_Y - keelY;
-            float hingeM = (dxFull > 0.0001f) ? (dyFull / dxFull) : 0f;
-
-            // Drive Connection Point Y from HoB lower arm pivoting around Keel Point (keelHalfWidth, keelY)
-            lrY = keelY + hingeM * (lrX - keelHalfWidth);
-            cachedLR = new Vector3(lrX, lrY, 0);
-            if (boxHeight > 0.0001f) connectionPointY = Mathf.Clamp01((lrY - keelY) / boxHeight);
-
-            targetL2_Y = baseL2_Y;
-            m = hingeM;
+            float distToRight = availableBeam / keelDirX;
+            float distToTop = boxHeight / keelDirY;
+            keelMaxDist = Mathf.Min(distToRight, distToTop);
         }
 
-        cachedL2 = new Vector3(maxBeam, targetL2_Y, 0);
+        // Cache Lower Mould points
+        // Segment 1: Keel (L0) → Keel Control (L1) → Connection Point (LR)
+        cachedL0 = new Vector3(keelHalfWidth, keelY, 0);
+        cachedL1 = cachedL0 + new Vector3(keelDirX, keelDirY, 0) * (keelMaxDist * keelArmLength);
 
-        // 6. Keel Control Arm (L1) extends along tangent line from Keel Point (keelHalfWidth, keelIntersectY) through LR
-        Vector3 keelBasePos = new Vector3(keelHalfWidth, keelIntersectY, 0);
-        cachedL1 = Vector3.Lerp(keelBasePos, cachedLR, keelArmLength);
+        // Segment 2: Connection Point (LR) → HoB Control (L2) → HoB (L3)
+        float hobDrop = boxHeight * hobLowerArmLength;
+        cachedL3 = new Vector3(maxBeam, hobY, 0);
+        cachedL2 = new Vector3(maxBeam, hobY - hobDrop, 0);
 
-        // Synchronize keelArmAngle readout
-        float keelDx = cachedLR.x - keelHalfWidth;
-        float keelDy = cachedLR.y - keelIntersectY;
-        keelArmAngle = Mathf.Atan2(keelDy, keelDx) * Mathf.Rad2Deg;
+        // Connection Point — constrained to lie on the line from L1 to L2
+        // This guarantees G1 tangent continuity at the join between the two quadratic segments
+        cachedLR = Vector3.Lerp(cachedL1, cachedL2, connectionPointPosition);
+
+        // Re-update SheerPlanTest cached values now that cachedLR is finalized
+        sheerPlan.UpdateCachedValues();
 
         // UPPER MOULD
         // Find the absolute highest part of the hull for the master Upper Mould
@@ -225,6 +232,11 @@ public class BodyPlanTest : MonoBehaviour
             u2MaxDist = Mathf.Min(distToBot, distToSide);
         }
         cachedU2 = cachedU3 + new Vector3(u2DirX, u2DirY, 0) * (u2MaxDist * topTimberArmLength);
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
@@ -252,7 +264,7 @@ public class BodyPlanTest : MonoBehaviour
 
     /// <summary>
     /// Evaluates the lower mould at a unified t parameter [0, 1] spanning both quadratic segments.
-    /// t [0, 0.5] = Segment 1 (Keel → Rising Line), t [0.5, 1] = Segment 2 (Rising Line → HoB).
+    /// t [0, 0.5] = Segment 1 (Keel → Connection Point), t [0.5, 1] = Segment 2 (Connection Point → HoB).
     /// </summary>
     public Vector3 EvaluateLowerMouldAtT(float t)
     {
@@ -327,7 +339,7 @@ public class BodyPlanTest : MonoBehaviour
         Gizmos.color = new Color(0.5f, 0.25f, 0f); // Brown
         Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
         Gizmos.DrawLine(new Vector3(keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelBottomY, 0));
-        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelBottomY, 0), new Vector3(keelHalfWidth, keelBottomY, 0));
+        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelBottomY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
         Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelTopY, 0));
 
         // Draw Starboard (Green)
@@ -371,13 +383,6 @@ public class BodyPlanTest : MonoBehaviour
         Gizmos.color = new Color(0.8f, 0.8f, 1f, 0.3f);
         Gizmos.DrawLine(u0, u1);
         Gizmos.DrawLine(u3, u2);
-
-        // Draw Grey Dashed Line: Rising Line point -> Centerline at HoB height
-        if (showRisingToHobGuide)
-        {
-            Vector3 centerlineHob = new Vector3(0f, m3.y, 0f);
-            DrawDashedLine(mR, centerlineHob, risingToHobGuideColor, 0.15f);
-        }
 
         // Draw Nodes
         Gizmos.color = Color.green;
@@ -436,23 +441,6 @@ public class BodyPlanTest : MonoBehaviour
         }
     }
 
-    protected void DrawDashedLine(Vector3 pA, Vector3 pB, Color color, float dashLength = 0.15f)
-    {
-        Gizmos.color = color;
-        float totalDist = Vector3.Distance(pA, pB);
-        if (totalDist <= 0.0001f) return;
-
-        int stepCount = Mathf.CeilToInt(totalDist / dashLength);
-        for (int i = 0; i < stepCount; i += 2)
-        {
-            float tStart = (float)i / stepCount;
-            float tEnd = Mathf.Min(1f, (float)(i + 1) / stepCount);
-            Vector3 pt1 = Vector3.Lerp(pA, pB, tStart);
-            Vector3 pt2 = Vector3.Lerp(pA, pB, tEnd);
-            Gizmos.DrawLine(pt1, pt2);
-        }
-    }
-
     protected void DrawInnerMirroredMould(float flipX, Color curveColor)
     {
         Gizmos.color = curveColor;
@@ -461,9 +449,6 @@ public class BodyPlanTest : MonoBehaviour
         int segments = 100;
 
         float topTimberY = cachedU3.y;
-
-        // ALWAYS calculate inner frame points on Starboard side (flipX = 1f) for perfect canonical geometry
-        float calcFlipX = 1f;
 
         for (int i = 0; i <= segments; i++)
         {
@@ -476,38 +461,29 @@ public class BodyPlanTest : MonoBehaviour
             float rawT = t * 2f;
             if (rawT <= 1f)
             {
-                outerPt = GetLowerMouldPoint(rawT, calcFlipX);
-                nextPt = GetLowerMouldPoint(Mathf.Min(1f, rawT + 0.01f), calcFlipX);
+                outerPt = GetLowerMouldPoint(rawT, flipX);
+                nextPt = GetLowerMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
             }
             else
             {
                 rawT -= 1f;
-                outerPt = GetUpperMouldPoint(rawT, calcFlipX);
-                nextPt = GetUpperMouldPoint(Mathf.Min(1f, rawT + 0.01f), calcFlipX);
+                outerPt = GetUpperMouldPoint(rawT, flipX);
+                nextPt = GetUpperMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
             }
 
-            Vector2 tangent = (nextPt - outerPt);
-            if (tangent.sqrMagnitude < 0.0001f)
-            {
-                // Look further forward along the mould to find a valid non-zero tangent direction
-                Vector2 futurePt = GetUpperMouldPoint(1f, calcFlipX);
-                tangent = futurePt - outerPt;
-            }
-            tangent = tangent.normalized;
-            if (tangent.sqrMagnitude < 0.0001f) tangent = Vector2.up;
+            Vector2 tangent = (nextPt - outerPt).normalized;
+            if (tangent == Vector2.zero) tangent = Vector2.up; // Fallback
             
-            // Calculate normal vector pointing inwards towards centerline (X = 0)
+            // Calculate normal pointing inwards. 
             Vector2 normal = new Vector2(-tangent.y, tangent.x);
-            if (normal.x > 0f) normal = -normal; // Ensure pointing Left towards centerline
+            
+            // Ensure normal always points towards the centerline
+            if (flipX > 0 && normal.x > 0) normal = -normal;
+            if (flipX < 0 && normal.x < 0) normal = -normal;
 
             float currentThickness = Mathf.Lerp(baseFrameThickness, topFrameThickness, t);
             Vector2 innerPt = outerPt + normal * currentThickness;
-
-            // Avoid adding consecutive duplicate points from collapsed segments
-            if (rawPoints.Count == 0 || Vector2.Distance(rawPoints[rawPoints.Count - 1], innerPt) > 0.001f)
-            {
-                rawPoints.Add(innerPt);
-            }
+            rawPoints.Add(innerPt);
         }
 
         // Remove self-intersections (swallowtail loops)
@@ -537,8 +513,7 @@ public class BodyPlanTest : MonoBehaviour
 
         for (int i = 0; i < rawPoints.Count; i++)
         {
-            // Mirror X coordinate according to flipX (Port vs Starboard)
-            Vector3 point = new Vector3(rawPoints[i].x * (flipX < 0 ? -1f : 1f), rawPoints[i].y, 0f);
+            Vector3 point = new Vector3(rawPoints[i].x, rawPoints[i].y, 0f);
 
             // Clamp to Top Timber
             if (point.y >= topTimberY)
