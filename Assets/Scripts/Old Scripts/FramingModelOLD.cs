@@ -958,10 +958,6 @@ public class FramingModelOLD : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        if (connectionGuideShape == null && breadthPlan != null)
-        {
-            connectionGuideShape = breadthPlan.connectionGuideShape;
-        }
         if (connectionGuideShape == null)
         {
             connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
@@ -971,8 +967,8 @@ public class FramingModelOLD : MonoBehaviour
         float aftZ = sheerPlan.cachedProjectedSternRisingEnd.z;
         float fwdZ = sheerPlan.cachedProjectedBowRisingEnd.z;
 
-        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : ((breadthPlan != null) ? breadthPlan.cachedConnSternPoint.z : aftZ);
-        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : ((breadthPlan != null) ? breadthPlan.cachedConnBowPoint.z : fwdZ);
+        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : aftZ;
+        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : fwdZ;
 
         const int steps = 100;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;
