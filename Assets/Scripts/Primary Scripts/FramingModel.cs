@@ -127,6 +127,19 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Color of the guide line tracing the Keel Control Arm points (pL1).")]
     public Color keelControlGuideColor = new Color(1f, 0.8f, 0.2f, 0.9f);
 
+    [Header("Pseudo Frame Settings")]
+    [Tooltip("Show grey dashed pseudo frame extensions simulating vertical frame extensions down to the Keel line height.")]
+    public bool showPseudoFrames = true;
+
+    [Tooltip("Color of the grey dashed pseudo frame vertical extensions.")]
+    public Color pseudoFrameColor = Color.gray;
+
+    [Tooltip("Dash length for drawing pseudo frame lines in Scene view.")]
+    public float pseudoFrameDashLength = 0.1f;
+
+    [Tooltip("Gap length between dashes for pseudo frame lines in Scene view.")]
+    public float pseudoFrameGapLength = 0.05f;
+
     private List<List<Vector3>> cachedAngledFrameLines = new List<List<Vector3>>();
     private bool isAngledFrameCacheDirty = true;
     private List<float> cachedStationList = new List<float>();
@@ -1245,6 +1258,19 @@ public class FramingModel : MonoBehaviour
             DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperMinT, upperTopCutoffT);
         }
 
+        // PSEUDO FRAME VERTICAL EXTENSION (SIMULATE EXTENDING DOWN TO KEEL LINE HEIGHT)
+        if (showPseudoFrames && pL0_curve.y > keelY + 0.001f)
+        {
+            Vector3 keelBaselinePt = new Vector3(side * hw, keelY, z);
+            DrawDashedLine(keelBaselinePt, pL0_curve, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
+
+            if (showFrameControlPoints)
+            {
+                Gizmos.color = pseudoKeelPointColor;
+                Gizmos.DrawSphere(keelBaselinePt, controlPointRadius * 0.8f);
+            }
+        }
+
         // CONTROL POINT VISUALIZATION (Keel Point, Connection Point, HOB Point)
         if (showFrameControlPoints)
         {
@@ -1407,6 +1433,29 @@ public class FramingModel : MonoBehaviour
             Vector3 currentPoint = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
+        }
+    }
+
+    private void DrawDashedLine(Vector3 start, Vector3 end, Color color, float dashLength = 0.1f, float gapLength = 0.05f)
+    {
+        Gizmos.color = color;
+        Vector3 dir = end - start;
+        float dist = dir.magnitude;
+        if (dist < 0.0001f) return;
+        Vector3 nDir = dir / dist;
+
+        dashLength = Mathf.Max(0.01f, dashLength);
+        gapLength = Mathf.Max(0.005f, gapLength);
+        float step = dashLength + gapLength;
+
+        float current = 0f;
+        while (current < dist)
+        {
+            float drawLen = Mathf.Min(dashLength, dist - current);
+            Vector3 p1 = start + nDir * current;
+            Vector3 p2 = p1 + nDir * drawLen;
+            Gizmos.DrawLine(p1, p2);
+            current += step;
         }
     }
 
