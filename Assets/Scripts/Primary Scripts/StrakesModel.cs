@@ -87,6 +87,16 @@ public class StrakesModel : MonoBehaviour
     [Tooltip("Show strake index labels in Scene view.")]
     public bool showLabels = false;
 
+    private static readonly Vector3[] ptTableBuffer = new Vector3[64];
+    private static readonly float[] distTableBuffer = new float[64];
+    private static readonly float[] rawYBuffer = new float[512];
+    private static readonly float[] targetYBuffer = new float[512];
+    private static readonly bool[] validBuffer = new bool[512];
+
+    private List<float> cachedValidStations = new List<float>();
+    private float cachedMidshipLength = 0f;
+    private bool isCacheDirty = true;
+
     private void Awake()
     {
         FindReferences();
@@ -94,6 +104,7 @@ public class StrakesModel : MonoBehaviour
 
     private void OnValidate()
     {
+        isCacheDirty = true;
         FindReferences();
     }
 
@@ -105,13 +116,52 @@ public class StrakesModel : MonoBehaviour
         if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
     }
 
+    private void RefreshCacheIfNeeded()
+    {
+        if (!isCacheDirty) return;
+        FindReferences();
+
+        // 1. Cache Midship Length ONCE
+        cachedMidshipLength = 0f;
+        if (framingModel != null)
+        {
+            Vector3 mL0, mL1, mLR, mL2, mL3, mU0, mU1, mU2, mU3;
+            if (framingModel.GetFrameControlPointsAtZ(0f, 1f, out mL0, out mL1, out mLR, out mL2, out mL3, out mU0, out mU1, out mU2, out mU3))
+            {
+                cachedMidshipLength = Vector3.Distance(mL0, mLR) + Vector3.Distance(mLR, mL3);
+            }
+        }
+
+        // 2. Cache Valid Frame Stations ONCE
+        cachedValidStations.Clear();
+        if (framingModel != null && sheerPlan != null)
+        {
+            sheerPlan.UpdateCachedValues();
+            List<float> allStations = framingModel.CalculateFrameStations();
+            if (allStations.Count > 1)
+            {
+                float maxBowZ = allStations[allStations.Count - 1];
+                foreach (float z in allStations)
+                {
+                    if (z < maxBowZ - 0.001f)
+                    {
+                        cachedValidStations.Add(z);
+                    }
+                }
+            }
+        }
+
+        isCacheDirty = false;
+    }
+
     /// <summary>
     /// Evaluates list of 3D points equally spaced by arc length along a sub-segment u in [minU, maxU] 
     /// using pre-fetched control points. Includes Pseudo Frame vertical segment when present (pL0.y > keelY).
+    /// Optimized with zero heap allocations during Gizmo drawing.
     /// </summary>
     public List<Vector3> GetSegmentStrakePointsFromControlPoints(
         Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3, Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
-        float minU, float maxU, int count, float keelY = float.NaN)
+        float minU, float maxU, int count, float keelY = float.NaN, float midshipLen = float.NaN)
     {
         List<Vector3> points = new List<Vector3>(count);
         if (framingModel == null) return points;
@@ -123,25 +173,22 @@ public class StrakesModel : MonoBehaviour
         const int pseudoSamples = 10;
         int totalSamples = hasPseudoFrame ? (pseudoSamples + curveSamples) : curveSamples;
 
-        Vector3[] ptTable = new Vector3[totalSamples + 1];
-        float[] distTable = new float[totalSamples + 1];
-
-        distTable[0] = 0f;
+        distTableBuffer[0] = 0f;
         float totalLength = 0f;
 
         if (hasPseudoFrame)
         {
             Vector3 keelBaselinePt = new Vector3(pL0.x, keelY, pL0.z);
-            ptTable[0] = keelBaselinePt;
+            ptTableBuffer[0] = keelBaselinePt;
 
             // 1. Sample vertical Pseudo Frame segment (keelBaselinePt -> pL0)
             for (int i = 1; i <= pseudoSamples; i++)
             {
                 float t = i / (float)pseudoSamples;
-                ptTable[i] = Vector3.Lerp(keelBaselinePt, pL0, t);
-                float stepDist = Vector3.Distance(ptTable[i - 1], ptTable[i]);
+                ptTableBuffer[i] = Vector3.Lerp(keelBaselinePt, pL0, t);
+                float stepDist = Vector3.Distance(ptTableBuffer[i - 1], ptTableBuffer[i]);
                 totalLength += stepDist;
-                distTable[i] = totalLength;
+                distTableBuffer[i] = totalLength;
             }
 
             // 2. Sample Lower Mould Bezier curve (pL0 -> pLR)
@@ -149,43 +196,34 @@ public class StrakesModel : MonoBehaviour
             {
                 float u = Mathf.Lerp(minU, maxU, i / (float)curveSamples);
                 int tableIdx = pseudoSamples + i;
-                ptTable[tableIdx] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
-                float stepDist = Vector3.Distance(ptTable[tableIdx - 1], ptTable[tableIdx]);
+                ptTableBuffer[tableIdx] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                float stepDist = Vector3.Distance(ptTableBuffer[tableIdx - 1], ptTableBuffer[tableIdx]);
                 totalLength += stepDist;
-                distTable[tableIdx] = totalLength;
+                distTableBuffer[tableIdx] = totalLength;
             }
         }
         else
         {
-            ptTable[0] = framingModel.EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+            ptTableBuffer[0] = framingModel.EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
 
             for (int i = 1; i <= curveSamples; i++)
             {
                 float u = Mathf.Lerp(minU, maxU, i / (float)curveSamples);
-                ptTable[i] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
-                float stepDist = Vector3.Distance(ptTable[i - 1], ptTable[i]);
+                ptTableBuffer[i] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                float stepDist = Vector3.Distance(ptTableBuffer[i - 1], ptTableBuffer[i]);
                 totalLength += stepDist;
-                distTable[i] = totalLength;
+                distTableBuffer[i] = totalLength;
             }
         }
 
         if (totalLength < 0.0001f)
         {
-            for (int k = 0; k < count; k++) points.Add(ptTable[0]);
+            for (int k = 0; k < count; k++) points.Add(ptTableBuffer[0]);
             return points;
         }
 
-        float midshipLength = 0f;
-        if (enableStrakeSmoothing && framingModel != null)
-        {
-            Vector3 mL0, mL1, mLR, mL2, mL3, mU0, mU1, mU2, mU3;
-            if (framingModel.GetFrameControlPointsAtZ(0f, 1f, out mL0, out mL1, out mLR, out mL2, out mL3, out mU0, out mU1, out mU2, out mU3))
-            {
-                midshipLength = Vector3.Distance(mL0, mLR) + Vector3.Distance(mLR, mL3);
-            }
-        }
-
-        float girthRatio = (enableStrakeSmoothing && midshipLength > 0.001f) ? Mathf.Clamp01(totalLength / midshipLength) : 1.0f;
+        float midLen = float.IsNaN(midshipLen) ? cachedMidshipLength : midshipLen;
+        float girthRatio = (enableStrakeSmoothing && midLen > 0.001f) ? Mathf.Clamp01(totalLength / midLen) : 1.0f;
         float power = Mathf.Lerp(1.0f / Mathf.Clamp(minHobTaperRatio, 0.3f, 1.0f), 1.0f, girthRatio);
 
         for (int k = 0; k < count; k++)
@@ -195,20 +233,20 @@ public class StrakesModel : MonoBehaviour
             float targetDist = tBiased * totalLength;
 
             int idx = 0;
-            while (idx < totalSamples && distTable[idx + 1] < targetDist)
+            while (idx < totalSamples && distTableBuffer[idx + 1] < targetDist)
             {
                 idx++;
             }
 
             if (idx >= totalSamples)
             {
-                points.Add(ptTable[totalSamples]);
+                points.Add(ptTableBuffer[totalSamples]);
             }
             else
             {
-                float segmentLength = distTable[idx + 1] - distTable[idx];
-                float t = segmentLength > 0.00001f ? (targetDist - distTable[idx]) / segmentLength : 0f;
-                Vector3 pt = Vector3.Lerp(ptTable[idx], ptTable[idx + 1], t);
+                float segmentLength = distTableBuffer[idx + 1] - distTableBuffer[idx];
+                float t = segmentLength > 0.00001f ? (targetDist - distTableBuffer[idx]) / segmentLength : 0f;
+                Vector3 pt = Vector3.Lerp(ptTableBuffer[idx], ptTableBuffer[idx + 1], t);
                 points.Add(pt);
             }
         }
@@ -219,7 +257,7 @@ public class StrakesModel : MonoBehaviour
     /// <summary>
     /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
     /// Smooths Y-height trajectories while projecting points back onto transverse frame surfaces 
-    /// or vertical Pseudo Frame segments.
+    /// or vertical Pseudo Frame segments. Optimized with zero allocation buffers.
     /// </summary>
     private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
     {
@@ -227,42 +265,40 @@ public class StrakesModel : MonoBehaviour
 
         float hw = framingModel.GetKeelHalfWidth();
         int passes = Mathf.Clamp(fairingPasses, 1, 5);
+        int stationCount = Mathf.Min(stations.Count, 512);
 
         for (int pass = 0; pass < passes; pass++)
         {
             for (int k = 0; k < strakeCount; k++)
             {
-                float[] rawY = new float[stations.Count];
-                bool[] valid = new bool[stations.Count];
-
-                for (int s = 0; s < stations.Count; s++)
+                for (int s = 0; s < stationCount; s++)
                 {
+                    validBuffer[s] = false;
                     if (pointDict.ContainsKey(s) && pointDict[s].Count > k)
                     {
-                        rawY[s] = pointDict[s][k].y;
-                        valid[s] = true;
+                        rawYBuffer[s] = pointDict[s][k].y;
+                        validBuffer[s] = true;
                     }
                 }
 
-                float[] targetY = new float[stations.Count];
-                for (int s = 0; s < stations.Count; s++)
+                for (int s = 0; s < stationCount; s++)
                 {
-                    if (!valid[s]) continue;
+                    if (!validBuffer[s]) continue;
 
-                    if (s == 0 || s == stations.Count - 1 || !valid[s - 1] || !valid[s + 1])
+                    if (s == 0 || s == stationCount - 1 || !validBuffer[s - 1] || !validBuffer[s + 1])
                     {
-                        targetY[s] = rawY[s];
+                        targetYBuffer[s] = rawYBuffer[s];
                     }
                     else
                     {
-                        float ySmoothed = 0.25f * rawY[s - 1] + 0.50f * rawY[s] + 0.25f * rawY[s + 1];
-                        targetY[s] = Mathf.Lerp(rawY[s], ySmoothed, fairingStrength);
+                        float ySmoothed = 0.25f * rawYBuffer[s - 1] + 0.50f * rawYBuffer[s] + 0.25f * rawYBuffer[s + 1];
+                        targetYBuffer[s] = Mathf.Lerp(rawYBuffer[s], ySmoothed, fairingStrength);
                     }
                 }
 
-                for (int s = 0; s < stations.Count; s++)
+                for (int s = 0; s < stationCount; s++)
                 {
-                    if (!valid[s]) continue;
+                    if (!validBuffer[s]) continue;
                     float z = stations[s];
                     float keelY = framingModel.GetFrameBottomYAtZ(z);
 
@@ -272,16 +308,14 @@ public class StrakesModel : MonoBehaviour
                         float profileY = pL0.y;
 
                         Vector3 fairedPt;
-                        if (targetY[s] < profileY - 0.001f)
+                        if (targetYBuffer[s] < profileY - 0.001f)
                         {
-                            // Target height lies on the vertical Pseudo Frame segment (keelY -> profileY at X = side * hw)
-                            float clampedY = Mathf.Max(keelY, targetY[s]);
+                            float clampedY = Mathf.Max(keelY, targetYBuffer[s]);
                             fairedPt = new Vector3(side * hw, clampedY, z);
                         }
                         else
                         {
-                            // Target height lies on the transverse frame curve
-                            fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetY[s]);
+                            fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetYBuffer[s]);
                         }
 
                         if (fairedPt != Vector3.zero)
@@ -310,7 +344,8 @@ public class StrakesModel : MonoBehaviour
     public List<Vector3> GetLowerLowerMouldStrakePoints(float z, float side, int count)
     {
         if (framingModel == null || sheerPlan == null) return new List<Vector3>();
-        sheerPlan.UpdateCachedValues();
+        RefreshCacheIfNeeded();
+
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
         float maxBowZ = allStations[allStations.Count - 1];
@@ -321,7 +356,7 @@ public class StrakesModel : MonoBehaviour
             return new List<Vector3>();
 
         float keelY = framingModel.GetFrameBottomYAtZ(z);
-        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, count, keelY);
+        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, count, keelY, cachedMidshipLength);
     }
 
     /// <summary>
@@ -330,7 +365,8 @@ public class StrakesModel : MonoBehaviour
     public List<Vector3> GetUpperLowerMouldStrakePoints(float z, float side, int count)
     {
         if (framingModel == null || sheerPlan == null) return new List<Vector3>();
-        sheerPlan.UpdateCachedValues();
+        RefreshCacheIfNeeded();
+
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
         float maxBowZ = allStations[allStations.Count - 1];
@@ -341,7 +377,7 @@ public class StrakesModel : MonoBehaviour
             return new List<Vector3>();
 
         float keelY = framingModel.GetFrameBottomYAtZ(z);
-        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, count, keelY);
+        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, count, keelY, cachedMidshipLength);
     }
 
     /// <summary>
@@ -350,33 +386,17 @@ public class StrakesModel : MonoBehaviour
     /// </summary>
     public List<float> GetValidFrameStations()
     {
-        List<float> stations = new List<float>();
-        if (framingModel == null || sheerPlan == null) return stations;
-
-        sheerPlan.UpdateCachedValues();
-        List<float> allStations = framingModel.CalculateFrameStations();
-        if (allStations.Count <= 1) return stations;
-
-        float maxBowZ = allStations[allStations.Count - 1];
-
-        foreach (float z in allStations)
-        {
-            if (z < maxBowZ - 0.001f)
-            {
-                stations.Add(z);
-            }
-        }
-
-        return stations;
+        RefreshCacheIfNeeded();
+        return cachedValidStations;
     }
 
     private void OnDrawGizmos()
     {
         if (!showStrakes) return;
-        FindReferences();
+        RefreshCacheIfNeeded();
         if (framingModel == null || sheerPlan == null) return;
 
-        List<float> stations = GetValidFrameStations();
+        List<float> stations = cachedValidStations;
         if (stations.Count == 0) return;
 
         int llCount = Mathf.Max(2, strakesPerLowerLowerMould);
@@ -397,8 +417,8 @@ public class StrakesModel : MonoBehaviour
             Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
             if (framingModel.GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             {
-                List<Vector3> portLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY);
-                List<Vector3> portUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY);
+                List<Vector3> portLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
+                List<Vector3> portUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
 
                 portLLPoints[s] = portLL;
                 portULPoints[s] = portUL;
@@ -407,8 +427,8 @@ public class StrakesModel : MonoBehaviour
             // Starboard Side (+1f) - Fetch control points ONCE per station
             if (framingModel.GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             {
-                List<Vector3> stbdLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY);
-                List<Vector3> stbdUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY);
+                List<Vector3> stbdLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
+                List<Vector3> stbdUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
 
                 stbdLLPoints[s] = stbdLL;
                 stbdULPoints[s] = stbdUL;
