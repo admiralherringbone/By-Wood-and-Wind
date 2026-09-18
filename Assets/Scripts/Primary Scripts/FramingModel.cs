@@ -101,6 +101,10 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Color of intermediate Bezier control handle points (pL1, pL2, pU1, pU2, pU3).")]
     public Color controlArmPointColor = new Color(1f, 0.8f, 0.2f, 1f);
 
+    [Header("Keel Control Arm Model")]
+    [Tooltip("Use Quadratic (t^2) scaling for Keel control arm to unload geometric tension and dive inward near stern/bow for a smooth rounded bilge.")]
+    public bool useQuadraticScaling = true;
+
     [Header("Gizmo Visualization Settings")]
     public bool showLabels = true;
     public bool showBackboneSideLines = true;
@@ -546,53 +550,86 @@ public class FramingModel : MonoBehaviour
         Vector3 backboneKeelPoint = new Vector3(side * hw, profileY, z);
         pL0_curve = backboneKeelPoint;
 
-        // --- KEEL CONTROL POINT (pL1) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
-        float floorX = breadthPlan.GetFloorLineXAtZ(z);
+        // --- CONNECTION POINT (pLR) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
+        if (connectionGuideShape == null)
+        {
+            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
+            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
+        }
+
+        float floorX = (connectionGuideShape != null && connectionGuideShape.enabled) 
+            ? connectionGuideShape.GetConnectionGuideXAtZ(z) 
+            : breadthPlan.GetFloorLineXAtZ(z);
         float risingY = sheerPlan.GetRisingLineYAtZ(z);
 
-        float pL1_Y = Mathf.Max(risingY, profileY);
-        pL1 = new Vector3(side * floorX, pL1_Y, z);
+        float pLR_Y = Mathf.Max(risingY, profileY);
+        pLR = new Vector3(side * floorX, pLR_Y, z);
 
         if (profileY >= risingY - 0.001f)
         {
-            pL1 = backboneKeelPoint;
+            pLR = backboneKeelPoint;
         }
 
-        // --- HOB (pL3) AND HOB LOWER CONTROL POINT (pL2) ---
+        // --- EQUAL FLOOR BREADTH SPACING OR QUADRATIC t^2 SCALED CONTROL ARMS AT CONNECTION POINT (pLR) ---
+        // 1. Proportional HOB lower arm drop calculation relative to Rising Line & HOB height
         float masterHobY = bodyPlan.cachedL3.y;
-        float masterL1_Y = bodyPlan.cachedL1.y;
+        float masterLR_Y = bodyPlan.cachedLR.y;
         float masterL2_Y = bodyPlan.cachedL2.y;
 
-        float masterAvailHeight = Mathf.Max(0.001f, masterHobY - masterL1_Y);
+        float masterAvailHeight = Mathf.Max(0.001f, masterHobY - masterLR_Y);
         float masterArmDrop = masterHobY - masterL2_Y;
-        float armRatio = masterArmDrop / masterAvailHeight;
+        float armDropRatio = masterArmDrop / masterAvailHeight;
 
-        float localAvailHeight = Mathf.Max(0f, hobY - pL1_Y);
-        float pL2_Y = hobY - (localAvailHeight * armRatio);
-        pL2 = new Vector3(side * hobBreadth, Mathf.Clamp(pL2_Y, profileY, hobY), z);
+        float localAvailHeight = Mathf.Max(0f, hobY - pLR.y);
+        float localArmDrop = localAvailHeight * armDropRatio;
+        float pL2_Y = hobY - localArmDrop;
+        pL2_Y = Mathf.Clamp(pL2_Y, profileY, hobY);
+
+        // 2. Position pL2 at (side * hobBreadth, pL2_Y, z) and pL3 at HOB
+        pL2 = new Vector3(side * hobBreadth, pL2_Y, z);
         pL3 = new Vector3(side * hobBreadth, hobY, z);
 
-        if (profileY >= risingY - 0.001f)
-        {
-            pL2.y = Mathf.Max(pL2.y, profileY);
-        }
+        // 3. Evaluate 2D magnitude slope of tangent ray from pLR to pL2 for bilateral symmetry
+        float deltaX_hob = Mathf.Max(0.0001f, hobBreadth - floorX);
+        float deltaY_hob = pL2.y - pLR.y;
+        float slope = deltaY_hob / deltaX_hob;
 
-        // --- CONNECTION POINT (pLR) SLIDES ALONG pL1 -> pL2 STRICTLY DRIVEN BY BREADTH PLAN / CONNECTION GUIDE SHAPE ---
-        float targetConnX = breadthPlan.GetConnectionPointXAtZ(z);
-        float pL1_X_abs = Mathf.Abs(pL1.x);
-        float pL2_X_abs = Mathf.Abs(pL2.x);
-        float denomX = pL2_X_abs - pL1_X_abs;
+        // 4. Calculate pL1.x position (Quadratic t^2 scaling or Linear constant spacing)
+        Vector3 masterL1 = bodyPlan.cachedL1;
+        Vector3 masterLR = bodyPlan.cachedLR;
 
-        float connRatio;
-        if (denomX > 0.0001f)
+        float pL1_X_abs;
+        if (useQuadraticScaling)
         {
-            connRatio = Mathf.Clamp01((targetConnX - pL1_X_abs) / denomX);
+            // Normalized floor breadth width factor t in [0, 1] relative to midship master floor line
+            float floorX_mid = breadthPlan.GetFloorLineXAtZ(0f);
+            float maxAvailBeam = Mathf.Max(0.001f, floorX_mid - hw);
+            float t_width = Mathf.Clamp01((floorX - hw) / maxAvailBeam);
+            float t_squared = t_width * t_width;
+
+            float masterKeelSpan = Mathf.Max(0.001f, masterL1.x - hw);
+            pL1_X_abs = hw + masterKeelSpan * t_squared;
         }
         else
         {
-            connRatio = bodyPlan.GetConnectionPointPositionAtZ(z);
+            // Linear constant horizontal spacing from Floor breadth line
+            float deltaX_mid = Mathf.Abs(masterLR.x - masterL1.x);
+            if (deltaX_mid <= 0.001f) deltaX_mid = 0.2f;
+            pL1_X_abs = floorX - deltaX_mid;
         }
-        pLR = Vector3.Lerp(pL1, pL2, connRatio);
+
+        pL1_X_abs = Mathf.Clamp(pL1_X_abs, hw, Mathf.Max(hw + 0.001f, floorX - 0.001f));
+        float dx_abs = floorX - pL1_X_abs;
+        float pL1_Y = Mathf.Max(profileY, pLR.y - dx_abs * slope);
+        pL1 = new Vector3(side * pL1_X_abs, pL1_Y, z);
+
+        // Edge case override when profile cutoff exceeds rising line height
+        if (profileY >= risingY - 0.001f)
+        {
+            pLR = backboneKeelPoint;
+            pL1 = backboneKeelPoint;
+            pL2.y = Mathf.Max(pL2.y, profileY);
+        }
 
         return true;
     }
@@ -958,10 +995,6 @@ public class FramingModel : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        if (connectionGuideShape == null && breadthPlan != null)
-        {
-            connectionGuideShape = breadthPlan.connectionGuideShape;
-        }
         if (connectionGuideShape == null)
         {
             connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
@@ -971,8 +1004,8 @@ public class FramingModel : MonoBehaviour
         float aftZ = sheerPlan.cachedProjectedSternRisingEnd.z;
         float fwdZ = sheerPlan.cachedProjectedBowRisingEnd.z;
 
-        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : ((breadthPlan != null) ? breadthPlan.cachedConnSternPoint.z : aftZ);
-        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : ((breadthPlan != null) ? breadthPlan.cachedConnBowPoint.z : fwdZ);
+        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : aftZ;
+        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : fwdZ;
 
         const int steps = 100;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;
