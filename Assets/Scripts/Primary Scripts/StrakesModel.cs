@@ -87,36 +87,68 @@ public class StrakesModel : MonoBehaviour
     }
 
     /// <summary>
+    /// <summary>
     /// Evaluates list of 3D points equally spaced by arc length along a sub-segment u in [minU, maxU] 
-    /// using pre-fetched control points. High-performance stack math with zero component queries.
+    /// using pre-fetched control points. Includes Pseudo Frame vertical segment when present (pL0.y > keelY).
     /// </summary>
     public List<Vector3> GetSegmentStrakePointsFromControlPoints(
         Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3, Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
-        float minU, float maxU, int count)
+        float minU, float maxU, int count, float keelY = float.NaN)
     {
         List<Vector3> points = new List<Vector3>(count);
         if (framingModel == null) return points;
 
         count = Mathf.Max(2, count);
-        const int samples = 20;
+        bool hasPseudoFrame = (Mathf.Approximately(minU, 0f) && !float.IsNaN(keelY) && pL0.y > keelY + 0.001f);
 
-        float[] uTable = new float[samples + 1];
-        Vector3[] ptTable = new Vector3[samples + 1];
-        float[] distTable = new float[samples + 1];
+        const int curveSamples = 20;
+        const int pseudoSamples = 10;
+        int totalSamples = hasPseudoFrame ? (pseudoSamples + curveSamples) : curveSamples;
+
+        Vector3[] ptTable = new Vector3[totalSamples + 1];
+        float[] distTable = new float[totalSamples + 1];
 
         distTable[0] = 0f;
-        uTable[0] = minU;
-        ptTable[0] = framingModel.EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
-
         float totalLength = 0f;
-        for (int i = 1; i <= samples; i++)
+
+        if (hasPseudoFrame)
         {
-            float u = Mathf.Lerp(minU, maxU, (float)i / samples);
-            uTable[i] = u;
-            ptTable[i] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
-            float stepDist = Vector3.Distance(ptTable[i - 1], ptTable[i]);
-            totalLength += stepDist;
-            distTable[i] = totalLength;
+            Vector3 keelBaselinePt = new Vector3(pL0.x, keelY, pL0.z);
+            ptTable[0] = keelBaselinePt;
+
+            // 1. Sample vertical Pseudo Frame segment (keelBaselinePt -> pL0)
+            for (int i = 1; i <= pseudoSamples; i++)
+            {
+                float t = i / (float)pseudoSamples;
+                ptTable[i] = Vector3.Lerp(keelBaselinePt, pL0, t);
+                float stepDist = Vector3.Distance(ptTable[i - 1], ptTable[i]);
+                totalLength += stepDist;
+                distTable[i] = totalLength;
+            }
+
+            // 2. Sample Lower Mould Bezier curve (pL0 -> pLR)
+            for (int i = 1; i <= curveSamples; i++)
+            {
+                float u = Mathf.Lerp(minU, maxU, i / (float)curveSamples);
+                int tableIdx = pseudoSamples + i;
+                ptTable[tableIdx] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                float stepDist = Vector3.Distance(ptTable[tableIdx - 1], ptTable[tableIdx]);
+                totalLength += stepDist;
+                distTable[tableIdx] = totalLength;
+            }
+        }
+        else
+        {
+            ptTable[0] = framingModel.EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+
+            for (int i = 1; i <= curveSamples; i++)
+            {
+                float u = Mathf.Lerp(minU, maxU, i / (float)curveSamples);
+                ptTable[i] = framingModel.EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                float stepDist = Vector3.Distance(ptTable[i - 1], ptTable[i]);
+                totalLength += stepDist;
+                distTable[i] = totalLength;
+            }
         }
 
         if (totalLength < 0.0001f)
@@ -130,21 +162,20 @@ public class StrakesModel : MonoBehaviour
             float targetDist = ((float)k / (count - 1)) * totalLength;
 
             int idx = 0;
-            while (idx < samples && distTable[idx + 1] < targetDist)
+            while (idx < totalSamples && distTable[idx + 1] < targetDist)
             {
                 idx++;
             }
 
-            if (idx >= samples)
+            if (idx >= totalSamples)
             {
-                points.Add(ptTable[samples]);
+                points.Add(ptTable[totalSamples]);
             }
             else
             {
                 float segmentLength = distTable[idx + 1] - distTable[idx];
                 float t = segmentLength > 0.00001f ? (targetDist - distTable[idx]) / segmentLength : 0f;
-                float solvedU = Mathf.Lerp(uTable[idx], uTable[idx + 1], t);
-                Vector3 pt = framingModel.EvaluateFramePointFromControlPoints(solvedU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+                Vector3 pt = Vector3.Lerp(ptTable[idx], ptTable[idx + 1], t);
                 points.Add(pt);
             }
         }
@@ -169,15 +200,17 @@ public class StrakesModel : MonoBehaviour
     {
         if (framingModel == null || sheerPlan == null) return new List<Vector3>();
         sheerPlan.UpdateCachedValues();
-        float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
-        float deadwoodStartZ = GetDeadwoodStartZ();
-        if (z < deadwoodStartZ - 0.001f || z > keelBowZ + 0.001f) return new List<Vector3>();
+        List<float> allStations = framingModel.CalculateFrameStations();
+        if (allStations.Count == 0) return new List<Vector3>();
+        float maxBowZ = allStations[allStations.Count - 1];
+        if (z >= maxBowZ - 0.001f) return new List<Vector3>();
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             return new List<Vector3>();
 
-        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, count);
+        float keelY = framingModel.GetFrameBottomYAtZ(z);
+        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, count, keelY);
     }
 
     /// <summary>
@@ -187,19 +220,22 @@ public class StrakesModel : MonoBehaviour
     {
         if (framingModel == null || sheerPlan == null) return new List<Vector3>();
         sheerPlan.UpdateCachedValues();
-        float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
-        float deadwoodStartZ = GetDeadwoodStartZ();
-        if (z < deadwoodStartZ - 0.001f || z > keelBowZ + 0.001f) return new List<Vector3>();
+        List<float> allStations = framingModel.CalculateFrameStations();
+        if (allStations.Count == 0) return new List<Vector3>();
+        float maxBowZ = allStations[allStations.Count - 1];
+        if (z >= maxBowZ - 0.001f) return new List<Vector3>();
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             return new List<Vector3>();
 
-        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, count);
+        float keelY = framingModel.GetFrameBottomYAtZ(z);
+        return GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, count, keelY);
     }
 
     /// <summary>
-    /// Gets list of frame station Z coordinates between the start of the Deadwood (aft) and the Keel Bow point (fwd).
+    /// Gets list of frame station Z coordinates for strakes, starting from the stern 
+    /// through the Deadwood, main body, and bow, excluding the single station at the very bow tip.
     /// </summary>
     public List<float> GetValidFrameStations()
     {
@@ -207,13 +243,14 @@ public class StrakesModel : MonoBehaviour
         if (framingModel == null || sheerPlan == null) return stations;
 
         sheerPlan.UpdateCachedValues();
-        float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
-        float deadwoodStartZ = GetDeadwoodStartZ();
-
         List<float> allStations = framingModel.CalculateFrameStations();
+        if (allStations.Count <= 1) return stations;
+
+        float maxBowZ = allStations[allStations.Count - 1];
+
         foreach (float z in allStations)
         {
-            if (z >= deadwoodStartZ - 0.001f && z <= keelBowZ + 0.001f)
+            if (z < maxBowZ - 0.001f)
             {
                 stations.Add(z);
             }
@@ -243,13 +280,14 @@ public class StrakesModel : MonoBehaviour
         for (int s = 0; s < stations.Count; s++)
         {
             float z = stations[s];
+            float keelY = framingModel.GetFrameBottomYAtZ(z);
 
             // Port Side (-1f) - Fetch control points ONCE per station
             Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
             if (framingModel.GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             {
-                List<Vector3> portLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount);
-                List<Vector3> portUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount);
+                List<Vector3> portLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY);
+                List<Vector3> portUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY);
 
                 portLLPoints[s] = portLL;
                 portULPoints[s] = portUL;
@@ -270,8 +308,8 @@ public class StrakesModel : MonoBehaviour
             // Starboard Side (+1f) - Fetch control points ONCE per station
             if (framingModel.GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             {
-                List<Vector3> stbdLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount);
-                List<Vector3> stbdUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount);
+                List<Vector3> stbdLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY);
+                List<Vector3> stbdUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY);
 
                 stbdLLPoints[s] = stbdLL;
                 stbdULPoints[s] = stbdUL;
