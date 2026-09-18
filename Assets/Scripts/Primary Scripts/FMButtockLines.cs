@@ -25,9 +25,6 @@ public class FMButtockLines : MonoBehaviour
     [Tooltip("Reference to the FramingModel to evaluate 3D transverse frame sections.")]
     public FramingModel framingModel;
 
-    [Tooltip("Reference to the ConnectionGuideShape to get active connection guide curves.")]
-    public ConnectionGuideShape connectionGuideShape;
-
     [Header("Buttock Line Settings")]
     [Tooltip("Show Buttock Lines in Scene view gizmos.")]
     public bool showButtockLines = true;
@@ -84,12 +81,6 @@ public class FMButtockLines : MonoBehaviour
         {
             framingModel = GetComponentInParent<FramingModel>();
             if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
-        }
-
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
         }
     }
 
@@ -165,12 +156,6 @@ public class FMButtockLines : MonoBehaviour
         sheerPlan.UpdateCachedValues();
         float sternZ = sheerPlan.cachedProjectedSternRisingEnd.z;
         float bowZ = sheerPlan.cachedUpperStemTopPoint.z;
-
-        if (connectionGuideShape != null)
-        {
-            sternZ = Mathf.Min(sternZ, connectionGuideShape.GetSternZ());
-            bowZ = Mathf.Max(bowZ, connectionGuideShape.GetBowZ());
-        }
 
         side = Mathf.Sign(side);
         resolution = Mathf.Max(10, resolution);

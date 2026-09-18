@@ -15,7 +15,6 @@ public class FramingModelOLD : MonoBehaviour
     public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
     public FashionTimberModel fashionTimberModel;
-    public ConnectionGuideShape connectionGuideShape;
 
     [Header("Frame Layout Settings")]
     [Tooltip("Method for spacing transverse frames along the hull (Uniform Z vs. Primary Breadth curve).")]
@@ -165,12 +164,6 @@ public class FramingModelOLD : MonoBehaviour
         {
             fashionTimberModel = GetComponentInParent<FashionTimberModel>();
             if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
-        }
-
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
         }
     }
 
@@ -958,17 +951,11 @@ public class FramingModelOLD : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
-        }
-
         float aftZ = sheerPlan.cachedProjectedSternRisingEnd.z;
         float fwdZ = sheerPlan.cachedProjectedBowRisingEnd.z;
 
-        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : aftZ;
-        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : fwdZ;
+        float connAftZ = aftZ;
+        float connFwdZ = fwdZ;
 
         const int steps = 100;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;

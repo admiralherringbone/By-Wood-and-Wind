@@ -15,7 +15,6 @@ public class FramingModel : MonoBehaviour
     public BodyPlan bodyPlan;
     public BreadthPlan breadthPlan;
     public FashionTimberModel fashionTimberModel;
-    public ConnectionGuideShape connectionGuideShape;
 
     [Header("Frame Layout Settings")]
     [Tooltip("Method for spacing transverse frames along the hull (Uniform Z vs. Primary Breadth curve).")]
@@ -169,12 +168,6 @@ public class FramingModel : MonoBehaviour
         {
             fashionTimberModel = GetComponentInParent<FashionTimberModel>();
             if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
-        }
-
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
         }
     }
 
@@ -551,15 +544,7 @@ public class FramingModel : MonoBehaviour
         pL0_curve = backboneKeelPoint;
 
         // --- CONNECTION POINT (pLR) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
-        }
-
-        float floorX = (connectionGuideShape != null && connectionGuideShape.enabled) 
-            ? connectionGuideShape.GetConnectionGuideXAtZ(z) 
-            : breadthPlan.GetFloorLineXAtZ(z);
+        float floorX = breadthPlan.GetFloorLineXAtZ(z);
         float risingY = sheerPlan.GetRisingLineYAtZ(z);
 
         float pLR_Y = Mathf.Max(risingY, profileY);
@@ -995,17 +980,11 @@ public class FramingModel : MonoBehaviour
 
     private void DrawRisingLineGuide()
     {
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
-        }
-
         float aftZ = sheerPlan.cachedProjectedSternRisingEnd.z;
         float fwdZ = sheerPlan.cachedProjectedBowRisingEnd.z;
 
-        float connAftZ = (connectionGuideShape != null) ? connectionGuideShape.GetSternZ() : aftZ;
-        float connFwdZ = (connectionGuideShape != null) ? connectionGuideShape.GetBowZ() : fwdZ;
+        float connAftZ = aftZ;
+        float connFwdZ = fwdZ;
 
         const int steps = 100;
         Vector3 pL0, pL1_stbd, pLR_stbd, pL2, pL3, pU0, pU1, pU2, pU3;

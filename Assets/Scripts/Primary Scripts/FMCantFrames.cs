@@ -31,9 +31,6 @@ public class FMCantFrames : MonoBehaviour
     [Tooltip("Reference to the FramingModel to evaluate 3D transverse frame sections.")]
     public FramingModel framingModel;
 
-    [Tooltip("Reference to the ConnectionGuideShape to get active connection guide curves.")]
-    public ConnectionGuideShape connectionGuideShape;
-
     [Header("Cant Frame Settings")]
     [Tooltip("Show Cant Frames in Scene view gizmos.")]
     public bool showCantFrames = true;
@@ -91,12 +88,6 @@ public class FMCantFrames : MonoBehaviour
             framingModel = GetComponentInParent<FramingModel>();
             if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
         }
-
-        if (connectionGuideShape == null)
-        {
-            connectionGuideShape = GetComponentInParent<ConnectionGuideShape>();
-            if (connectionGuideShape == null) connectionGuideShape = FindFirstObjectByType<ConnectionGuideShape>();
-        }
     }
 
     public float GetKeelHalfWidth()
@@ -131,11 +122,7 @@ public class FMCantFrames : MonoBehaviour
         float hw = GetKeelHalfWidth();
 
         float maxBreadthAtStart = hw;
-        if (connectionGuideShape != null)
-        {
-            maxBreadthAtStart = Mathf.Max(hw, connectionGuideShape.GetConnectionGuideXAtZ(startZ));
-        }
-        else if (breadthPlan != null)
+        if (breadthPlan != null)
         {
             maxBreadthAtStart = Mathf.Max(hw, breadthPlan.GetConnectionPointXAtZ(startZ));
         }
