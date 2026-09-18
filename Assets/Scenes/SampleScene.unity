@@ -196,7 +196,6 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   fashionTimberModel: {fileID: 900456903}
-  connectionGuideShape: {fileID: 1896285904}
   frameSpacingMode: 1
   frameSpacing: 0.8
   cutFramesAtFashionTimber: 1
@@ -210,7 +209,7 @@ MonoBehaviour:
   connectionPointAftBlend: 0.5
   showFrameControlPoints: 0
   showProjectedRisingMarkPoints: 1
-  showFrameControlArms: 1
+  showFrameControlArms: 0
   controlPointRadius: 0.05
   keelPointColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   pseudoKeelPointColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -233,6 +232,10 @@ MonoBehaviour:
   frameColor: {r: 0.2, g: 0.8, b: 1, a: 0.7}
   risingLineGuideColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   keelControlGuideColor: {r: 1, g: 0.8, b: 0.2, a: 0.9}
+  showPseudoFrames: 1
+  pseudoFrameColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  pseudoFrameDashLength: 0.1
+  pseudoFrameGapLength: 0.05
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -1035,7 +1038,6 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   framingModel: {fileID: 287447048}
-  connectionGuideShape: {fileID: 1896285904}
   showButtockLines: 1
   numberOfButtockLines: 5
   buttockLineResolution: 100
@@ -1123,7 +1125,7 @@ MonoBehaviour:
   showFloorLine: 1
   floorLineColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
   floorBowControl: 0.671
-  floorSternControl: 0.237
+  floorSternControl: 0.427
   cachedFwdP0: {x: 0.125, y: 3, z: 10}
   cachedFwdP1: {x: 2.297, y: 3, z: 9.161336}
   cachedFwdP2: {x: 3, y: 3, z: 6.94}
@@ -1145,8 +1147,8 @@ MonoBehaviour:
   cachedFloorBowPoint: {x: 0.125, y: 1.2232372, z: 9.425062}
   cachedFloorBowCp: {x: 2.3214998, y: 1.2232372, z: 6.324217}
   cachedFloorMidshipPoint: {x: 2.3214998, y: 1.2232372, z: 0}
-  cachedFloorSternCp: {x: 2.3214998, y: 1.2232372, z: -2.2633014}
-  cachedFloorSternPoint: {x: 0.125, y: 1.2232372, z: -9.549794}
+  cachedFloorSternCp: {x: 2.3214998, y: 1.2232372, z: -4.1360965}
+  cachedFloorSternPoint: {x: 0.125, y: 1.2232372, z: -9.686409}
 --- !u!43 &1250226744
 Mesh:
   m_ObjectHideFlags: 0
@@ -1493,64 +1495,12 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   framingModel: {fileID: 287447048}
-  connectionGuideShape: {fileID: 1896285904}
   showCantFrames: 1
   startLocation: 1
   numberOfCantFrames: 5
   cantFrameResolution: 100
   cantFrameColor: {r: 1, g: 0.85, b: 0.2, a: 0.95}
   showLabels: 1
---- !u!1 &1896285903
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1896285905}
-  - component: {fileID: 1896285904}
-  m_Layer: 0
-  m_Name: ConnectionGuideShape
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1896285904
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1896285903}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30b7eb36bc70542669c6b64526b16e20, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ConnectionGuideShape
-  sheerPlan: {fileID: 1972862976}
-  bodyPlan: {fileID: 722911565}
-  breadthPlan: {fileID: 1109839672}
-  guideMode: 1
-  showConnectionGuide: 1
-  guideColor: {r: 0.1, g: 1, b: 0.4, a: 0.9}
-  showLabels: 1
---- !u!4 &1896285905
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1896285903}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -1667,7 +1617,7 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   bowRisingLineEndPos: 0.454
   bowRisingLineControl: 0.737
-  sternRisingLineEndPos: 0.66
+  sternRisingLineEndPos: 0.824
   sternRisingLineControl: 0.5
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
@@ -1680,10 +1630,10 @@ MonoBehaviour:
   cachedBowP1Ctrl: {x: 0, y: 1.2232372, z: 6.2184157}
   cachedBowRisingLineEndT: 9.999996
   cachedProjectedBowRisingEnd: {x: 0, y: 1.65458, z: 10}
-  cachedSternRisingEnd: {x: 0, y: 1.9242796, z: -9.549794}
+  cachedSternRisingEnd: {x: 0, y: 2.4024339, z: -9.686409}
   cachedSternP1Ctrl: {x: 0, y: 1.2232372, z: -4.5}
-  cachedProjectedSternRisingEnd: {x: 0, y: 2.1909516, z: -11.333046}
-  cachedSternRisingLineEndT: 1.1749015
+  cachedProjectedSternRisingEnd: {x: 0, y: 2.8020644, z: -11.333013}
+  cachedSternRisingLineEndT: 1.1571088
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 2.915575, z: -9.833021}
   cachedCounterBasePoint: {x: 0, y: 2.915575, z: -9.833021}
@@ -1827,7 +1777,6 @@ SceneRoots:
   - {fileID: 2023851845}
   - {fileID: 964694956}
   - {fileID: 1844188329}
-  - {fileID: 1896285905}
   - {fileID: 1890003678}
   - {fileID: 1104684823}
   - {fileID: 1059441841}

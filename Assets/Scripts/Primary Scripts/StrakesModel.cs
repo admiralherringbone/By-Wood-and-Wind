@@ -44,6 +44,25 @@ public class StrakesModel : MonoBehaviour
     [Tooltip("Connect strake points across adjacent frame stations to form longitudinal strake guide lines.")]
     public bool showStrakeLines = true;
 
+    [Header("Strake Smoothing & Longitudinal Fairing Settings")]
+    [Tooltip("Enable Y-Profile Longitudinal Fairing to smooth the side-view Y-height profile of strakes across stations Z.")]
+    public bool enableLongitudinalFairing = true;
+
+    [Range(0f, 1f)]
+    [Tooltip("Strength blend for Y-Profile Fairing (0 = raw station math, 1 = fully faired Y profile).")]
+    public float fairingStrength = 0.75f;
+
+    [Range(1, 5)]
+    [Tooltip("Number of longitudinal smoothing passes.")]
+    public int fairingPasses = 2;
+
+    [Tooltip("Enable graduated non-linear tapering from Keel to HOB (narrowing near HOB, widening near Keel).")]
+    public bool enableStrakeSmoothing = true;
+
+    [Range(0.3f, 1.0f)]
+    [Tooltip("Minimum width ratio limit for strakes near HOB relative to midship width (e.g. 0.5 = 1/2 min width).")]
+    public float minHobTaperRatio = 0.5f;
+
     [Header("Gizmo Settings - Lower Lower Mould")]
     [Tooltip("Color of Lower-Lower Mould strake point spheres.")]
     public Color lowerLowerPointColor = new Color(0.1f, 0.9f, 0.4f, 1f);
@@ -86,7 +105,6 @@ public class StrakesModel : MonoBehaviour
         if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
     }
 
-    /// <summary>
     /// <summary>
     /// Evaluates list of 3D points equally spaced by arc length along a sub-segment u in [minU, maxU] 
     /// using pre-fetched control points. Includes Pseudo Frame vertical segment when present (pL0.y > keelY).
@@ -157,9 +175,24 @@ public class StrakesModel : MonoBehaviour
             return points;
         }
 
+        float midshipLength = 0f;
+        if (enableStrakeSmoothing && framingModel != null)
+        {
+            Vector3 mL0, mL1, mLR, mL2, mL3, mU0, mU1, mU2, mU3;
+            if (framingModel.GetFrameControlPointsAtZ(0f, 1f, out mL0, out mL1, out mLR, out mL2, out mL3, out mU0, out mU1, out mU2, out mU3))
+            {
+                midshipLength = Vector3.Distance(mL0, mLR) + Vector3.Distance(mLR, mL3);
+            }
+        }
+
+        float girthRatio = (enableStrakeSmoothing && midshipLength > 0.001f) ? Mathf.Clamp01(totalLength / midshipLength) : 1.0f;
+        float power = Mathf.Lerp(1.0f / Mathf.Clamp(minHobTaperRatio, 0.3f, 1.0f), 1.0f, girthRatio);
+
         for (int k = 0; k < count; k++)
         {
-            float targetDist = ((float)k / (count - 1)) * totalLength;
+            float linearT = (float)k / (count - 1);
+            float tBiased = enableStrakeSmoothing ? Mathf.Pow(linearT, power) : linearT;
+            float targetDist = tBiased * totalLength;
 
             int idx = 0;
             while (idx < totalSamples && distTable[idx + 1] < targetDist)
@@ -181,6 +214,62 @@ public class StrakesModel : MonoBehaviour
         }
 
         return points;
+    }
+
+    /// <summary>
+    /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
+    /// Smooths Y-height trajectories while projecting points back onto transverse frame surfaces.
+    /// </summary>
+    private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
+    {
+        if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
+
+        int passes = Mathf.Clamp(fairingPasses, 1, 5);
+
+        for (int pass = 0; pass < passes; pass++)
+        {
+            for (int k = 0; k < strakeCount; k++)
+            {
+                float[] rawY = new float[stations.Count];
+                bool[] valid = new bool[stations.Count];
+
+                for (int s = 0; s < stations.Count; s++)
+                {
+                    if (pointDict.ContainsKey(s) && pointDict[s].Count > k)
+                    {
+                        rawY[s] = pointDict[s][k].y;
+                        valid[s] = true;
+                    }
+                }
+
+                float[] targetY = new float[stations.Count];
+                for (int s = 0; s < stations.Count; s++)
+                {
+                    if (!valid[s]) continue;
+
+                    if (s == 0 || s == stations.Count - 1 || !valid[s - 1] || !valid[s + 1])
+                    {
+                        targetY[s] = rawY[s];
+                    }
+                    else
+                    {
+                        float ySmoothed = 0.25f * rawY[s - 1] + 0.50f * rawY[s] + 0.25f * rawY[s + 1];
+                        targetY[s] = Mathf.Lerp(rawY[s], ySmoothed, fairingStrength);
+                    }
+                }
+
+                for (int s = 0; s < stations.Count; s++)
+                {
+                    if (!valid[s]) continue;
+                    float z = stations[s];
+                    Vector3 fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetY[s]);
+                    if (fairedPt != Vector3.zero)
+                    {
+                        pointDict[s][k] = fairedPt;
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -291,18 +380,6 @@ public class StrakesModel : MonoBehaviour
 
                 portLLPoints[s] = portLL;
                 portULPoints[s] = portUL;
-
-                Gizmos.color = lowerLowerPointColor;
-                foreach (Vector3 pt in portLL) Gizmos.DrawSphere(pt, pointRadius);
-
-                Gizmos.color = upperLowerPointColor;
-                foreach (Vector3 pt in portUL) Gizmos.DrawSphere(pt, pointRadius);
-
-                if (highlightConnectionPoints && portLL.Count > 0)
-                {
-                    Gizmos.color = connectionPointColor;
-                    Gizmos.DrawSphere(portLL[portLL.Count - 1], pointRadius * 1.3f);
-                }
             }
 
             // Starboard Side (+1f) - Fetch control points ONCE per station
@@ -313,18 +390,53 @@ public class StrakesModel : MonoBehaviour
 
                 stbdLLPoints[s] = stbdLL;
                 stbdULPoints[s] = stbdUL;
+            }
+        }
 
+        // Apply Y-Profile Surface-Constrained Longitudinal Fairing
+        if (enableLongitudinalFairing)
+        {
+            ApplyYProfileLongitudinalFairing(stations, portLLPoints, -1f, llCount);
+            ApplyYProfileLongitudinalFairing(stations, portULPoints, -1f, ulCount);
+            ApplyYProfileLongitudinalFairing(stations, stbdLLPoints, 1f, llCount);
+            ApplyYProfileLongitudinalFairing(stations, stbdULPoints, 1f, ulCount);
+        }
+
+        // Draw Node Spheres
+        for (int s = 0; s < stations.Count; s++)
+        {
+            if (portLLPoints.ContainsKey(s))
+            {
                 Gizmos.color = lowerLowerPointColor;
-                foreach (Vector3 pt in stbdLL) Gizmos.DrawSphere(pt, pointRadius);
-
-                Gizmos.color = upperLowerPointColor;
-                foreach (Vector3 pt in stbdUL) Gizmos.DrawSphere(pt, pointRadius);
-
-                if (highlightConnectionPoints && stbdLL.Count > 0)
+                foreach (Vector3 pt in portLLPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
+                if (highlightConnectionPoints && portLLPoints[s].Count > 0)
                 {
                     Gizmos.color = connectionPointColor;
-                    Gizmos.DrawSphere(stbdLL[stbdLL.Count - 1], pointRadius * 1.3f);
+                    Gizmos.DrawSphere(portLLPoints[s][portLLPoints[s].Count - 1], pointRadius * 1.3f);
                 }
+            }
+
+            if (portULPoints.ContainsKey(s))
+            {
+                Gizmos.color = upperLowerPointColor;
+                foreach (Vector3 pt in portULPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
+            }
+
+            if (stbdLLPoints.ContainsKey(s))
+            {
+                Gizmos.color = lowerLowerPointColor;
+                foreach (Vector3 pt in stbdLLPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
+                if (highlightConnectionPoints && stbdLLPoints[s].Count > 0)
+                {
+                    Gizmos.color = connectionPointColor;
+                    Gizmos.DrawSphere(stbdLLPoints[s][stbdLLPoints[s].Count - 1], pointRadius * 1.3f);
+                }
+            }
+
+            if (stbdULPoints.ContainsKey(s))
+            {
+                Gizmos.color = upperLowerPointColor;
+                foreach (Vector3 pt in stbdULPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
             }
         }
 

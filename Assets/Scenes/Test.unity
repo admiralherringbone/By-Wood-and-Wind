@@ -225,17 +225,17 @@ MonoBehaviour:
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
-  cachedMidshipRisingPoint: {x: 0, y: 1.061137, z: 0}
+  cachedMidshipRisingPoint: {x: 0, y: 0.94066066, z: 0}
   cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.428572}
   cachedProjectedTopLineStart: {x: 0, y: 6.6643763, z: -11.428572}
   cachedProjectedTopLineEnd: {x: 0, y: 6.5, z: 10}
   cachedBowRisingEnd: {x: 0, y: 1.6100016, z: 9.438027}
-  cachedBowP1Ctrl: {x: 0, y: 1.061137, z: 5.4846134}
+  cachedBowP1Ctrl: {x: 0, y: 0.94066066, z: 5.4846134}
   cachedBowRisingLineEndT: 1
-  cachedProjectedBowRisingEnd: {x: 0, y: 1.6880219, z: 10}
+  cachedProjectedBowRisingEnd: {x: 0, y: 1.7051475, z: 10}
   cachedSternRisingEnd: {x: 0, y: 2.483, z: -9.709429}
-  cachedSternP1Ctrl: {x: 0, y: 1.061137, z: -4.5}
-  cachedProjectedSternRisingEnd: {x: 0, y: 2.9849188, z: -11.428529}
+  cachedSternP1Ctrl: {x: 0, y: 0.94066066, z: -4.5}
+  cachedProjectedSternRisingEnd: {x: 0, y: 3.027447, z: -11.428529}
   cachedSternRisingLineEndT: 1.1631856
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 3.25, z: -9.928572}
@@ -472,7 +472,6 @@ MonoBehaviour:
   bodyPlan: {fileID: 1104684822}
   breadthPlan: {fileID: 1358841768}
   fashionTimberModel: {fileID: 0}
-  connectionGuideShape: {fileID: 0}
   frameSpacingMode: 0
   frameSpacing: 0.8
   cutFramesAtFashionTimber: 1
@@ -669,8 +668,8 @@ MonoBehaviour:
   breadthPlan: {fileID: 1358841768}
   showLabels: 1
   keelArmAngle: 15.5
-  keelArmLength: 0.694
-  hobLowerArmLength: 0.469
+  keelArmLength: 0.5
+  hobLowerArmLength: 0.5
   connectionPointPosition: 0.5
   bowConnectionPointPosition: 0.5
   sternConnectionPointPosition: 0.5
@@ -689,9 +688,9 @@ MonoBehaviour:
   innerKeelPosition: 0.5
   middleControlPosition: 0.5
   cachedL0: {x: 0.25, y: 0, z: 0}
-  cachedL1: {x: 2.1585002, y: 0.5292739, z: 0}
-  cachedLR: {x: 2.57925, y: 1.061137, z: 0}
-  cachedL2: {x: 3, y: 1.5929999, z: 0}
+  cachedL1: {x: 1.625, y: 0.38132128, z: 0}
+  cachedLR: {x: 2.3125, y: 0.94066066, z: 0}
+  cachedL2: {x: 3, y: 1.5, z: 0}
   cachedL3: {x: 3, y: 3, z: 0}
   cachedU0: {x: 3, y: 3, z: 0}
   cachedU1: {x: 3, y: 4.5, z: 0}
@@ -782,11 +781,11 @@ MonoBehaviour:
   cachedTTAftP2: {x: 1.2750001, y: 6, z: -11.428572}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
-  cachedFloorBowPoint: {x: 0.25, y: 1.061137, z: 9.438027}
-  cachedFloorBowCp: {x: 2.57925, y: 1.061137, z: 5.936519}
-  cachedFloorMidshipPoint: {x: 2.57925, y: 1.061137, z: 0}
-  cachedFloorSternCp: {x: 2.57925, y: 1.061137, z: -3.9226093}
-  cachedFloorSternPoint: {x: 0.25, y: 1.061137, z: -9.709429}
+  cachedFloorBowPoint: {x: 0.25, y: 0.94066066, z: 9.438027}
+  cachedFloorBowCp: {x: 2.3125, y: 0.94066066, z: 5.936519}
+  cachedFloorMidshipPoint: {x: 2.3125, y: 0.94066066, z: 0}
+  cachedFloorSternCp: {x: 2.3125, y: 0.94066066, z: -3.9226093}
+  cachedFloorSternPoint: {x: 0.25, y: 0.94066066, z: -9.709429}
 --- !u!4 &1358841769
 Transform:
   m_ObjectHideFlags: 0
