@@ -153,11 +153,26 @@ public class StrakesModel : MonoBehaviour
     }
 
     /// <summary>
+    /// Gets the starting Z coordinate of the Deadwood (aft boundary for strakes).
+    /// </summary>
+    public float GetDeadwoodStartZ()
+    {
+        if (sheerPlan == null) return 0f;
+        sheerPlan.UpdateCachedValues();
+        return sheerPlan.showDeadwoodRake ? sheerPlan.cachedDeadwoodForePoint.z : sheerPlan.cachedSternRisingEnd.z;
+    }
+
+    /// <summary>
     /// Gets strake points along the Lower-Lower Mould segment (Keel pL0 to Connection Point pLR).
     /// </summary>
     public List<Vector3> GetLowerLowerMouldStrakePoints(float z, float side, int count)
     {
-        if (framingModel == null) return new List<Vector3>();
+        if (framingModel == null || sheerPlan == null) return new List<Vector3>();
+        sheerPlan.UpdateCachedValues();
+        float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
+        float deadwoodStartZ = GetDeadwoodStartZ();
+        if (z < deadwoodStartZ - 0.001f || z > keelBowZ + 0.001f) return new List<Vector3>();
+
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             return new List<Vector3>();
@@ -170,7 +185,12 @@ public class StrakesModel : MonoBehaviour
     /// </summary>
     public List<Vector3> GetUpperLowerMouldStrakePoints(float z, float side, int count)
     {
-        if (framingModel == null) return new List<Vector3>();
+        if (framingModel == null || sheerPlan == null) return new List<Vector3>();
+        sheerPlan.UpdateCachedValues();
+        float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
+        float deadwoodStartZ = GetDeadwoodStartZ();
+        if (z < deadwoodStartZ - 0.001f || z > keelBowZ + 0.001f) return new List<Vector3>();
+
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
             return new List<Vector3>();
@@ -179,7 +199,7 @@ public class StrakesModel : MonoBehaviour
     }
 
     /// <summary>
-    /// Gets list of frame station Z coordinates up to the Keel Bow point (right before the start of the Stem).
+    /// Gets list of frame station Z coordinates between the start of the Deadwood (aft) and the Keel Bow point (fwd).
     /// </summary>
     public List<float> GetValidFrameStations()
     {
@@ -188,11 +208,12 @@ public class StrakesModel : MonoBehaviour
 
         sheerPlan.UpdateCachedValues();
         float keelBowZ = sheerPlan.cachedKeelBowPoint.z;
+        float deadwoodStartZ = GetDeadwoodStartZ();
 
         List<float> allStations = framingModel.CalculateFrameStations();
         foreach (float z in allStations)
         {
-            if (z <= keelBowZ + 0.001f)
+            if (z >= deadwoodStartZ - 0.001f && z <= keelBowZ + 0.001f)
             {
                 stations.Add(z);
             }
