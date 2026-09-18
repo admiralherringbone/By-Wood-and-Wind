@@ -218,12 +218,14 @@ public class StrakesModel : MonoBehaviour
 
     /// <summary>
     /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
-    /// Smooths Y-height trajectories while projecting points back onto transverse frame surfaces.
+    /// Smooths Y-height trajectories while projecting points back onto transverse frame surfaces 
+    /// or vertical Pseudo Frame segments.
     /// </summary>
     private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
     {
         if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
 
+        float hw = framingModel.GetKeelHalfWidth();
         int passes = Mathf.Clamp(fairingPasses, 1, 5);
 
         for (int pass = 0; pass < passes; pass++)
@@ -262,10 +264,30 @@ public class StrakesModel : MonoBehaviour
                 {
                     if (!valid[s]) continue;
                     float z = stations[s];
-                    Vector3 fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetY[s]);
-                    if (fairedPt != Vector3.zero)
+                    float keelY = framingModel.GetFrameBottomYAtZ(z);
+
+                    Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+                    if (framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
                     {
-                        pointDict[s][k] = fairedPt;
+                        float profileY = pL0.y;
+
+                        Vector3 fairedPt;
+                        if (targetY[s] < profileY - 0.001f)
+                        {
+                            // Target height lies on the vertical Pseudo Frame segment (keelY -> profileY at X = side * hw)
+                            float clampedY = Mathf.Max(keelY, targetY[s]);
+                            fairedPt = new Vector3(side * hw, clampedY, z);
+                        }
+                        else
+                        {
+                            // Target height lies on the transverse frame curve
+                            fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetY[s]);
+                        }
+
+                        if (fairedPt != Vector3.zero)
+                        {
+                            pointDict[s][k] = fairedPt;
+                        }
                     }
                 }
             }
