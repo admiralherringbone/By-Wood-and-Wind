@@ -978,11 +978,20 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
   showStrakes: 1
   strakesPerLowerLowerMould: 5
   strakesPerUpperLowerMould: 5
   pointRadius: 0.05
   showStrakeLines: 1
+  showProfileEndpoints: 1
+  stemEndpointColor: {r: 0.2, g: 0.85, b: 1, a: 1}
+  sternEndpointColor: {r: 1, g: 0.3, b: 0.65, a: 1}
+  enableLongitudinalFairing: 1
+  fairingStrength: 2
+  fairingPasses: 10
+  enableStrakeSmoothing: 1
+  minHobTaperRatio: 0.657
   lowerLowerPointColor: {r: 0.1, g: 0.9, b: 0.4, a: 1}
   lowerLowerLineColor: {r: 0.2, g: 1, b: 0.7, a: 0.8}
   upperLowerPointColor: {r: 1, g: 0.85, b: 0.2, a: 1}
@@ -1124,8 +1133,8 @@ MonoBehaviour:
   topTimberSternArmLength: 1
   showFloorLine: 1
   floorLineColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
-  floorBowControl: 0.671
-  floorSternControl: 0.427
+  floorBowControl: 0.688
+  floorSternControl: 0.415
   cachedFwdP0: {x: 0.125, y: 3, z: 10}
   cachedFwdP1: {x: 2.297, y: 3, z: 9.161336}
   cachedFwdP2: {x: 3, y: 3, z: 6.94}
@@ -1144,10 +1153,10 @@ MonoBehaviour:
   cachedTTAftP2: {x: 1.0944, y: 6, z: -11.333021}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
-  cachedFloorBowPoint: {x: 0.125, y: 1.2232372, z: 9.425062}
-  cachedFloorBowCp: {x: 2.3214998, y: 1.2232372, z: 6.324217}
+  cachedFloorBowPoint: {x: 0.125, y: 1.2232372, z: 9.589458}
+  cachedFloorBowCp: {x: 2.3214998, y: 1.2232372, z: 6.5975475}
   cachedFloorMidshipPoint: {x: 2.3214998, y: 1.2232372, z: 0}
-  cachedFloorSternCp: {x: 2.3214998, y: 1.2232372, z: -4.1360965}
+  cachedFloorSternCp: {x: 2.3214998, y: 1.2232372, z: -4.01986}
   cachedFloorSternPoint: {x: 0.125, y: 1.2232372, z: -9.686409}
 --- !u!43 &1250226744
 Mesh:
@@ -1615,10 +1624,10 @@ MonoBehaviour:
   hobDropAft: 0
   hobCurveControlLength: 0.5
   bodyPlan: {fileID: 722911565}
-  bowRisingLineEndPos: 0.454
-  bowRisingLineControl: 0.737
+  bowRisingLineEndPos: 0.537
+  bowRisingLineControl: 0.856
   sternRisingLineEndPos: 0.824
-  sternRisingLineControl: 0.5
+  sternRisingLineControl: 0.621
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
@@ -1626,14 +1635,14 @@ MonoBehaviour:
   cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.333021}
   cachedProjectedTopLineStart: {x: 0, y: 6.6415157, z: -11.333021}
   cachedProjectedTopLineEnd: {x: 0, y: 6.5, z: 10}
-  cachedBowRisingEnd: {x: 0, y: 1.5890002, z: 9.425062}
-  cachedBowP1Ctrl: {x: 0, y: 1.2232372, z: 6.2184157}
+  cachedBowRisingEnd: {x: 0, y: 1.8795006, z: 9.589458}
+  cachedBowP1Ctrl: {x: 0, y: 1.2232372, z: 7.383867}
   cachedBowRisingLineEndT: 9.999996
-  cachedProjectedBowRisingEnd: {x: 0, y: 1.65458, z: 10}
+  cachedProjectedBowRisingEnd: {x: 0, y: 2.0016553, z: 10}
   cachedSternRisingEnd: {x: 0, y: 2.4024339, z: -9.686409}
-  cachedSternP1Ctrl: {x: 0, y: 1.2232372, z: -4.5}
-  cachedProjectedSternRisingEnd: {x: 0, y: 2.8020644, z: -11.333013}
-  cachedSternRisingLineEndT: 1.1571088
+  cachedSternP1Ctrl: {x: 0, y: 1.2232372, z: -5.5889997}
+  cachedProjectedSternRisingEnd: {x: 0, y: 2.9464855, z: -11.333014}
+  cachedSternRisingLineEndT: 1.2088733
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 2.915575, z: -9.833021}
   cachedCounterBasePoint: {x: 0, y: 2.915575, z: -9.833021}
