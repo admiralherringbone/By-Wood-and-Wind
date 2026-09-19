@@ -8,7 +8,7 @@ using UnityEditor;
 /// StrakesModel places and visualizes highly optimized strake points and longitudinal guide lines 
 /// separated into Lower-Lower Mould strakes (u in [0, 0.25]) and Upper-Lower Mould strakes (u in [0.25, 0.50]),
 /// divided by the Connection Points along the lower frame moulds up to the Keel Bow.
-/// Optimized for maximum Edit-Mode performance with full 3D point caching and 1D-decoupled fairing passes.
+/// Supports Stem Profile (bow) and Stern Profile / Fashion Timbers (stern) termination points.
 /// </summary>
 [ExecuteInEditMode]
 public class StrakesModel : MonoBehaviour
@@ -25,6 +25,9 @@ public class StrakesModel : MonoBehaviour
 
     [Tooltip("Reference to the FramingModel to evaluate 3D frame sections.")]
     public FramingModel framingModel;
+
+    [Tooltip("Reference to the FashionTimberModel for stern fashion timber profile points.")]
+    public FashionTimberModel fashionTimberModel;
 
     [Header("Strake Settings")]
     [Tooltip("Show Strake Points and Guide Lines in Scene view gizmos.")]
@@ -44,6 +47,16 @@ public class StrakesModel : MonoBehaviour
 
     [Tooltip("Connect strake points across adjacent frame stations to form longitudinal strake guide lines.")]
     public bool showStrakeLines = true;
+
+    [Header("Profile Endpoints Settings")]
+    [Tooltip("Show strake termination points on the Stem profile (bow) and Stern profile / Fashion Timbers (stern).")]
+    public bool showProfileEndpoints = true;
+
+    [Tooltip("Color of Stem Profile strake termination points at the bow.")]
+    public Color stemEndpointColor = new Color(0.2f, 0.85f, 1f, 1f);
+
+    [Tooltip("Color of Stern Profile / Fashion Timber strake termination points at the stern.")]
+    public Color sternEndpointColor = new Color(1f, 0.3f, 0.65f, 1f);
 
     [Header("Strake Smoothing & Longitudinal Fairing Settings")]
     [Tooltip("Enable Y-Profile Longitudinal Fairing to smooth the side-view Y-height profile of strakes across stations Z.")]
@@ -106,6 +119,17 @@ public class StrakesModel : MonoBehaviour
     private readonly Dictionary<int, List<Vector3>> cachedPortULPoints = new Dictionary<int, List<Vector3>>();
     private readonly Dictionary<int, List<Vector3>> cachedStbdULPoints = new Dictionary<int, List<Vector3>>();
 
+    // Cached Stem Profile & Stern Profile (Fashion Timber) endpoint points
+    private readonly List<Vector3> cachedPortStemLL = new List<Vector3>();
+    private readonly List<Vector3> cachedStbdStemLL = new List<Vector3>();
+    private readonly List<Vector3> cachedPortStemUL = new List<Vector3>();
+    private readonly List<Vector3> cachedStbdStemUL = new List<Vector3>();
+
+    private readonly List<Vector3> cachedPortSternLL = new List<Vector3>();
+    private readonly List<Vector3> cachedStbdSternLL = new List<Vector3>();
+    private readonly List<Vector3> cachedPortSternUL = new List<Vector3>();
+    private readonly List<Vector3> cachedStbdSternUL = new List<Vector3>();
+
     private void Awake()
     {
         FindReferences();
@@ -134,6 +158,7 @@ public class StrakesModel : MonoBehaviour
         if (bodyPlan == null) bodyPlan = FindFirstObjectByType<BodyPlan>();
         if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
         if (framingModel == null) framingModel = FindFirstObjectByType<FramingModel>();
+        if (fashionTimberModel == null) fashionTimberModel = FindFirstObjectByType<FashionTimberModel>();
     }
 
     private void RefreshCacheIfNeeded()
@@ -181,8 +206,18 @@ public class StrakesModel : MonoBehaviour
         cachedPortULPoints.Clear();
         cachedStbdULPoints.Clear();
 
+        cachedPortSternLL.Clear();
+        cachedStbdSternLL.Clear();
+        cachedPortStemLL.Clear();
+        cachedStbdStemLL.Clear();
+
+        cachedPortSternUL.Clear();
+        cachedStbdSternUL.Clear();
+        cachedPortStemUL.Clear();
+        cachedStbdStemUL.Clear();
+
         List<float> stations = cachedValidStations;
-        if (stations.Count == 0 || framingModel == null) return;
+        if (stations.Count == 0 || framingModel == null || sheerPlan == null) return;
 
         int llCount = Mathf.Max(2, strakesPerLowerLowerMould);
         int ulCount = Mathf.Max(2, strakesPerUpperLowerMould);
@@ -216,6 +251,66 @@ public class StrakesModel : MonoBehaviour
             ApplyYProfileLongitudinalFairing(stations, cachedStbdLLPoints, 1f, llCount);
             ApplyYProfileLongitudinalFairing(stations, cachedStbdULPoints, 1f, ulCount);
         }
+
+        // Build Stem Profile (Bow) & Stern Profile / Fashion Timber (Stern) Strake Termination Points
+        int lastS = stations.Count - 1;
+        float hw = framingModel.GetKeelHalfWidth();
+
+        // 1. Lower-Lower Mould Profile Endpoints
+        for (int k = 0; k < llCount; k++)
+        {
+            // Stern Profile / Fashion Timber Point (Station 0 - Stern)
+            if (cachedPortLLPoints.ContainsKey(0) && cachedPortLLPoints[0].Count > k)
+            {
+                float aftY = cachedPortLLPoints[0][k].y;
+                float sternZ = sheerPlan.GetSternProfileZAtY(aftY);
+                float sternX = (fashionTimberModel != null)
+                    ? fashionTimberModel.GetNaturalHullXAtYZ(aftY, sternZ)
+                    : hw;
+
+                cachedPortSternLL.Add(new Vector3(-sternX, aftY, sternZ));
+                cachedStbdSternLL.Add(new Vector3(sternX, aftY, sternZ));
+            }
+
+            // Stem Profile Point (Station lastS - Bow)
+            if (cachedPortLLPoints.ContainsKey(lastS) && cachedPortLLPoints[lastS].Count > k)
+            {
+                float foreY = cachedPortLLPoints[lastS][k].y;
+                float stemZ = sheerPlan.GetStemProfileZAtY(foreY);
+                float stemX = hw;
+
+                cachedPortStemLL.Add(new Vector3(-stemX, foreY, stemZ));
+                cachedStbdStemLL.Add(new Vector3(stemX, foreY, stemZ));
+            }
+        }
+
+        // 2. Upper-Lower Mould Profile Endpoints
+        for (int k = 0; k < ulCount; k++)
+        {
+            // Stern Profile / Fashion Timber Point (Station 0 - Stern)
+            if (cachedPortULPoints.ContainsKey(0) && cachedPortULPoints[0].Count > k)
+            {
+                float aftY = cachedPortULPoints[0][k].y;
+                float sternZ = sheerPlan.GetSternProfileZAtY(aftY);
+                float sternX = (fashionTimberModel != null)
+                    ? fashionTimberModel.GetNaturalHullXAtYZ(aftY, sternZ)
+                    : hw;
+
+                cachedPortSternUL.Add(new Vector3(-sternX, aftY, sternZ));
+                cachedStbdSternUL.Add(new Vector3(sternX, aftY, sternZ));
+            }
+
+            // Stem Profile Point (Station lastS - Bow)
+            if (cachedPortULPoints.ContainsKey(lastS) && cachedPortULPoints[lastS].Count > k)
+            {
+                float foreY = cachedPortULPoints[lastS][k].y;
+                float stemZ = sheerPlan.GetStemProfileZAtY(foreY);
+                float stemX = hw;
+
+                cachedPortStemUL.Add(new Vector3(-stemX, foreY, stemZ));
+                cachedStbdStemUL.Add(new Vector3(stemX, foreY, stemZ));
+            }
+        }
     }
 
     /// <summary>
@@ -243,7 +338,7 @@ public class StrakesModel : MonoBehaviour
                 }
             }
 
-            // 2. Perform 1D binomial smoothing passes ONLY in float array memory (0 heavy 3D math here!)
+            // 2. Perform 1D binomial smoothing passes ONLY in float array memory
             for (int pass = 0; pass < passes; pass++)
             {
                 for (int s = 0; s < stationCount; s++)
@@ -304,7 +399,6 @@ public class StrakesModel : MonoBehaviour
     /// <summary>
     /// Evaluates list of 3D points equally spaced by arc length along a sub-segment u in [minU, maxU] 
     /// using pre-fetched control points. Includes Pseudo Frame vertical segment when present (pL0.y > keelY).
-    /// Optimized with zero heap allocations during calculation.
     /// </summary>
     public List<Vector3> GetSegmentStrakePointsFromControlPoints(
         Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3, Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
@@ -331,6 +425,7 @@ public class StrakesModel : MonoBehaviour
             }
             return points;
         }
+
         bool hasPseudoFrame = (Mathf.Approximately(minU, 0f) && !float.IsNaN(keelY) && pL0.y > keelY + 0.001f);
 
         const int curveSamples = 20;
@@ -426,7 +521,6 @@ public class StrakesModel : MonoBehaviour
 
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
-        float maxBowZ = allStations[allStations.Count - 1];
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
@@ -446,7 +540,6 @@ public class StrakesModel : MonoBehaviour
 
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
-        float maxBowZ = allStations[allStations.Count - 1];
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
@@ -481,7 +574,9 @@ public class StrakesModel : MonoBehaviour
         // Draw Strake Nodes (Fast Cube Markers)
         Vector3 cubeSize = Vector3.one * (pointRadius * 1.5f);
         Vector3 highlightSize = Vector3.one * (pointRadius * 2.0f);
+        Vector3 endpointSize = Vector3.one * (pointRadius * 2.2f);
 
+        // 1. Draw Frame Station Nodes
         for (int s = 0; s < stations.Count; s++)
         {
             if (cachedPortLLPoints.ContainsKey(s))
@@ -519,13 +614,36 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
-        // Draw Longitudinal Guide Lines
-        if (showStrakeLines && stations.Count > 1)
+        // 2. Draw Stem & Stern Profile Endpoint Nodes
+        if (showProfileEndpoints)
+        {
+            // Stem Profile Nodes (Bow)
+            Gizmos.color = stemEndpointColor;
+            foreach (Vector3 pt in cachedPortStemLL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedStbdStemLL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedPortStemUL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedStbdStemUL) Gizmos.DrawCube(pt, endpointSize);
+
+            // Stern Profile Nodes (Fashion Timbers)
+            Gizmos.color = sternEndpointColor;
+            foreach (Vector3 pt in cachedPortSternLL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedStbdSternLL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedPortSternUL) Gizmos.DrawCube(pt, endpointSize);
+            foreach (Vector3 pt in cachedStbdSternUL) Gizmos.DrawCube(pt, endpointSize);
+        }
+
+        // 3. Draw Longitudinal Guide Lines (Extended from Stern Profile to Stem Profile)
+        if (showStrakeLines && stations.Count > 0)
         {
             // Lower-Lower Mould Lines
             Gizmos.color = lowerLowerLineColor;
             for (int k = 0; k < llCount; k++)
             {
+                // Port Side
+                if (k < cachedPortSternLL.Count && cachedPortLLPoints.ContainsKey(0) && cachedPortLLPoints[0].Count > k)
+                {
+                    Gizmos.DrawLine(cachedPortSternLL[k], cachedPortLLPoints[0][k]);
+                }
                 for (int s = 0; s < stations.Count - 1; s++)
                 {
                     if (cachedPortLLPoints.ContainsKey(s) && cachedPortLLPoints.ContainsKey(s + 1) &&
@@ -533,12 +651,29 @@ public class StrakesModel : MonoBehaviour
                     {
                         Gizmos.DrawLine(cachedPortLLPoints[s][k], cachedPortLLPoints[s + 1][k]);
                     }
+                }
+                int lastS = stations.Count - 1;
+                if (k < cachedPortStemLL.Count && cachedPortLLPoints.ContainsKey(lastS) && cachedPortLLPoints[lastS].Count > k)
+                {
+                    Gizmos.DrawLine(cachedPortLLPoints[lastS][k], cachedPortStemLL[k]);
+                }
 
+                // Starboard Side
+                if (k < cachedStbdSternLL.Count && cachedStbdLLPoints.ContainsKey(0) && cachedStbdLLPoints[0].Count > k)
+                {
+                    Gizmos.DrawLine(cachedStbdSternLL[k], cachedStbdLLPoints[0][k]);
+                }
+                for (int s = 0; s < stations.Count - 1; s++)
+                {
                     if (cachedStbdLLPoints.ContainsKey(s) && cachedStbdLLPoints.ContainsKey(s + 1) &&
                         cachedStbdLLPoints[s].Count > k && cachedStbdLLPoints[s + 1].Count > k)
                     {
                         Gizmos.DrawLine(cachedStbdLLPoints[s][k], cachedStbdLLPoints[s + 1][k]);
                     }
+                }
+                if (k < cachedStbdStemLL.Count && cachedStbdLLPoints.ContainsKey(lastS) && cachedStbdLLPoints[lastS].Count > k)
+                {
+                    Gizmos.DrawLine(cachedStbdLLPoints[lastS][k], cachedStbdStemLL[k]);
                 }
             }
 
@@ -546,6 +681,11 @@ public class StrakesModel : MonoBehaviour
             Gizmos.color = upperLowerLineColor;
             for (int k = 0; k < ulCount; k++)
             {
+                // Port Side
+                if (k < cachedPortSternUL.Count && cachedPortULPoints.ContainsKey(0) && cachedPortULPoints[0].Count > k)
+                {
+                    Gizmos.DrawLine(cachedPortSternUL[k], cachedPortULPoints[0][k]);
+                }
                 for (int s = 0; s < stations.Count - 1; s++)
                 {
                     if (cachedPortULPoints.ContainsKey(s) && cachedPortULPoints.ContainsKey(s + 1) &&
@@ -553,12 +693,29 @@ public class StrakesModel : MonoBehaviour
                     {
                         Gizmos.DrawLine(cachedPortULPoints[s][k], cachedPortULPoints[s + 1][k]);
                     }
+                }
+                int lastS = stations.Count - 1;
+                if (k < cachedPortStemUL.Count && cachedPortULPoints.ContainsKey(lastS) && cachedPortULPoints[lastS].Count > k)
+                {
+                    Gizmos.DrawLine(cachedPortULPoints[lastS][k], cachedPortStemUL[k]);
+                }
 
+                // Starboard Side
+                if (k < cachedStbdSternUL.Count && cachedStbdULPoints.ContainsKey(0) && cachedStbdULPoints[0].Count > k)
+                {
+                    Gizmos.DrawLine(cachedStbdSternUL[k], cachedStbdULPoints[0][k]);
+                }
+                for (int s = 0; s < stations.Count - 1; s++)
+                {
                     if (cachedStbdULPoints.ContainsKey(s) && cachedStbdULPoints.ContainsKey(s + 1) &&
                         cachedStbdULPoints[s].Count > k && cachedStbdULPoints[s + 1].Count > k)
                     {
                         Gizmos.DrawLine(cachedStbdULPoints[s][k], cachedStbdULPoints[s + 1][k]);
                     }
+                }
+                if (k < cachedStbdStemUL.Count && cachedStbdULPoints.ContainsKey(lastS) && cachedStbdULPoints[lastS].Count > k)
+                {
+                    Gizmos.DrawLine(cachedStbdULPoints[lastS][k], cachedStbdStemUL[k]);
                 }
             }
         }
