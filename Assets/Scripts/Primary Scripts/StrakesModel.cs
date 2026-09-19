@@ -59,6 +59,9 @@ public class StrakesModel : MonoBehaviour
     [Tooltip("Clip Upper Mould strakes to respect frame cutoffs (e.g. Top Timber sheer height and Fashion Timber cuts).")]
     public bool respectFrameCutoffs = true;
 
+    [Tooltip("Lock top defining strake line (u = 1.00) to align 100% exactly with the Sheer Plan Main Deck Sheer line.")]
+    public bool lockTopStrakeToSheerPlan = true;
+
     [Tooltip("Size of the strake point node markers in Scene view.")]
     [Range(0.01f, 0.3f)]
     public float pointRadius = 0.05f;
@@ -280,13 +283,13 @@ public class StrakesModel : MonoBehaviour
         // Apply Y-Profile Surface-Constrained Longitudinal Fairing across cached station points
         if (enableLongitudinalFairing)
         {
-            ApplyYProfileLongitudinalFairing(stations, cachedPortLLPoints, -1f, llCount);
-            ApplyYProfileLongitudinalFairing(stations, cachedPortULPoints, -1f, ulCount);
-            ApplyYProfileLongitudinalFairing(stations, cachedPortUMPoints, -1f, umCount);
+            ApplyYProfileLongitudinalFairing(stations, cachedPortLLPoints, -1f, llCount, false);
+            ApplyYProfileLongitudinalFairing(stations, cachedPortULPoints, -1f, ulCount, false);
+            ApplyYProfileLongitudinalFairing(stations, cachedPortUMPoints, -1f, umCount, true);
 
-            ApplyYProfileLongitudinalFairing(stations, cachedStbdLLPoints, 1f, llCount);
-            ApplyYProfileLongitudinalFairing(stations, cachedStbdULPoints, 1f, ulCount);
-            ApplyYProfileLongitudinalFairing(stations, cachedStbdUMPoints, 1f, umCount);
+            ApplyYProfileLongitudinalFairing(stations, cachedStbdLLPoints, 1f, llCount, false);
+            ApplyYProfileLongitudinalFairing(stations, cachedStbdULPoints, 1f, ulCount, false);
+            ApplyYProfileLongitudinalFairing(stations, cachedStbdUMPoints, 1f, umCount, true);
         }
 
         // Apply Frame Cutoffs (Clipping Upper Mould strakes past top timber sheer height & fashion timber cutoffs)
@@ -412,7 +415,7 @@ public class StrakesModel : MonoBehaviour
     /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
     /// Operates in 1D array space for N smoothing passes, then projects back to 3D frame surfaces ONCE.
     /// </summary>
-    private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
+    private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount, bool isUpperMould = false)
     {
         if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
 
@@ -422,6 +425,8 @@ public class StrakesModel : MonoBehaviour
 
         for (int k = 0; k < strakeCount; k++)
         {
+            bool isTopSheerStrake = (lockTopStrakeToSheerPlan && isUpperMould && k == strakeCount - 1);
+
             // 1. Fetch un-faired Y points for strake k across all stations
             for (int s = 0; s < stationCount; s++)
             {
@@ -440,7 +445,12 @@ public class StrakesModel : MonoBehaviour
                 {
                     if (!validBuffer[s]) continue;
 
-                    if (s == 0 || s == stationCount - 1 || !validBuffer[s - 1] || !validBuffer[s + 1])
+                    if (isTopSheerStrake)
+                    {
+                        float z = stations[s];
+                        targetYBuffer[s] = (framingModel.disableFrameCutoffs) ? sheerPlan.GetPureSheerYAtZ(z) : sheerPlan.GetTopTimberYAtZ(z);
+                    }
+                    else if (s == 0 || s == stationCount - 1 || !validBuffer[s - 1] || !validBuffer[s + 1])
                     {
                         targetYBuffer[s] = rawYBuffer[s];
                     }
