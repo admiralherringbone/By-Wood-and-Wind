@@ -235,9 +235,6 @@ public class FramingModel : MonoBehaviour
         // Master Frame at Z = 0
         stations.Add(0f);
 
-        // Furthest forward station at bow
-        stations.Add(fwdZ);
-
         if (frameSpacingMode == FrameSpacingMode.PrimaryBreadthCurve && breadthPlan != null)
         {
             breadthPlan.UpdateCachedCurves();
@@ -288,7 +285,7 @@ public class FramingModel : MonoBehaviour
         {
             // Forward Stations (Z > 0)
             float curZ = frameSpacing;
-            while (curZ <= fwdZ)
+            while (curZ < fwdZ - 0.001f)
             {
                 stations.Add(curZ);
                 curZ += frameSpacing;
@@ -328,26 +325,15 @@ public class FramingModel : MonoBehaviour
 
         stations.Sort();
 
-        // Filter out near-duplicate stations (within 5mm)
+        // Filter out near-duplicate stations (within 5mm) and exclude the apex bow station (fwdZ)
         List<float> uniqueStations = new List<float>();
         foreach (float s in stations)
         {
+            if (s >= fwdZ - 0.001f) continue;
+
             if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.005f)
             {
                 uniqueStations.Add(s);
-            }
-        }
-
-        // Ensure the absolute furthest forward station (fwdZ) is always included
-        if (uniqueStations.Count > 0 && Mathf.Abs(uniqueStations[uniqueStations.Count - 1] - fwdZ) > 0.0001f)
-        {
-            if (Mathf.Abs(uniqueStations[uniqueStations.Count - 1] - fwdZ) <= 0.005f)
-            {
-                uniqueStations[uniqueStations.Count - 1] = fwdZ;
-            }
-            else
-            {
-                uniqueStations.Add(fwdZ);
             }
         }
 
