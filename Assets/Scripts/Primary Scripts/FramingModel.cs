@@ -913,6 +913,25 @@ public class FramingModel : MonoBehaviour
                 DrawFrameAtZ(z, c, isMaster);
             }
 
+            // Bow Apex Pseudo Frame (Single line at the very bow apex from Keel to HOB height)
+            if (showPseudoFrames || showFrames)
+            {
+                float fwdZ = sheerPlan.GetFwdMostZ();
+                float keelY = GetFrameBottomYAtZ(fwdZ);
+                Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+                if (GetFrameControlPointsAtZ(fwdZ, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                {
+                    float hobY = pL3.y;
+                    Vector3 stbdKeelPt = new Vector3(hw, keelY, fwdZ);
+                    Vector3 stbdHobPt = new Vector3(hw, hobY, fwdZ);
+                    Vector3 portKeelPt = new Vector3(-hw, keelY, fwdZ);
+                    Vector3 portHobPt = new Vector3(-hw, hobY, fwdZ);
+
+                    DrawDashedLine(stbdKeelPt, stbdHobPt, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
+                    DrawDashedLine(portKeelPt, portHobPt, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
+                }
+            }
+
 #if UNITY_EDITOR
             if (showLabels)
             {
