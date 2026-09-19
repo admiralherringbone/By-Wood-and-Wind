@@ -152,21 +152,17 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
-        // 2. Cache Valid Frame Stations ONCE
+        // 2. Cache Valid Frame Stations ONCE (including terminal bow station fwdZ)
         cachedValidStations.Clear();
         if (framingModel != null && sheerPlan != null)
         {
             sheerPlan.UpdateCachedValues();
             List<float> allStations = framingModel.CalculateFrameStations();
-            if (allStations.Count > 1)
+            if (allStations.Count > 0)
             {
-                float maxBowZ = allStations[allStations.Count - 1];
                 foreach (float z in allStations)
                 {
-                    if (z < maxBowZ - 0.001f)
-                    {
-                        cachedValidStations.Add(z);
-                    }
+                    cachedValidStations.Add(z);
                 }
             }
         }
@@ -216,6 +212,51 @@ public class StrakesModel : MonoBehaviour
             ApplyYProfileLongitudinalFairing(stations, cachedPortULPoints, -1f, ulCount);
             ApplyYProfileLongitudinalFairing(stations, cachedStbdLLPoints, 1f, llCount);
             ApplyYProfileLongitudinalFairing(stations, cachedStbdULPoints, 1f, ulCount);
+        }
+
+        // Trim / Clip Strake endpoints at the 2D Stem Profile curve of the Sheer Plan
+        TrimStrakesAtStemProfile(stations, cachedPortLLPoints, llCount);
+        TrimStrakesAtStemProfile(stations, cachedPortULPoints, ulCount);
+        TrimStrakesAtStemProfile(stations, cachedStbdLLPoints, llCount);
+        TrimStrakesAtStemProfile(stations, cachedStbdULPoints, ulCount);
+    }
+
+    /// <summary>
+    /// Trims/clips longitudinal strake lines against the Sheer Plan 2D Stem Profile curve.
+    /// Ensures all forward-running strakes terminate cleanly on the stem seam at X = 0.
+    /// </summary>
+    private void TrimStrakesAtStemProfile(List<float> stations, Dictionary<int, List<Vector3>> pointDict, int strakeCount)
+    {
+        if (sheerPlan == null || stations == null || stations.Count == 0 || pointDict == null) return;
+
+        int stationCount = stations.Count;
+
+        for (int k = 0; k < strakeCount; k++)
+        {
+            int lastStationIdx = -1;
+            for (int s = stationCount - 1; s >= 0; s--)
+            {
+                if (pointDict.ContainsKey(s) && pointDict[s].Count > k)
+                {
+                    lastStationIdx = s;
+                    break;
+                }
+            }
+
+            if (lastStationIdx < 0) continue;
+
+            for (int s = 0; s <= lastStationIdx; s++)
+            {
+                if (!pointDict.ContainsKey(s) || pointDict[s].Count <= k) continue;
+
+                Vector3 currentPt = pointDict[s][k];
+                float stemZ = sheerPlan.GetStemProfileZAtY(currentPt.y);
+
+                if (s == lastStationIdx || currentPt.z >= stemZ - 0.001f)
+                {
+                    pointDict[s][k] = new Vector3(0f, currentPt.y, stemZ);
+                }
+            }
         }
     }
 
