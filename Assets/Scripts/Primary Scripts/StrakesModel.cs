@@ -152,7 +152,7 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
-        // 2. Cache Valid Frame Stations ONCE
+        // 2. Cache Valid Frame Stations ONCE (including the bow apex vertical line at fwdZ)
         cachedValidStations.Clear();
         if (framingModel != null && sheerPlan != null)
         {
@@ -161,6 +161,12 @@ public class StrakesModel : MonoBehaviour
             if (allStations.Count > 0)
             {
                 cachedValidStations.AddRange(allStations);
+            }
+
+            float fwdZ = sheerPlan.GetFwdMostZ();
+            if (cachedValidStations.Count == 0 || cachedValidStations[cachedValidStations.Count - 1] < fwdZ - 0.001f)
+            {
+                cachedValidStations.Add(fwdZ);
             }
         }
 
@@ -274,9 +280,11 @@ public class StrakesModel : MonoBehaviour
                     float profileY = pL0.y;
 
                     Vector3 fairedPt;
-                    if (targetYBuffer[s] < profileY - 0.001f)
+                    float fwdZVal = (sheerPlan != null) ? sheerPlan.GetFwdMostZ() : float.MinValue;
+                    if (Mathf.Abs(z - fwdZVal) < 0.005f || targetYBuffer[s] < profileY - 0.001f)
                     {
-                        float clampedY = Mathf.Max(keelY, targetYBuffer[s]);
+                        float hobY = Mathf.Max(pL3.y, profileY);
+                        float clampedY = Mathf.Clamp(targetYBuffer[s], keelY, hobY);
                         fairedPt = new Vector3(side * hw, clampedY, z);
                     }
                     else
@@ -306,6 +314,23 @@ public class StrakesModel : MonoBehaviour
         if (framingModel == null) return points;
 
         count = Mathf.Max(2, count);
+
+        float fwdZVal = (sheerPlan != null) ? sheerPlan.GetFwdMostZ() : float.MinValue;
+        bool isBowApex = (!float.IsNaN(keelY) && (Mathf.Abs(pL0.z - fwdZVal) < 0.005f || Vector3.Distance(pL0, pL3) < 0.005f));
+
+        if (isBowApex)
+        {
+            float hobY = Mathf.Max(pL3.y, pL0.y);
+            float startY = Mathf.Lerp(keelY, hobY, minU * 2.0f);
+            float endY = Mathf.Lerp(keelY, hobY, maxU * 2.0f);
+            for (int k = 0; k < count; k++)
+            {
+                float t = (float)k / (count - 1);
+                float y = Mathf.Lerp(startY, endY, t);
+                points.Add(new Vector3(pL0.x, y, pL0.z));
+            }
+            return points;
+        }
         bool hasPseudoFrame = (Mathf.Approximately(minU, 0f) && !float.IsNaN(keelY) && pL0.y > keelY + 0.001f);
 
         const int curveSamples = 20;
