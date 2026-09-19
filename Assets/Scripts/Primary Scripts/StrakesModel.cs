@@ -48,13 +48,13 @@ public class StrakesModel : MonoBehaviour
     [Tooltip("Enable Y-Profile Longitudinal Fairing to smooth the side-view Y-height profile of strakes across stations Z.")]
     public bool enableLongitudinalFairing = true;
 
-    [Range(0f, 1f)]
-    [Tooltip("Strength blend for Y-Profile Fairing (0 = raw station math, 1 = fully faired Y profile).")]
-    public float fairingStrength = 0.75f;
+    [Range(0f, 2f)]
+    [Tooltip("Strength blend for Y-Profile Fairing (0 = raw station math, 1 = 100% smoothed blend, >1 = over-relaxation for maximum curvature stiffness).")]
+    public float fairingStrength = 1.0f;
 
-    [Range(1, 5)]
-    [Tooltip("Number of longitudinal smoothing passes.")]
-    public int fairingPasses = 2;
+    [Range(1, 20)]
+    [Tooltip("Number of longitudinal smoothing passes (higher values apply stronger longitudinal fairing across frames).")]
+    public int fairingPasses = 5;
 
     [Tooltip("Enable graduated non-linear tapering from Keel to HOB (narrowing near HOB, widening near Keel).")]
     public bool enableStrakeSmoothing = true;
@@ -264,7 +264,7 @@ public class StrakesModel : MonoBehaviour
         if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
 
         float hw = framingModel.GetKeelHalfWidth();
-        int passes = Mathf.Clamp(fairingPasses, 1, 5);
+        int passes = Mathf.Clamp(fairingPasses, 1, 20);
         int stationCount = Mathf.Min(stations.Count, 512);
 
         for (int pass = 0; pass < passes; pass++)
