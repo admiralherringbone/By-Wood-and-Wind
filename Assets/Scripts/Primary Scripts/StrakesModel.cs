@@ -152,7 +152,7 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
-        // 2. Cache Valid Frame Stations ONCE (including the bow frame at maxBowZ)
+        // 2. Cache Valid Frame Stations ONCE
         cachedValidStations.Clear();
         if (framingModel != null && sheerPlan != null)
         {
