@@ -473,8 +473,8 @@ public class StrakesModel : MonoBehaviour
                     float fwdZVal = (sheerPlan != null) ? sheerPlan.GetFwdMostZ() : float.MinValue;
                     if (Mathf.Abs(z - fwdZVal) < 0.005f || targetYBuffer[s] < profileY - 0.001f)
                     {
-                        float hobY = Mathf.Max(pL3.y, profileY);
-                        float clampedY = Mathf.Clamp(targetYBuffer[s], keelY, hobY);
+                        float topY = pU3.y > pL3.y + 0.001f ? pU3.y : (sheerPlan != null ? sheerPlan.GetTopTimberYAtZ(z) : pL3.y);
+                        float clampedY = Mathf.Clamp(targetYBuffer[s], keelY, topY);
                         fairedPt = new Vector3(side * hw, clampedY, z);
                     }
                     else
