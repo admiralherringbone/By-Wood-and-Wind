@@ -8,6 +8,7 @@ using UnityEditor;
 /// StrakesModel places and visualizes highly optimized strake points and longitudinal guide lines 
 /// separated into Lower-Lower Mould strakes (u in [0, 0.25]) and Upper-Lower Mould strakes (u in [0.25, 0.50]),
 /// divided by the Connection Points along the lower frame moulds up to the Keel Bow.
+/// Optimized for maximum Edit-Mode performance with full 3D point caching and 1D-decoupled fairing passes.
 /// </summary>
 [ExecuteInEditMode]
 public class StrakesModel : MonoBehaviour
@@ -37,7 +38,7 @@ public class StrakesModel : MonoBehaviour
     [Range(2, 20)]
     public int strakesPerUpperLowerMould = 5;
 
-    [Tooltip("Size of the strake point node spheres in Scene view.")]
+    [Tooltip("Size of the strake point node markers in Scene view.")]
     [Range(0.01f, 0.3f)]
     public float pointRadius = 0.05f;
 
@@ -87,25 +88,44 @@ public class StrakesModel : MonoBehaviour
     [Tooltip("Show strake index labels in Scene view.")]
     public bool showLabels = false;
 
+    // Static buffers for zero heap allocation during calculation passes
     private static readonly Vector3[] ptTableBuffer = new Vector3[64];
     private static readonly float[] distTableBuffer = new float[64];
     private static readonly float[] rawYBuffer = new float[512];
     private static readonly float[] targetYBuffer = new float[512];
     private static readonly bool[] validBuffer = new bool[512];
 
+    // Caching fields
     private List<float> cachedValidStations = new List<float>();
     private float cachedMidshipLength = 0f;
     private bool isCacheDirty = true;
 
+    // Cached fully faired 3D strake point data for ultra-fast Gizmo drawing
+    private readonly Dictionary<int, List<Vector3>> cachedPortLLPoints = new Dictionary<int, List<Vector3>>();
+    private readonly Dictionary<int, List<Vector3>> cachedStbdLLPoints = new Dictionary<int, List<Vector3>>();
+    private readonly Dictionary<int, List<Vector3>> cachedPortULPoints = new Dictionary<int, List<Vector3>>();
+    private readonly Dictionary<int, List<Vector3>> cachedStbdULPoints = new Dictionary<int, List<Vector3>>();
+
     private void Awake()
     {
         FindReferences();
+        SetDirty();
+    }
+
+    private void OnEnable()
+    {
+        FindReferences();
+        SetDirty();
     }
 
     private void OnValidate()
     {
+        SetDirty();
+    }
+
+    public void SetDirty()
+    {
         isCacheDirty = true;
-        FindReferences();
     }
 
     public void FindReferences()
@@ -151,13 +171,139 @@ public class StrakesModel : MonoBehaviour
             }
         }
 
+        RebuildCachedGizmoPoints();
         isCacheDirty = false;
+    }
+
+    private void RebuildCachedGizmoPoints()
+    {
+        cachedPortLLPoints.Clear();
+        cachedStbdLLPoints.Clear();
+        cachedPortULPoints.Clear();
+        cachedStbdULPoints.Clear();
+
+        List<float> stations = cachedValidStations;
+        if (stations.Count == 0 || framingModel == null) return;
+
+        int llCount = Mathf.Max(2, strakesPerLowerLowerMould);
+        int ulCount = Mathf.Max(2, strakesPerUpperLowerMould);
+
+        for (int s = 0; s < stations.Count; s++)
+        {
+            float z = stations[s];
+            float keelY = framingModel.GetFrameBottomYAtZ(z);
+
+            // Port Side (-1f)
+            Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+            if (framingModel.GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                cachedPortLLPoints[s] = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
+                cachedPortULPoints[s] = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
+            }
+
+            // Starboard Side (+1f)
+            if (framingModel.GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            {
+                cachedStbdLLPoints[s] = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
+                cachedStbdULPoints[s] = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
+            }
+        }
+
+        // Apply Y-Profile Surface-Constrained Longitudinal Fairing across cached station points
+        if (enableLongitudinalFairing)
+        {
+            ApplyYProfileLongitudinalFairing(stations, cachedPortLLPoints, -1f, llCount);
+            ApplyYProfileLongitudinalFairing(stations, cachedPortULPoints, -1f, ulCount);
+            ApplyYProfileLongitudinalFairing(stations, cachedStbdLLPoints, 1f, llCount);
+            ApplyYProfileLongitudinalFairing(stations, cachedStbdULPoints, 1f, ulCount);
+        }
+    }
+
+    /// <summary>
+    /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
+    /// Operates in 1D array space for N smoothing passes, then projects back to 3D frame surfaces ONCE.
+    /// </summary>
+    private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
+    {
+        if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
+
+        float hw = framingModel.GetKeelHalfWidth();
+        int passes = Mathf.Clamp(fairingPasses, 1, 20);
+        int stationCount = Mathf.Min(stations.Count, 512);
+
+        for (int k = 0; k < strakeCount; k++)
+        {
+            // 1. Fetch un-faired Y points for strake k across all stations
+            for (int s = 0; s < stationCount; s++)
+            {
+                validBuffer[s] = false;
+                if (pointDict.ContainsKey(s) && pointDict[s].Count > k)
+                {
+                    rawYBuffer[s] = pointDict[s][k].y;
+                    validBuffer[s] = true;
+                }
+            }
+
+            // 2. Perform 1D binomial smoothing passes ONLY in float array memory (0 heavy 3D math here!)
+            for (int pass = 0; pass < passes; pass++)
+            {
+                for (int s = 0; s < stationCount; s++)
+                {
+                    if (!validBuffer[s]) continue;
+
+                    if (s == 0 || s == stationCount - 1 || !validBuffer[s - 1] || !validBuffer[s + 1])
+                    {
+                        targetYBuffer[s] = rawYBuffer[s];
+                    }
+                    else
+                    {
+                        float ySmoothed = 0.25f * rawYBuffer[s - 1] + 0.50f * rawYBuffer[s] + 0.25f * rawYBuffer[s + 1];
+                        targetYBuffer[s] = Mathf.Lerp(rawYBuffer[s], ySmoothed, fairingStrength);
+                    }
+                }
+
+                for (int s = 0; s < stationCount; s++)
+                {
+                    if (validBuffer[s]) rawYBuffer[s] = targetYBuffer[s];
+                }
+            }
+
+            // 3. Project faired Y target heights back onto 3D frame surfaces ONCE after all passes complete
+            for (int s = 0; s < stationCount; s++)
+            {
+                if (!validBuffer[s]) continue;
+                float z = stations[s];
+                float keelY = framingModel.GetFrameBottomYAtZ(z);
+
+                Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+                if (framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+                {
+                    float profileY = pL0.y;
+
+                    Vector3 fairedPt;
+                    if (targetYBuffer[s] < profileY - 0.001f)
+                    {
+                        float clampedY = Mathf.Max(keelY, targetYBuffer[s]);
+                        fairedPt = new Vector3(side * hw, clampedY, z);
+                    }
+                    else
+                    {
+                        fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetYBuffer[s]);
+                    }
+
+                    if (fairedPt != Vector3.zero)
+                    {
+                        pointDict[s][k] = fairedPt;
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
     /// Evaluates list of 3D points equally spaced by arc length along a sub-segment u in [minU, maxU] 
     /// using pre-fetched control points. Includes Pseudo Frame vertical segment when present (pL0.y > keelY).
-    /// Optimized with zero heap allocations during Gizmo drawing.
+    /// Optimized with zero heap allocations during calculation.
     /// </summary>
     public List<Vector3> GetSegmentStrakePointsFromControlPoints(
         Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3, Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
@@ -181,7 +327,6 @@ public class StrakesModel : MonoBehaviour
             Vector3 keelBaselinePt = new Vector3(pL0.x, keelY, pL0.z);
             ptTableBuffer[0] = keelBaselinePt;
 
-            // 1. Sample vertical Pseudo Frame segment (keelBaselinePt -> pL0)
             for (int i = 1; i <= pseudoSamples; i++)
             {
                 float t = i / (float)pseudoSamples;
@@ -191,7 +336,6 @@ public class StrakesModel : MonoBehaviour
                 distTableBuffer[i] = totalLength;
             }
 
-            // 2. Sample Lower Mould Bezier curve (pL0 -> pLR)
             for (int i = 1; i <= curveSamples; i++)
             {
                 float u = Mathf.Lerp(minU, maxU, i / (float)curveSamples);
@@ -255,91 +399,7 @@ public class StrakesModel : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies Y-Profile Surface-Constrained Longitudinal Fairing across stations Z.
-    /// Smooths Y-height trajectories while projecting points back onto transverse frame surfaces 
-    /// or vertical Pseudo Frame segments. Optimized with zero allocation buffers.
-    /// </summary>
-    private void ApplyYProfileLongitudinalFairing(List<float> stations, Dictionary<int, List<Vector3>> pointDict, float side, int strakeCount)
-    {
-        if (!enableLongitudinalFairing || stations == null || stations.Count < 3 || pointDict == null || framingModel == null) return;
-
-        float hw = framingModel.GetKeelHalfWidth();
-        int passes = Mathf.Clamp(fairingPasses, 1, 20);
-        int stationCount = Mathf.Min(stations.Count, 512);
-
-        for (int pass = 0; pass < passes; pass++)
-        {
-            for (int k = 0; k < strakeCount; k++)
-            {
-                for (int s = 0; s < stationCount; s++)
-                {
-                    validBuffer[s] = false;
-                    if (pointDict.ContainsKey(s) && pointDict[s].Count > k)
-                    {
-                        rawYBuffer[s] = pointDict[s][k].y;
-                        validBuffer[s] = true;
-                    }
-                }
-
-                for (int s = 0; s < stationCount; s++)
-                {
-                    if (!validBuffer[s]) continue;
-
-                    if (s == 0 || s == stationCount - 1 || !validBuffer[s - 1] || !validBuffer[s + 1])
-                    {
-                        targetYBuffer[s] = rawYBuffer[s];
-                    }
-                    else
-                    {
-                        float ySmoothed = 0.25f * rawYBuffer[s - 1] + 0.50f * rawYBuffer[s] + 0.25f * rawYBuffer[s + 1];
-                        targetYBuffer[s] = Mathf.Lerp(rawYBuffer[s], ySmoothed, fairingStrength);
-                    }
-                }
-
-                for (int s = 0; s < stationCount; s++)
-                {
-                    if (!validBuffer[s]) continue;
-                    float z = stations[s];
-                    float keelY = framingModel.GetFrameBottomYAtZ(z);
-
-                    Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-                    if (framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-                    {
-                        float profileY = pL0.y;
-
-                        Vector3 fairedPt;
-                        if (targetYBuffer[s] < profileY - 0.001f)
-                        {
-                            float clampedY = Mathf.Max(keelY, targetYBuffer[s]);
-                            fairedPt = new Vector3(side * hw, clampedY, z);
-                        }
-                        else
-                        {
-                            fairedPt = framingModel.GetTransverseFramePointAtY(z, side, targetYBuffer[s]);
-                        }
-
-                        if (fairedPt != Vector3.zero)
-                        {
-                            pointDict[s][k] = fairedPt;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets the starting Z coordinate of the Deadwood (aft boundary for strakes).
-    /// </summary>
-    public float GetDeadwoodStartZ()
-    {
-        if (sheerPlan == null) return 0f;
-        sheerPlan.UpdateCachedValues();
-        return sheerPlan.showDeadwoodRake ? sheerPlan.cachedDeadwoodForePoint.z : sheerPlan.cachedSternRisingEnd.z;
-    }
-
-    /// <summary>
-    /// Gets strake points along the Lower-Lower Mould segment (Keel pL0 to Connection Point pLR).
+    /// Gets list of strake points along Lower-Lower Mould (Keel to Connection Point pLR) at station z.
     /// </summary>
     public List<Vector3> GetLowerLowerMouldStrakePoints(float z, float side, int count)
     {
@@ -349,7 +409,6 @@ public class StrakesModel : MonoBehaviour
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
         float maxBowZ = allStations[allStations.Count - 1];
-        if (z >= maxBowZ - 0.001f) return new List<Vector3>();
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
@@ -360,7 +419,7 @@ public class StrakesModel : MonoBehaviour
     }
 
     /// <summary>
-    /// Gets strake points along the Upper-Lower Mould segment (Connection Point pLR to pL3).
+    /// Gets list of strake points along Upper-Lower Mould (Connection Point pLR to pL3) at station z.
     /// </summary>
     public List<Vector3> GetUpperLowerMouldStrakePoints(float z, float side, int count)
     {
@@ -370,7 +429,6 @@ public class StrakesModel : MonoBehaviour
         List<float> allStations = framingModel.CalculateFrameStations();
         if (allStations.Count == 0) return new List<Vector3>();
         float maxBowZ = allStations[allStations.Count - 1];
-        if (z >= maxBowZ - 0.001f) return new List<Vector3>();
 
         Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
         if (!framingModel.GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
@@ -402,83 +460,44 @@ public class StrakesModel : MonoBehaviour
         int llCount = Mathf.Max(2, strakesPerLowerLowerMould);
         int ulCount = Mathf.Max(2, strakesPerUpperLowerMould);
 
-        // Store points for longitudinal line connections
-        Dictionary<int, List<Vector3>> portLLPoints = new Dictionary<int, List<Vector3>>();
-        Dictionary<int, List<Vector3>> stbdLLPoints = new Dictionary<int, List<Vector3>>();
-        Dictionary<int, List<Vector3>> portULPoints = new Dictionary<int, List<Vector3>>();
-        Dictionary<int, List<Vector3>> stbdULPoints = new Dictionary<int, List<Vector3>>();
+        // Draw Strake Nodes (Fast Cube Markers)
+        Vector3 cubeSize = Vector3.one * (pointRadius * 1.5f);
+        Vector3 highlightSize = Vector3.one * (pointRadius * 2.0f);
 
         for (int s = 0; s < stations.Count; s++)
         {
-            float z = stations[s];
-            float keelY = framingModel.GetFrameBottomYAtZ(z);
-
-            // Port Side (-1f) - Fetch control points ONCE per station
-            Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-            if (framingModel.GetFrameControlPointsAtZ(z, -1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-            {
-                List<Vector3> portLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
-                List<Vector3> portUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
-
-                portLLPoints[s] = portLL;
-                portULPoints[s] = portUL;
-            }
-
-            // Starboard Side (+1f) - Fetch control points ONCE per station
-            if (framingModel.GetFrameControlPointsAtZ(z, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-            {
-                List<Vector3> stbdLL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0f, 0.25f, llCount, keelY, cachedMidshipLength);
-                List<Vector3> stbdUL = GetSegmentStrakePointsFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, 0.25f, 0.50f, ulCount, keelY, cachedMidshipLength);
-
-                stbdLLPoints[s] = stbdLL;
-                stbdULPoints[s] = stbdUL;
-            }
-        }
-
-        // Apply Y-Profile Surface-Constrained Longitudinal Fairing
-        if (enableLongitudinalFairing)
-        {
-            ApplyYProfileLongitudinalFairing(stations, portLLPoints, -1f, llCount);
-            ApplyYProfileLongitudinalFairing(stations, portULPoints, -1f, ulCount);
-            ApplyYProfileLongitudinalFairing(stations, stbdLLPoints, 1f, llCount);
-            ApplyYProfileLongitudinalFairing(stations, stbdULPoints, 1f, ulCount);
-        }
-
-        // Draw Node Spheres
-        for (int s = 0; s < stations.Count; s++)
-        {
-            if (portLLPoints.ContainsKey(s))
+            if (cachedPortLLPoints.ContainsKey(s))
             {
                 Gizmos.color = lowerLowerPointColor;
-                foreach (Vector3 pt in portLLPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
-                if (highlightConnectionPoints && portLLPoints[s].Count > 0)
+                foreach (Vector3 pt in cachedPortLLPoints[s]) Gizmos.DrawCube(pt, cubeSize);
+                if (highlightConnectionPoints && cachedPortLLPoints[s].Count > 0)
                 {
                     Gizmos.color = connectionPointColor;
-                    Gizmos.DrawSphere(portLLPoints[s][portLLPoints[s].Count - 1], pointRadius * 1.3f);
+                    Gizmos.DrawCube(cachedPortLLPoints[s][cachedPortLLPoints[s].Count - 1], highlightSize);
                 }
             }
 
-            if (portULPoints.ContainsKey(s))
+            if (cachedPortULPoints.ContainsKey(s))
             {
                 Gizmos.color = upperLowerPointColor;
-                foreach (Vector3 pt in portULPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
+                foreach (Vector3 pt in cachedPortULPoints[s]) Gizmos.DrawCube(pt, cubeSize);
             }
 
-            if (stbdLLPoints.ContainsKey(s))
+            if (cachedStbdLLPoints.ContainsKey(s))
             {
                 Gizmos.color = lowerLowerPointColor;
-                foreach (Vector3 pt in stbdLLPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
-                if (highlightConnectionPoints && stbdLLPoints[s].Count > 0)
+                foreach (Vector3 pt in cachedStbdLLPoints[s]) Gizmos.DrawCube(pt, cubeSize);
+                if (highlightConnectionPoints && cachedStbdLLPoints[s].Count > 0)
                 {
                     Gizmos.color = connectionPointColor;
-                    Gizmos.DrawSphere(stbdLLPoints[s][stbdLLPoints[s].Count - 1], pointRadius * 1.3f);
+                    Gizmos.DrawCube(cachedStbdLLPoints[s][cachedStbdLLPoints[s].Count - 1], highlightSize);
                 }
             }
 
-            if (stbdULPoints.ContainsKey(s))
+            if (cachedStbdULPoints.ContainsKey(s))
             {
                 Gizmos.color = upperLowerPointColor;
-                foreach (Vector3 pt in stbdULPoints[s]) Gizmos.DrawSphere(pt, pointRadius);
+                foreach (Vector3 pt in cachedStbdULPoints[s]) Gizmos.DrawCube(pt, cubeSize);
             }
         }
 
@@ -491,16 +510,16 @@ public class StrakesModel : MonoBehaviour
             {
                 for (int s = 0; s < stations.Count - 1; s++)
                 {
-                    if (portLLPoints.ContainsKey(s) && portLLPoints.ContainsKey(s + 1) &&
-                        portLLPoints[s].Count > k && portLLPoints[s + 1].Count > k)
+                    if (cachedPortLLPoints.ContainsKey(s) && cachedPortLLPoints.ContainsKey(s + 1) &&
+                        cachedPortLLPoints[s].Count > k && cachedPortLLPoints[s + 1].Count > k)
                     {
-                        Gizmos.DrawLine(portLLPoints[s][k], portLLPoints[s + 1][k]);
+                        Gizmos.DrawLine(cachedPortLLPoints[s][k], cachedPortLLPoints[s + 1][k]);
                     }
 
-                    if (stbdLLPoints.ContainsKey(s) && stbdLLPoints.ContainsKey(s + 1) &&
-                        stbdLLPoints[s].Count > k && stbdLLPoints[s + 1].Count > k)
+                    if (cachedStbdLLPoints.ContainsKey(s) && cachedStbdLLPoints.ContainsKey(s + 1) &&
+                        cachedStbdLLPoints[s].Count > k && cachedStbdLLPoints[s + 1].Count > k)
                     {
-                        Gizmos.DrawLine(stbdLLPoints[s][k], stbdLLPoints[s + 1][k]);
+                        Gizmos.DrawLine(cachedStbdLLPoints[s][k], cachedStbdLLPoints[s + 1][k]);
                     }
                 }
             }
@@ -511,16 +530,16 @@ public class StrakesModel : MonoBehaviour
             {
                 for (int s = 0; s < stations.Count - 1; s++)
                 {
-                    if (portULPoints.ContainsKey(s) && portULPoints.ContainsKey(s + 1) &&
-                        portULPoints[s].Count > k && portULPoints[s + 1].Count > k)
+                    if (cachedPortULPoints.ContainsKey(s) && cachedPortULPoints.ContainsKey(s + 1) &&
+                        cachedPortULPoints[s].Count > k && cachedPortULPoints[s + 1].Count > k)
                     {
-                        Gizmos.DrawLine(portULPoints[s][k], portULPoints[s + 1][k]);
+                        Gizmos.DrawLine(cachedPortULPoints[s][k], cachedPortULPoints[s + 1][k]);
                     }
 
-                    if (stbdULPoints.ContainsKey(s) && stbdULPoints.ContainsKey(s + 1) &&
-                        stbdULPoints[s].Count > k && stbdULPoints[s + 1].Count > k)
+                    if (cachedStbdULPoints.ContainsKey(s) && cachedStbdULPoints.ContainsKey(s + 1) &&
+                        cachedStbdULPoints[s].Count > k && cachedStbdULPoints[s + 1].Count > k)
                     {
-                        Gizmos.DrawLine(stbdULPoints[s][k], stbdULPoints[s + 1][k]);
+                        Gizmos.DrawLine(cachedStbdULPoints[s][k], cachedStbdULPoints[s + 1][k]);
                     }
                 }
             }
