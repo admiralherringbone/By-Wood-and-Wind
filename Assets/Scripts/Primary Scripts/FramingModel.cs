@@ -157,6 +157,11 @@ public class FramingModel : MonoBehaviour
         FindReferences();
     }
 
+    public void MarkStationsDirty()
+    {
+        isStationListDirty = true;
+    }
+
     public void FindReferences()
     {
         if (sheerPlan == null)
@@ -323,15 +328,47 @@ public class FramingModel : MonoBehaviour
             }
         }
 
+        // Stem & Stern Profile Auxiliary Frame Stations for all Strakes
+        StrakesModel strakesModel = GetComponent<StrakesModel>() ?? FindObjectOfType<StrakesModel>();
+        if (strakesModel != null)
+        {
+            strakesModel.CollectProfileIntersectionZs(stations);
+        }
+
+        float[] profileKeyZs = new float[]
+        {
+            sheerPlan.GetAftMostZ(),
+            sheerPlan.GetFwdMostZ(),
+            sheerPlan.cachedTopTimberBowIntersect.z,
+            sheerPlan.cachedHobBowIntersect.z,
+            sheerPlan.cachedBowRisingEnd.z,
+            sheerPlan.cachedUpperStemTopPoint.z,
+            sheerPlan.cachedTopTimberSternIntersect.z,
+            sheerPlan.cachedHobSternIntersect.z,
+            sheerPlan.cachedSternRisingEnd.z,
+            sheerPlan.cachedTransomTopPoint.z,
+            sheerPlan.cachedCounterTopPoint.z,
+            sheerPlan.cachedSternPostTopPoint.z
+        };
+
+        foreach (float pZ in profileKeyZs)
+        {
+            if (pZ >= aftZ - 0.001f && pZ <= fwdZ + 0.001f)
+            {
+                stations.Add(pZ);
+            }
+        }
+
         stations.Sort();
 
-        // Filter out near-duplicate stations (within 5mm) and exclude the apex bow station (fwdZ)
+        // Filter out near-duplicate stations (within 2.5cm) and exclude out-of-bounds stations (outside aftZ to fwdZ range)
         List<float> uniqueStations = new List<float>();
         foreach (float s in stations)
         {
             if (s >= fwdZ - 0.001f) continue;
+            if (s < aftZ - 0.001f) continue;
 
-            if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.005f)
+            if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.025f)
             {
                 uniqueStations.Add(s);
             }
@@ -544,7 +581,7 @@ public class FramingModel : MonoBehaviour
 
         // --- CONNECTION POINT (pLR) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
         float floorX = breadthPlan.GetFloorLineXAtZ(z);
-        float risingY = sheerPlan.GetRisingLineYAtZ(z);
+        float risingY = sheerPlan.GetProjectedBowRisingYAtZ(z);
 
         float pLR_Y = Mathf.Max(risingY, profileY);
         pLR = new Vector3(side * floorX, pLR_Y, z);

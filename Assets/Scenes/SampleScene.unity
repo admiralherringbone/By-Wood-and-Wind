@@ -980,25 +980,39 @@ MonoBehaviour:
   framingModel: {fileID: 287447048}
   fashionTimberModel: {fileID: 900456903}
   showStrakes: 1
+  showIntermediateStrakes: 1
+  showMainDeckSheerLine: 1
+  mainDeckSheerColor: {r: 0.1, g: 0.95, b: 0.95, a: 1}
+  lockMainDeckSheerToSheerPlan: 1
+  showConnectionPointLine: 1
+  connectionPointColor: {r: 1, g: 0.2, b: 0.8, a: 1}
+  lockConnectionPointToRisingLine: 1
   strakesPerLowerLowerMould: 5
   strakesPerUpperLowerMould: 5
-  pointRadius: 0.05
-  showStrakeLines: 1
-  showProfileEndpoints: 1
-  stemEndpointColor: {r: 0.2, g: 0.85, b: 1, a: 1}
-  sternEndpointColor: {r: 1, g: 0.3, b: 0.65, a: 1}
-  enableLongitudinalFairing: 1
-  fairingStrength: 2
-  fairingPasses: 10
-  enableStrakeSmoothing: 1
-  minHobTaperRatio: 0.657
+  showUpperMouldStrakes: 1
+  strakesPerUpperMould: 5
+  upperMouldPointColor: {r: 0.9, g: 0.4, b: 1, a: 1}
+  upperMouldLineColor: {r: 0.95, g: 0.6, b: 1, a: 0.8}
   lowerLowerPointColor: {r: 0.1, g: 0.9, b: 0.4, a: 1}
   lowerLowerLineColor: {r: 0.2, g: 1, b: 0.7, a: 0.8}
   upperLowerPointColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   upperLowerLineColor: {r: 1, g: 0.92, b: 0.4, a: 0.8}
-  highlightConnectionPoints: 1
-  connectionPointColor: {r: 1, g: 0.2, b: 0.8, a: 1}
+  respectFrameCutoffs: 1
+  lockTopStrakeToSheerPlan: 1
+  pointRadius: 0.01
+  showStrakeLines: 1
+  enableLongitudinalFairing: 1
+  fairingStrengthY: 1
+  fairingStrengthX: 1
+  fairingPasses: 10
+  enableStrakeSmoothing: 1
+  minHobTaperRatio: 0.5
   showLabels: 0
+  showProfileIntersectionPoints: 1
+  intersectionMarkerMode: 0
+  stemIntersectionColor: {r: 0.2941177, g: 0, b: 0.509804, a: 1}
+  sternIntersectionColor: {r: 0.1, g: 0.6, b: 1, a: 1}
+  profileIntersectionRadius: 0.08
 --- !u!4 &1059441841
 Transform:
   m_ObjectHideFlags: 0

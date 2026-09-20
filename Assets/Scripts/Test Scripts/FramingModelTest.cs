@@ -315,11 +315,11 @@ public class FramingModelTest : MonoBehaviour
 
         stations.Sort();
 
-        // Filter out near-duplicate stations (within 5mm)
+        // Filter out near-duplicate stations (within 2.5cm)
         List<float> uniqueStations = new List<float>();
         foreach (float s in stations)
         {
-            if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.005f)
+            if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.025f)
             {
                 uniqueStations.Add(s);
             }

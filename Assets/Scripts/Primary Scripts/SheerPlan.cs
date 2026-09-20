@@ -1830,11 +1830,12 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetPureSheerYAtZ(float z)
     {
+        float globalOffset = GetGlobalSheerOffsetAtZ(z);
         if (upperDecks != null && upperDecks.Count > 0)
         {
-            return GetBaseDeckYAtZ(z) + GetMaxDeckHeight();
+            return GetBaseDeckYAtZ(z) + GetMaxDeckHeight() + globalOffset;
         }
-        return GetBaseDeckYAtZ(z) + bulwarkHeight;
+        return GetBaseDeckYAtZ(z) + bulwarkHeight + globalOffset;
     }
 
     protected void DrawDashedDeckCurve(float heightOffset, Color color, int dashCount = 80)
