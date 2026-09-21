@@ -163,6 +163,73 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &140451277
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 140451279}
+  - component: {fileID: 140451278}
+  m_Layer: 0
+  m_Name: RibbandStrakesModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &140451278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 140451277}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a11387a6f263e4b54aaf9103791dc690, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RibbandStrakesModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  fashionTimberModel: {fileID: 900456903}
+  showRibbands: 1
+  strakesPerLowerLowerMould: 5
+  strakesPerUpperLowerMould: 5
+  strakesPerUpperMould: 5
+  showUpperMouldRibbands: 1
+  ribbandSamplesPerStrake: 120
+  respectFrameCutoffs: 1
+  enableLongitudinalFairing: 1
+  fairingStrength: 0.5
+  fairingPasses: 3
+  showProfileIntersectionPoints: 1
+  intersectionMarkerMode: 2
+  profileIntersectionRadius: 0.06
+  stemIntersectionColor: {r: 0.2, g: 1, b: 0.4, a: 1}
+  sternIntersectionColor: {r: 1, g: 0.3, b: 0.2, a: 1}
+  lowerLowerColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  upperLowerColor: {r: 0, g: 1, b: 1, a: 1}
+  upperMouldColor: {r: 1, g: 0, b: 1, a: 1}
+--- !u!4 &140451279
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 140451277}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &287447047
 GameObject:
   m_ObjectHideFlags: 0
@@ -990,7 +1057,7 @@ MonoBehaviour:
   strakesPerLowerLowerMould: 5
   strakesPerUpperLowerMould: 5
   showUpperMouldStrakes: 1
-  strakesPerUpperMould: 5
+  strakesPerUpperMould: 8
   upperMouldPointColor: {r: 0.9, g: 0.4, b: 1, a: 1}
   upperMouldLineColor: {r: 0.95, g: 0.6, b: 1, a: 0.8}
   lowerLowerPointColor: {r: 0.1, g: 0.9, b: 0.4, a: 1}
@@ -1013,6 +1080,11 @@ MonoBehaviour:
   stemIntersectionColor: {r: 0.2941177, g: 0, b: 0.509804, a: 1}
   sternIntersectionColor: {r: 0.1, g: 0.6, b: 1, a: 1}
   profileIntersectionRadius: 0.08
+  showStructuralStrakes: 1
+  structuralStrakeSamples: 120
+  mainDeckBulwarkColor: {r: 0.2, g: 0.8, b: 1, a: 1}
+  upperDeckColor: {r: 1, g: 0.7, b: 0.2, a: 1}
+  upperDeckBulwarkColor: {r: 1, g: 0.4, b: 0.2, a: 1}
 --- !u!4 &1059441841
 Transform:
   m_ObjectHideFlags: 0
@@ -1394,82 +1466,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1844188327
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1844188329}
-  - component: {fileID: 1844188328}
-  m_Layer: 0
-  m_Name: Body Plan Experiment
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1844188328
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1844188327}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6f5f6749cc734495f8b00bc7f638d78c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BodyPlan
-  sheerPlan: {fileID: 1972862976}
-  breadthPlan: {fileID: 1109839672}
-  showLabels: 1
-  keelArmAngle: 90
-  keelArmLength: 0
-  hobLowerArmLength: 0.528
-  connectionPointPosition: 0.576
-  bowConnectionPointPosition: 0.5
-  sternConnectionPointPosition: 0.16
-  flareTumblehomePercentage: 0.8
-  upperHobArmAngle: 0
-  upperHobArmLength: 0.5
-  topTimberArmAngle: 0
-  topTimberArmLength: 0.5
-  keelWidth: 0.25
-  baseFrameThickness: 0.3
-  topFrameThickness: 0.15
-  showInnerFrame: 1
-  innerFrameColor: {r: 1, g: 0, b: 1, a: 1}
-  useQuarticBezier: 0
-  useQuinticBezier: 1
-  innerKeelPosition: 0.5
-  middleControlPosition: 0.5
-  cachedL0: {x: 0.125, y: 0, z: 0}
-  cachedL1: {x: 0.125, y: 0, z: 0}
-  cachedLR: {x: 1.7809999, y: 0.81561595, z: 0}
-  cachedL2: {x: 3, y: 1.416, z: 0}
-  cachedL3: {x: 3, y: 3, z: 0}
-  cachedU0: {x: 3, y: 3, z: 0}
-  cachedU1: {x: 3, y: 4.5, z: 0}
-  cachedU2: {x: 2.4, y: 4.5, z: 0}
-  cachedU3: {x: 2.4, y: 6, z: 0}
---- !u!4 &1844188329
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1844188327}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1890003677
 GameObject:
   m_ObjectHideFlags: 0
@@ -1799,7 +1795,7 @@ SceneRoots:
   - {fileID: 303860433}
   - {fileID: 2023851845}
   - {fileID: 964694956}
-  - {fileID: 1844188329}
   - {fileID: 1890003678}
   - {fileID: 1104684823}
   - {fileID: 1059441841}
+  - {fileID: 140451279}
