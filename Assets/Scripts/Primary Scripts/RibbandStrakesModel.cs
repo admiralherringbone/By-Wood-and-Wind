@@ -19,6 +19,12 @@ public class RibbandStrakesModel : MonoBehaviour
         OnBoth
     }
 
+    public enum StrakeSpacingMode
+    {
+        TargetPhysicalSpacing,
+        FixedStrakeCounts
+    }
+
     [Header("Component References")]
     public SheerPlan sheerPlan;
     public BodyPlan bodyPlan;
@@ -30,16 +36,43 @@ public class RibbandStrakesModel : MonoBehaviour
     [Tooltip("Master toggle to show/hide experimental continuous surface-batten ribbands.")]
     public bool showRibbands = true;
 
+    [Tooltip("Method for spacing strakes (TargetPhysicalSpacing calculates counts dynamically from Master Frame Z=0 arc length; FixedStrakeCounts uses manual sliders).")]
+    public StrakeSpacingMode spacingMode = StrakeSpacingMode.TargetPhysicalSpacing;
+
+    [Range(0.05f, 1.0f)]
+    [Tooltip("Target physical spacing distance between adjacent strakes along the Master Frame (Z=0) 3D arc length (meters). Default is 0.25m (25 cm).")]
+    public float targetStrakeSpacing = 0.25f;
+
+    [Header("Master Frame (Z=0) Dynamic Measurements (Read-Only)")]
+    [Tooltip("Calculated 3D arc length of Lower-Lower Mould at Master Frame Z=0 (meters).")]
+    public float masterFrameLLArcLength;
+
+    [Tooltip("Calculated 3D arc length of Upper-Lower Mould at Master Frame Z=0 (meters).")]
+    public float masterFrameULArcLength;
+
+    [Tooltip("Calculated 3D arc length of Upper Mould at Master Frame Z=0 (meters).")]
+    public float masterFrameUMArcLength;
+
+    [Tooltip("Dynamically calculated strake count for Lower-Lower Mould based on target spacing.")]
+    public int calculatedLLStrakeCount;
+
+    [Tooltip("Dynamically calculated strake count for Upper-Lower Mould based on target spacing.")]
+    public int calculatedULStrakeCount;
+
+    [Tooltip("Dynamically calculated strake count for Upper Mould based on target spacing.")]
+    public int calculatedUMStrakeCount;
+
+    [Header("Fixed Strake Count Sliders (FixedStrakeCounts Mode Only)")]
     [Range(2, 20)]
-    [Tooltip("Number of strake lines in Lower-Lower Mould (Keel to Connection/Floor Line).")]
+    [Tooltip("Number of strake lines in Lower-Lower Mould (Keel to Connection/Floor Line). Used in FixedStrakeCounts mode.")]
     public int strakesPerLowerLowerMould = 5;
 
     [Range(2, 20)]
-    [Tooltip("Number of strake lines in Upper-Lower Mould (Connection/Floor Line to Main Deck Sheer).")]
+    [Tooltip("Number of strake lines in Upper-Lower Mould (Connection/Floor Line to Main Deck Sheer). Used in FixedStrakeCounts mode.")]
     public int strakesPerUpperLowerMould = 5;
 
     [Range(2, 20)]
-    [Tooltip("Number of strake lines in Upper Mould (Main Deck Sheer to Top Line Sheer).")]
+    [Tooltip("Number of strake lines in Upper Mould (Main Deck Sheer to Top Line Sheer). Used in FixedStrakeCounts mode.")]
     public int strakesPerUpperMould = 5;
 
     [Tooltip("Toggle to display Upper Mould ribband strakes.")]
@@ -149,6 +182,69 @@ public class RibbandStrakesModel : MonoBehaviour
         return new Vector3(side * hw, targetY, z);
     }
 
+    public float CalculateMasterFrameLLArcLength()
+    {
+        if (framingModel == null || sheerPlan == null) return 0f;
+        const int samples = 50;
+        float totalArc = 0f;
+
+        float keelY = framingModel.GetFrameBottomYAtZ(0f);
+        float connY = sheerPlan.GetProjectedBowRisingYAtZ(0f);
+        Vector3 prevPt = GetStrakeFramePointAtY(0f, 1f, keelY);
+
+        for (int i = 1; i <= samples; i++)
+        {
+            float y = Mathf.Lerp(keelY, connY, (float)i / samples);
+            Vector3 currPt = GetStrakeFramePointAtY(0f, 1f, y);
+            totalArc += Vector3.Distance(prevPt, currPt);
+            prevPt = currPt;
+        }
+
+        return totalArc;
+    }
+
+    public float CalculateMasterFrameULArcLength()
+    {
+        if (framingModel == null || sheerPlan == null) return 0f;
+        const int samples = 50;
+        float totalArc = 0f;
+
+        float connY = sheerPlan.GetProjectedBowRisingYAtZ(0f);
+        float deckY = sheerPlan.GetBaseDeckYAtZ(0f);
+        Vector3 prevPt = GetStrakeFramePointAtY(0f, 1f, connY);
+
+        for (int i = 1; i <= samples; i++)
+        {
+            float y = Mathf.Lerp(connY, deckY, (float)i / samples);
+            Vector3 currPt = GetStrakeFramePointAtY(0f, 1f, y);
+            totalArc += Vector3.Distance(prevPt, currPt);
+            prevPt = currPt;
+        }
+
+        return totalArc;
+    }
+
+    public float CalculateMasterFrameUMArcLength()
+    {
+        if (framingModel == null || sheerPlan == null) return 0f;
+        const int samples = 50;
+        float totalArc = 0f;
+
+        float deckY = sheerPlan.GetBaseDeckYAtZ(0f);
+        float topY = sheerPlan.GetPureSheerYAtZ(0f);
+        Vector3 prevPt = GetStrakeFramePointAtY(0f, 1f, deckY);
+
+        for (int i = 1; i <= samples; i++)
+        {
+            float y = Mathf.Lerp(deckY, topY, (float)i / samples);
+            Vector3 currPt = GetStrakeFramePointAtY(0f, 1f, y);
+            totalArc += Vector3.Distance(prevPt, currPt);
+            prevPt = currPt;
+        }
+
+        return totalArc;
+    }
+
     private void RefreshCacheIfNeeded()
     {
         if (!isCacheDirty) return;
@@ -169,9 +265,38 @@ public class RibbandStrakesModel : MonoBehaviour
         cachedSternStrakeMarkers.Clear();
         cachedSternTimberMarkers.Clear();
 
-        int llCount = Mathf.Max(2, strakesPerLowerLowerMould);
-        int ulCount = Mathf.Max(2, strakesPerUpperLowerMould);
-        int umCount = Mathf.Max(2, strakesPerUpperMould);
+        int llCount, ulCount, umCount;
+
+        if (spacingMode == StrakeSpacingMode.TargetPhysicalSpacing)
+        {
+            float spacing = Mathf.Max(0.01f, targetStrakeSpacing);
+
+            masterFrameLLArcLength = CalculateMasterFrameLLArcLength();
+            masterFrameULArcLength = CalculateMasterFrameULArcLength();
+            masterFrameUMArcLength = CalculateMasterFrameUMArcLength();
+
+            calculatedLLStrakeCount = Mathf.Max(2, Mathf.RoundToInt(masterFrameLLArcLength / spacing) + 1);
+            calculatedULStrakeCount = Mathf.Max(2, Mathf.RoundToInt(masterFrameULArcLength / spacing) + 1);
+            calculatedUMStrakeCount = Mathf.Max(2, Mathf.RoundToInt(masterFrameUMArcLength / spacing) + 1);
+
+            llCount = calculatedLLStrakeCount;
+            ulCount = calculatedULStrakeCount;
+            umCount = calculatedUMStrakeCount;
+        }
+        else
+        {
+            llCount = Mathf.Max(2, strakesPerLowerLowerMould);
+            ulCount = Mathf.Max(2, strakesPerUpperLowerMould);
+            umCount = Mathf.Max(2, strakesPerUpperMould);
+
+            masterFrameLLArcLength = CalculateMasterFrameLLArcLength();
+            masterFrameULArcLength = CalculateMasterFrameULArcLength();
+            masterFrameUMArcLength = CalculateMasterFrameUMArcLength();
+
+            calculatedLLStrakeCount = llCount;
+            calculatedULStrakeCount = ulCount;
+            calculatedUMStrakeCount = umCount;
+        }
 
         // Build Port (-1) and Starboard (1) continuous plank ribbands
         RebuildContinuousPlankSegment(llCount, -1f, 0, cachedPortLLRibbands);
