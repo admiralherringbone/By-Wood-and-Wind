@@ -159,7 +159,11 @@ public class FashionTimberModel : MonoBehaviour
     {
         if (framingModel != null)
         {
-            return Mathf.Abs(framingModel.GetTransverseFramePointAtY(originalZ, 1f, targetY).x);
+            Vector3 pt = framingModel.GetTransverseFramePointAtY(originalZ, 1f, targetY);
+            if (pt != Vector3.zero && Mathf.Abs(pt.x) > 0.0001f)
+            {
+                return Mathf.Abs(pt.x);
+            }
         }
 
         if (bodyPlan == null || sheerPlan == null || breadthPlan == null) return 0f;

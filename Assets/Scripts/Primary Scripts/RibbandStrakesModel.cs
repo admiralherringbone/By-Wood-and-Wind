@@ -158,6 +158,104 @@ public class RibbandStrakesModel : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns the 3D stern landing points for all unique ribband strakes below the HoB (Main Deck) line.
+    /// LL (Lower-Lower Mould) and UL (Upper-Lower Mould) strakes are included.
+    /// </summary>
+    public List<Vector3> GetSternLandingPointsBelowHoB(bool isStbd)
+    {
+        RefreshCacheIfNeeded();
+        List<Vector3> points = new List<Vector3>();
+
+        List<List<Vector3>> llList = isStbd ? cachedStbdLLRibbands : cachedPortLLRibbands;
+        List<List<Vector3>> ulList = isStbd ? cachedStbdULRibbands : cachedPortULRibbands;
+
+        // LL strakes
+        for (int i = 0; i < llList.Count; i++)
+        {
+            if (llList[i] != null && llList[i].Count > 0)
+            {
+                points.Add(llList[i][0]);
+            }
+        }
+
+        // UL strakes (deduplicate if connection line overlaps)
+        for (int i = 0; i < ulList.Count; i++)
+        {
+            if (ulList[i] != null && ulList[i].Count > 0)
+            {
+                Vector3 pt = ulList[i][0];
+                if (points.Count > 0 && Vector3.Distance(points[points.Count - 1], pt) < 0.001f)
+                {
+                    continue;
+                }
+                points.Add(pt);
+            }
+        }
+
+        return points;
+    }
+
+    /// <summary>
+    /// Returns the 3D stern landing points for all unique ribband strakes from the Connection Point (Projected Bow Rising Line)
+    /// upward through Upper-Lower Mould (UL) and Upper Mould (UM) strakes to the Transom Top.
+    /// </summary>
+    public List<Vector3> GetSternLandingPointsFromConnectionUpward(bool isStbd)
+    {
+        RefreshCacheIfNeeded();
+        List<Vector3> points = new List<Vector3>();
+
+        List<List<Vector3>> ulList = isStbd ? cachedStbdULRibbands : cachedPortULRibbands;
+        List<List<Vector3>> umList = isStbd ? cachedStbdUMRibbands : cachedPortUMRibbands;
+
+        // UL strakes (Connection Line to Main Deck Sheer)
+        for (int i = 0; i < ulList.Count; i++)
+        {
+            if (ulList[i] != null && ulList[i].Count > 0)
+            {
+                points.Add(ulList[i][0]);
+            }
+        }
+
+        // UM strakes (Main Deck Sheer to Top Line / Transom Top)
+        for (int i = 0; i < umList.Count; i++)
+        {
+            if (umList[i] != null && umList[i].Count > 0)
+            {
+                Vector3 pt = umList[i][0];
+                // Deduplicate if deck line overlaps between UL and UM
+                if (points.Count > 0 && Vector3.Distance(points[points.Count - 1], pt) < 0.001f)
+                {
+                    continue;
+                }
+                points.Add(pt);
+            }
+        }
+
+        return points;
+    }
+
+    /// <summary>
+    /// Returns the 3D stern landing points for Upper-Lower Mould (UL) strakes strictly between
+    /// the Connection Point (Projected Bow Rising Line) and the Main Deck Sheer / HoB line.
+    /// </summary>
+    public List<Vector3> GetULSternLandingPoints(bool isStbd)
+    {
+        RefreshCacheIfNeeded();
+        List<Vector3> points = new List<Vector3>();
+        List<List<Vector3>> ulList = isStbd ? cachedStbdULRibbands : cachedPortULRibbands;
+
+        for (int i = 0; i < ulList.Count; i++)
+        {
+            if (ulList[i] != null && ulList[i].Count > 0)
+            {
+                points.Add(ulList[i][0]);
+            }
+        }
+
+        return points;
+    }
+
+    /// <summary>
     /// Evaluates a 3D point on the frame surface at station z and height targetY.
     /// Handles Pseudo Frame vertical line for points below section curve bottom.
     /// </summary>
