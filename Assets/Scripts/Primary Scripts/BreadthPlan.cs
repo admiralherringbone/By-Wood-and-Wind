@@ -106,6 +106,7 @@ public class BreadthPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedFloorMidshipPoint;
     [HideInInspector] public Vector3 cachedFloorSternCp;
     [HideInInspector] public Vector3 cachedFloorSternPoint;
+    [HideInInspector] public int changeVersion = 0;
 
     private bool isUpdatingCurves = false;
 
@@ -281,10 +282,10 @@ public class BreadthPlan : MonoBehaviour
         Vector3 floorMidshipPoint = new Vector3(floorMaxBeam, floorBaseY, midshipZ);
         Vector3 floorSternPoint = new Vector3(hw, floorBaseY, floorSternZ);
 
-        float floorBowControlZ = Mathf.Lerp(midshipZ, floorBowZ, floorBowControl);
+        float floorBowControlZ = Mathf.Lerp(midshipZ, floorBowZ, Mathf.Clamp(floorBowControl, 0f, 0.95f));
         Vector3 floorBowCp = new Vector3(floorMaxBeam, floorBaseY, floorBowControlZ);
 
-        float floorSternControlZ = Mathf.Lerp(midshipZ, floorSternZ, floorSternControl);
+        float floorSternControlZ = Mathf.Lerp(midshipZ, floorSternZ, Mathf.Clamp(floorSternControl, 0f, 0.95f));
         Vector3 floorSternCp = new Vector3(floorMaxBeam, floorBaseY, floorSternControlZ);
 
         cachedFloorBowPoint = floorBowPoint;
@@ -292,6 +293,7 @@ public class BreadthPlan : MonoBehaviour
         cachedFloorMidshipPoint = floorMidshipPoint;
         cachedFloorSternCp = floorSternCp;
         cachedFloorSternPoint = floorSternPoint;
+        changeVersion++;
         }
         finally
         {
@@ -390,18 +392,26 @@ public class BreadthPlan : MonoBehaviour
 
     public float GetFloorLineXAtZ(float z)
     {
+        float rawX;
         if (z >= 0)
         {
-            if (z >= cachedFloorBowPoint.z) return cachedFloorBowPoint.x;
-            float t = GetBezierTAtZ(cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint, Vector3.zero, z, false);
-            return CalculateQuadraticBezierPoint(t, cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint).x;
+            if (z >= cachedFloorBowPoint.z) rawX = cachedFloorBowPoint.x;
+            else
+            {
+                float t = GetBezierTAtZ(cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint, Vector3.zero, z, false);
+                rawX = CalculateQuadraticBezierPoint(t, cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint).x;
+            }
         }
         else
         {
-            if (z <= cachedFloorSternPoint.z) return cachedFloorSternPoint.x;
-            float t = GetBezierTAtZ(cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint, Vector3.zero, z, false);
-            return CalculateQuadraticBezierPoint(t, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint).x;
+            if (z <= cachedFloorSternPoint.z) rawX = cachedFloorSternPoint.x;
+            else
+            {
+                float t = GetBezierTAtZ(cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint, Vector3.zero, z, false);
+                rawX = CalculateQuadraticBezierPoint(t, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint).x;
+            }
         }
+        return Mathf.Min(rawX, GetTheoreticalBreadthXAtZ(z));
     }
 
 
@@ -503,14 +513,6 @@ public class BreadthPlan : MonoBehaviour
             Gizmos.color = Color.magenta;
             Gizmos.DrawSphere(cachedTTAftP2, 0.15f);
             Gizmos.DrawSphere(MirrorX(cachedTTAftP2), 0.15f);
-        }
-
-        // Draw Transom Side Connections
-        if (!cachedIsAftCubic && !cachedIsTTAftCubic)
-        {
-            Gizmos.color = Color.white;
-            Gizmos.DrawLine(cachedAftP2, cachedTTAftP2);
-            Gizmos.DrawLine(MirrorX(cachedAftP2), MirrorX(cachedTTAftP2));
         }
 
         // Draw Nodes (Starboard)

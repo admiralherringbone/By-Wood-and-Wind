@@ -10,6 +10,10 @@ public class SheerPlan : MonoBehaviour
     [Header("Gizmo Settings")]
     public bool showLabels = true;
     public bool showControlArms = true;
+    [Tooltip("Color of the Main Sheer Line curve and gizmo markers in Scene view.")]
+    public Color mainSheerLineColor = Color.yellow;
+    [Tooltip("Color of the Height of Breadth (HoB) curve line and gizmo markers in Scene view.")]
+    public Color hobLineColor = Color.cyan;
     [Tooltip("Draw a grey dashed line extending aft from the Keel Stern Point to the furthest aft Z coordinate.")]
     public bool showProjectedAftKeelLine = true;
     [Tooltip("Draw a grey dashed curve continuing the Stern Rising Line curve extending aft to the furthest aft Z coordinate.")]
@@ -61,14 +65,14 @@ public class SheerPlan : MonoBehaviour
     [Tooltip("Percentage of the length for the Stern Post Rake.")]
     [Range(0f, 0.5f)] public float sternPostRakePercentage = 0.05f;
 
-    [Header("Deadwood Rake")]
-    public bool showDeadwoodRake = true;
-    [Range(0f, 1f)] public float deadwoodRakeForeSlider = 0.8f;
-    [Range(0f, 1f)] public float deadwoodRakeAftSlider = 0.2f;
-    [Range(0f, 1f)] public float deadwoodBottomControlZ = 0.5f;
-    [Range(0f, 1f)] public float deadwoodBottomControlY = 0f;
-    [Range(0f, 1f)] public float deadwoodTopControlZ = 1f;
-    [Range(0f, 1f)] public float deadwoodTopControlY = 0.5f;
+    // Deadwood Rake (removed customization per requirements)
+    [HideInInspector] public bool showDeadwoodRake = false;
+    [HideInInspector] public float deadwoodRakeForeSlider = 0.8f;
+    [HideInInspector] public float deadwoodRakeAftSlider = 0.2f;
+    [HideInInspector] public float deadwoodBottomControlZ = 0.5f;
+    [HideInInspector] public float deadwoodBottomControlY = 0f;
+    [HideInInspector] public float deadwoodTopControlZ = 1f;
+    [HideInInspector] public float deadwoodTopControlY = 0.5f;
 
     [Header("Counter")]
     [Tooltip("Enable or disable the optional Counter overhang at the stern.")]
@@ -81,8 +85,8 @@ public class SheerPlan : MonoBehaviour
     [Range(0f, 1f)] public float counterCurveAngle = 0.5f;
     [Range(0f, 1f)] public float counterCurveLength = 0.5f;
 
-    [Header("Top Timber Line (Bulwark)")]
-    [Tooltip("The vertical height of the Top Timber line (Bulwark) above the Base Deck sheer.")]
+    [Header("Upper Deck Sheer Line")]
+    [Tooltip("The vertical height of the Upper Deck Sheer line (Bulwark) above the Base Deck sheer.")]
     public float bulwarkHeight = 1.5f;
 
     [Tooltip("Extra bulwark height added at the bow (applies globally to the highest deck).")]
@@ -163,15 +167,31 @@ public class SheerPlan : MonoBehaviour
     public float transomAftRake = 0.5f;
 
     [Header("Base Deck Line")]
-    [Tooltip("The sheer rise of the base deck at the bow.")]
-    public float baseDeckSheerFwd = 2f;
-    [Tooltip("The sheer rise of the base deck at the stern.")]
-    public float baseDeckSheerAft = 1.5f;
-    [Tooltip("How much the sheer curve is biased towards the extremities vs the midship.")]
-    [Range(0.1f, 1f)] public float baseDeckCurveControlLength = 0.6f;
+    [Tooltip("The sheer rise of the base deck at the bow (bounded between 0 and Main Sheer Fwd).")]
+    public float baseDeckSheerFwd = 0f;
+    [Tooltip("The sheer rise of the base deck at the stern (bounded between 0 and Main Sheer Aft).")]
+    public float baseDeckSheerAft = 0f;
+
+    [System.Obsolete("Use mainSheerCurveControlLength instead. Base Deck control arms match Main Sheer Line.")]
+    public float baseDeckCurveControlLength
+    {
+        get => mainSheerCurveControlLength;
+        set => mainSheerCurveControlLength = value;
+    }
+
+    [Header("Main Sheer Line")]
+    [Tooltip("The sheer rise of the main sheer line at the bow.")]
+    public float mainSheerFwd = 0f;
+    [Tooltip("The sheer rise of the main sheer line at the stern.")]
+    public float mainSheerAft = 0f;
+    [Tooltip("How much the main sheer curve is biased towards the extremities vs the midship.")]
+    [Range(0.1f, 1f)] public float mainSheerCurveControlLength = 0.6f;
+
+    [Tooltip("If true, the Main Sheer Line control handle Z-distances slave to BreadthPlan's topTimberMidshipFwdArmLength, topTimberMidshipAftArmLength, and topTimberBowArmLength for 2D curve synchronization.")]
+    public bool slaveMainSheerHandlesToBreadthPlan = true;
 
     [Header("Rising Lines (Height of Breadth)")]
-    [Tooltip("If checked, allows independent customization of the HoB line. If unchecked, the HoB perfectly matches the Base Deck line.")]
+    [Tooltip("If checked, allows independent customization of the HoB line. If unchecked, the HoB perfectly matches the Base Deck line heights.")]
     public bool customizeHob = false;
 
     [Tooltip("The height of the HoB at the Midship section.")]
@@ -185,9 +205,18 @@ public class SheerPlan : MonoBehaviour
     [Tooltip("How much the HoB curve is biased towards the extremities vs the midship.")]
     [Range(0.1f, 1f)] public float hobCurveControlLength = 0.5f;
 
+    [Tooltip("If true, the HoB control handle Z-distances slave to BreadthPlan's midshipFwdArmLength and midshipAftArmLength for 2D curve synchronization.")]
+    public bool slaveHobHandlesToBreadthPlan = true;
+
+    [Tooltip("Reference to the BreadthPlan to sync HoB control handles for 2D curve synchronization.")]
+    public BreadthPlan breadthPlan;
+
     [Header("Rising Lines (Floor Sweeps)")]
     [Tooltip("Reference to the ModularBodyPlan to sync Midship Rising Line height.")]
     public BodyPlan bodyPlan;
+
+    [Tooltip("If true, the Rising Line control handle Z-distances slave to BreadthPlan's floorBowControl and floorSternControl for 2D curve synchronization.")]
+    public bool slaveRisingLineHandlesToBreadthPlan = true;
 
     [Tooltip("The vertical position where the Bow Rising Line terminates on the Stem Rake (0 = Keel, 1 = HoB).")]
     [Range(0f, 1f)] public float bowRisingLineEndPos = 1f;
@@ -216,6 +245,7 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedSternP1Ctrl;
     [HideInInspector] public Vector3 cachedProjectedSternRisingEnd;
     [HideInInspector] public float cachedSternRisingLineEndT = 1f;
+    [HideInInspector] public int changeVersion = 0;
 
     [HideInInspector] public Vector3 cachedStemTopPoint;
     [HideInInspector] public Vector3 cachedSternPostTopPoint;
@@ -237,6 +267,14 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedBaseDeckMidCpFwd;
     [HideInInspector] public Vector3 cachedBaseDeckBowCp;
     [HideInInspector] public Vector3 cachedBaseDeckBowIntersect;
+    
+    [HideInInspector] public Vector3 cachedMainSheerSternIntersect;
+    [HideInInspector] public Vector3 cachedMainSheerSternCp;
+    [HideInInspector] public Vector3 cachedMainSheerMidCpAft;
+    [HideInInspector] public Vector3 cachedMainSheerMidshipPoint;
+    [HideInInspector] public Vector3 cachedMainSheerMidCpFwd;
+    [HideInInspector] public Vector3 cachedMainSheerBowCp;
+    [HideInInspector] public Vector3 cachedMainSheerBowIntersect;
     
     [HideInInspector] public Vector3 cachedUpperStemTopPoint;
     [HideInInspector] public Vector3 cachedTransomTopPoint;
@@ -264,6 +302,10 @@ public class SheerPlan : MonoBehaviour
 
     private void OnValidate()
     {
+        mainSheerFwd = Mathf.Max(0f, mainSheerFwd);
+        mainSheerAft = Mathf.Max(0f, mainSheerAft);
+        baseDeckSheerFwd = Mathf.Clamp(baseDeckSheerFwd, 0f, mainSheerFwd);
+        baseDeckSheerAft = Mathf.Clamp(baseDeckSheerAft, 0f, mainSheerAft);
         // 1. Calculate sum of lower deck tiers
         float lowerDecksSum = 0f;
         if (lowerDecks != null)
@@ -378,13 +420,22 @@ public class SheerPlan : MonoBehaviour
         cachedKeelBowPoint = new Vector3(0, 0, halfLength - stemRakeLength);
         cachedMidshipKeel = new Vector3(0, -keelMidshipDrop, 0);
 
-        // Base Deck Heights
+        // Main Sheer Heights (Sets maximum sheer for the ship)
+        mainSheerFwd = Mathf.Max(0f, mainSheerFwd);
+        mainSheerAft = Mathf.Max(0f, mainSheerAft);
+        float mainSheerMidY = lowerHullHeight;
+        float mainSheerBowY = lowerHullHeight + mainSheerFwd;
+        float mainSheerSternY = lowerHullHeight + mainSheerAft;
+
+        // Base Deck Heights (Clamped between 0 and Main Sheer Line heights)
+        baseDeckSheerFwd = Mathf.Clamp(baseDeckSheerFwd, 0f, mainSheerFwd);
+        baseDeckSheerAft = Mathf.Clamp(baseDeckSheerAft, 0f, mainSheerAft);
         float baseDeckMidY = lowerHullHeight;
         float baseDeckBowY = lowerHullHeight + baseDeckSheerFwd;
         float baseDeckSternY = lowerHullHeight + baseDeckSheerAft;
 
         // Calculate absolute maximum transom top height beforehand for Counter logic
-        float sternMaxHeight = baseDeckSternY;
+        float sternMaxHeight = mainSheerSternY;
         ModularUpperDeck sternDeck = null;
         if (upperDecks != null) {
             foreach (var d in upperDecks) {
@@ -399,7 +450,7 @@ public class SheerPlan : MonoBehaviour
         float actualTransomAftRake = transomAftRake;
 
         // Stern Post & Counter
-        Vector3 originalSPT = new Vector3(0, baseDeckSternY, -halfLength);
+        Vector3 originalSPT = new Vector3(0, mainSheerSternY, -halfLength);
         
         if (enableCounter)
         {
@@ -457,36 +508,14 @@ public class SheerPlan : MonoBehaviour
             cachedCounterCp2 = cachedSternPostTopPoint;
         }
 
-        // Deadwood Rake
-        float deadwoodForeZ = Mathf.Lerp(cachedMidshipKeel.z, cachedKeelSternPoint.z, deadwoodRakeForeSlider);
-        cachedDeadwoodForePoint = new Vector3(0, GetKeelYAtZ(deadwoodForeZ), deadwoodForeZ);
-        cachedDeadwoodAftPoint = Vector3.Lerp(cachedKeelSternPoint, cachedSternPostTopPoint, deadwoodRakeAftSlider);
-        
-        float deadwoodHobSternY = enableCounter ? cachedHobSternIntersect.y : GetHobYAtZ(cachedSternPostTopPoint.z);
-        if (cachedDeadwoodAftPoint.y > deadwoodHobSternY)
-        {
-            float tempSternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
-            float deadwoodSternT = tempSternTotalY > 0.0001f ? (deadwoodHobSternY - cachedKeelSternPoint.y) / tempSternTotalY : 0f;
-            cachedDeadwoodAftPoint = new Vector3(0, deadwoodHobSternY, Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, deadwoodSternT));
-        }
-        
-        float dMinZ = cachedDeadwoodForePoint.z;
-        float dMaxZ = cachedDeadwoodAftPoint.z;
-        float dMinY = cachedDeadwoodForePoint.y;
-        float dMaxY = cachedDeadwoodAftPoint.y;
-        
-        float p1Y = Mathf.Lerp(dMinY, dMaxY, deadwoodBottomControlY);
-        float p2Y = Mathf.Lerp(dMinY, dMaxY, deadwoodTopControlY);
-        
-        float deadwoodSternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
-        float p1MaxZ = (Mathf.Abs(deadwoodSternTotalY) > 0.001f) ? Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, (p1Y - cachedKeelSternPoint.y) / deadwoodSternTotalY) : cachedKeelSternPoint.z;
-        float p2MaxZ = (Mathf.Abs(deadwoodSternTotalY) > 0.001f) ? Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, (p2Y - cachedKeelSternPoint.y) / deadwoodSternTotalY) : cachedKeelSternPoint.z;
-
-        cachedDeadwoodP1 = new Vector3(0, p1Y, Mathf.Lerp(dMinZ, p1MaxZ, deadwoodBottomControlZ));
-        cachedDeadwoodP2 = new Vector3(0, p2Y, Mathf.Lerp(dMinZ, p2MaxZ, deadwoodTopControlZ));
+        // Deadwood Rake (removed, defaulting cached points)
+        cachedDeadwoodForePoint = cachedKeelSternPoint;
+        cachedDeadwoodAftPoint = cachedKeelSternPoint;
+        cachedDeadwoodP1 = cachedKeelSternPoint;
+        cachedDeadwoodP2 = cachedKeelSternPoint;
 
         // Stem
-        cachedStemTopPoint = new Vector3(0, baseDeckBowY, halfLength);
+        cachedStemTopPoint = new Vector3(0, mainSheerBowY, halfLength);
         
         float minZ = cachedKeelBowPoint.z;
         float maxZ = cachedStemTopPoint.z;
@@ -499,8 +528,14 @@ public class SheerPlan : MonoBehaviour
         cachedBaseDeckMidshipPoint = new Vector3(0, baseDeckMidY, 0);
         
         // Base Deck Bow Intersect (Stem)
-        // Since stemTopPoint is now exactly baseDeckBowY, they naturally terminate at the exact same point!
-        cachedBaseDeckBowIntersect = cachedStemTopPoint;
+        if (baseDeckBowY <= cachedStemTopPoint.y)
+        {
+            cachedBaseDeckBowIntersect = GetBezierPointAtY(cachedKeelBowPoint, cachedStemP1, cachedStemP2, cachedStemTopPoint, baseDeckBowY);
+        }
+        else
+        {
+            cachedBaseDeckBowIntersect = new Vector3(0, baseDeckBowY, cachedStemTopPoint.z);
+        }
         
         // Base Deck Stern Intersect
         if (enableCounter)
@@ -511,16 +546,17 @@ public class SheerPlan : MonoBehaviour
                 float tBaseZ = cachedCounterTopPoint.z;
                 float tTopZ = tBaseZ - actualTransomAftRake;
                 float transomTotalY = absoluteTransomTopY - cachedCounterTopPoint.y;
-                float tTransom = (baseDeckSternY - cachedCounterTopPoint.y) / transomTotalY;
+                float tTransom = (transomTotalY > 0.001f) ? (baseDeckSternY - cachedCounterTopPoint.y) / transomTotalY : 0f;
                 float hitZ = Mathf.LerpUnclamped(tBaseZ, tTopZ, tTransom);
                 cachedBaseDeckSternIntersect = new Vector3(0, baseDeckSternY, hitZ);
             }
             else if (baseDeckSternY < cachedCounterBasePoint.y)
             {
                 // State 2: Counter is ABOVE Base Deck. Base Deck intersects the Stern Post.
-                // Since the Stern Post line from Keel goes exactly through originalSPT (which sits at baseDeckSternY),
-                // the intersection is exactly originalSPT.
-                cachedBaseDeckSternIntersect = originalSPT;
+                float postTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+                float postT = (postTotalY > 0.001f) ? (baseDeckSternY - cachedKeelSternPoint.y) / postTotalY : 1f;
+                float hitZ = Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, postT);
+                cachedBaseDeckSternIntersect = new Vector3(0, baseDeckSternY, hitZ);
             }
             else
             {
@@ -532,7 +568,10 @@ public class SheerPlan : MonoBehaviour
         }
         else
         {
-            cachedBaseDeckSternIntersect = cachedSternPostTopPoint;
+            float postTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+            float postT = (postTotalY > 0.001f) ? (baseDeckSternY - cachedKeelSternPoint.y) / postTotalY : 1f;
+            float hitZ = Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, postT);
+            cachedBaseDeckSternIntersect = new Vector3(0, baseDeckSternY, hitZ);
         }
 
         float deckControlDist = halfLength * baseDeckCurveControlLength;
@@ -544,8 +583,98 @@ public class SheerPlan : MonoBehaviour
         cachedBaseDeckMidCpFwd = cachedBaseDeckMidshipPoint + new Vector3(0, 0, deckFwdDist);
         cachedBaseDeckBowCp = cachedBaseDeckBowIntersect;
 
+        // Main Sheer Line Points (Calculated independently using Main Sheer controls)
+        cachedMainSheerMidshipPoint = new Vector3(0, mainSheerMidY, 0);
+
+        if (mainSheerBowY <= cachedStemTopPoint.y)
+        {
+            cachedMainSheerBowIntersect = cachedStemTopPoint;
+        }
+        else
+        {
+            cachedMainSheerBowIntersect = new Vector3(0, mainSheerBowY, cachedStemTopPoint.z);
+        }
+
+        if (enableCounter)
+        {
+            if (mainSheerSternY > cachedCounterTopPoint.y)
+            {
+                float tBaseZ = cachedCounterTopPoint.z;
+                float tTopZ = tBaseZ - actualTransomAftRake;
+                float transomTotalY = absoluteTransomTopY - cachedCounterTopPoint.y;
+                float tTransom = (transomTotalY > 0.001f) ? (mainSheerSternY - cachedCounterTopPoint.y) / transomTotalY : 0f;
+                float hitZ = Mathf.LerpUnclamped(tBaseZ, tTopZ, tTransom);
+                cachedMainSheerSternIntersect = new Vector3(0, mainSheerSternY, hitZ);
+            }
+            else if (mainSheerSternY < cachedCounterBasePoint.y)
+            {
+                float postTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+                float postT = (postTotalY > 0.001f) ? (mainSheerSternY - cachedKeelSternPoint.y) / postTotalY : 1f;
+                float hitZ = Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, postT);
+                cachedMainSheerSternIntersect = new Vector3(0, mainSheerSternY, hitZ);
+            }
+            else
+            {
+                float hitT = GetBezierTAtY(cachedCounterBasePoint, cachedCounterCp1, cachedCounterCp2, cachedCounterTopPoint, mainSheerSternY);
+                float hitZ = CalculateCubicBezierPoint(hitT, cachedCounterBasePoint, cachedCounterCp1, cachedCounterCp2, cachedCounterTopPoint).z;
+                cachedMainSheerSternIntersect = new Vector3(0, mainSheerSternY, hitZ);
+            }
+        }
+        else
+        {
+            float postTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+            float postT = (postTotalY > 0.001f) ? (mainSheerSternY - cachedKeelSternPoint.y) / postTotalY : 1f;
+            float hitZ = Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, postT);
+            cachedMainSheerSternIntersect = new Vector3(0, mainSheerSternY, hitZ);
+        }
+
+        if (slaveMainSheerHandlesToBreadthPlan && breadthPlan != null)
+        {
+            breadthPlan.UpdateCachedCurves();
+
+            float mMidY = cachedMainSheerMidshipPoint.y;
+            float mMidZ = cachedMainSheerMidshipPoint.z;
+            float mBowZ = cachedMainSheerBowIntersect.z;
+            float mSternZ = cachedMainSheerSternIntersect.z;
+
+            // 1. Midship Forward Handle Z (slaved to topTimberMidshipFwdArmLength)
+            float fwdArmDist = halfLength * breadthPlan.topTimberMidshipFwdArmLength;
+            float fwdLimit = Mathf.Abs(mBowZ - mMidZ) * 0.95f;
+            float fwdDist = Mathf.Min(fwdArmDist, fwdLimit);
+            cachedMainSheerMidCpFwd = new Vector3(0, mMidY, mMidZ + fwdDist);
+
+            // 2. Midship Aft Handle Z (slaved to topTimberMidshipAftArmLength)
+            float aftArmDist = halfLength * breadthPlan.topTimberMidshipAftArmLength;
+            float aftLimit = Mathf.Abs(mMidZ - mSternZ) * 0.95f;
+            float aftDist = Mathf.Min(aftArmDist, aftLimit);
+            cachedMainSheerMidCpAft = new Vector3(0, mMidY, mMidZ - aftDist);
+
+            // 3. Bow Handle (Z-position strictly matched to BreadthPlan's Top Timber Bow control arm cachedTTFwdP1.z)
+            float targetZ = breadthPlan.cachedTTFwdP1.z;
+            float dzTotal = cachedMainSheerMidCpFwd.z - cachedMainSheerBowIntersect.z;
+            float tZ = (Mathf.Abs(dzTotal) > 0.001f) ? (targetZ - cachedMainSheerBowIntersect.z) / dzTotal : 0f;
+            tZ = Mathf.Clamp01(tZ);
+            float targetY = Mathf.Lerp(cachedMainSheerBowIntersect.y, cachedMainSheerMidCpFwd.y, tZ);
+
+            cachedMainSheerBowCp = new Vector3(0, targetY, targetZ);
+
+            // 4. Stern Handle (Pinned to Stern Intersect)
+            cachedMainSheerSternCp = cachedMainSheerSternIntersect;
+        }
+        else
+        {
+            float mainSheerControlDist = halfLength * mainSheerCurveControlLength;
+            float mainSheerFwdDist = Mathf.Min(mainSheerControlDist, cachedMainSheerBowIntersect.z * 0.95f);
+            float mainSheerAftDist = Mathf.Min(mainSheerControlDist, -cachedMainSheerSternIntersect.z * 0.95f);
+
+            cachedMainSheerSternCp = cachedMainSheerSternIntersect;
+            cachedMainSheerMidCpAft = cachedMainSheerMidshipPoint + new Vector3(0, 0, -mainSheerAftDist);
+            cachedMainSheerMidCpFwd = cachedMainSheerMidshipPoint + new Vector3(0, 0, mainSheerFwdDist);
+            cachedMainSheerBowCp = cachedMainSheerBowIntersect;
+        }
+
         // Upper Stem (Always perfectly vertical)
-        float bowMaxHeight = baseDeckBowY;
+        float bowMaxHeight = mainSheerBowY;
         ModularUpperDeck bowDeck = null;
         if (upperDecks != null) {
             foreach (var d in upperDecks) {
@@ -555,7 +684,7 @@ public class SheerPlan : MonoBehaviour
         if (bowDeck == null) bowMaxHeight += bulwarkHeight;
         else bowMaxHeight += GetAbsoluteDeckHeight(bowDeck) + bowDeck.bulwarkHeight;
         
-        cachedUpperStemTopPoint = new Vector3(0, bowMaxHeight + bulwarkSheerFwd, cachedBaseDeckBowIntersect.z);
+        cachedUpperStemTopPoint = new Vector3(0, bowMaxHeight + bulwarkSheerFwd, cachedStemTopPoint.z);
 
         // Transom Rake
         float transomBaseZ = (enableCounter) ? cachedCounterTopPoint.z : cachedBaseDeckSternIntersect.z;
@@ -564,47 +693,33 @@ public class SheerPlan : MonoBehaviour
         cachedTransomTopPoint = new Vector3(0, absoluteTransomTopY, transomTopZ);
 
         // Top Timber Sheer
-        cachedTopTimberMidshipPoint = cachedBaseDeckMidshipPoint + new Vector3(0, bulwarkHeight, 0);
+        cachedTopTimberMidshipPoint = cachedMainSheerMidshipPoint + new Vector3(0, bulwarkHeight, 0);
         
-        // The Top Timber anchors for the base deck bezier curve MUST ONLY mirror the base deck sheer.
-        // They must NOT inherit upper deck heights or global sheer offsets, otherwise the waist bulwark will sheer upwards artificially!
-        cachedTopTimberBowIntersect = new Vector3(0, cachedBaseDeckBowIntersect.y + bulwarkHeight, cachedBaseDeckBowIntersect.z);
-        cachedTopTimberSternIntersect = new Vector3(0, cachedBaseDeckSternIntersect.y + bulwarkHeight, transomTopZ);
+        // The Top Timber anchors for the sheer bezier curve mirror the Main Sheer Line.
+        cachedTopTimberBowIntersect = new Vector3(0, cachedMainSheerBowIntersect.y + bulwarkHeight, cachedMainSheerBowIntersect.z);
+        cachedTopTimberSternIntersect = new Vector3(0, cachedMainSheerSternIntersect.y + bulwarkHeight, transomTopZ);
 
-        cachedTopTimberMidCpFwd = cachedBaseDeckMidCpFwd + new Vector3(0, bulwarkHeight, 0);
-        cachedTopTimberBowCp = cachedTopTimberBowIntersect;
-        cachedTopTimberMidCpAft = cachedBaseDeckMidCpAft + new Vector3(0, bulwarkHeight, 0);
-        cachedTopTimberSternCp = cachedTopTimberSternIntersect;
+        cachedTopTimberMidCpFwd = cachedMainSheerMidCpFwd + new Vector3(0, bulwarkHeight, 0);
+        cachedTopTimberBowCp = cachedMainSheerBowCp + new Vector3(0, bulwarkHeight, 0);
+        cachedTopTimberMidCpAft = cachedMainSheerMidCpAft + new Vector3(0, bulwarkHeight, 0);
+        cachedTopTimberSternCp = cachedMainSheerSternCp + new Vector3(0, bulwarkHeight, 0);
 
-        // HoB
+        // HoB (Height of Breadth) - Defaults to Main Sheer Line heights unless customized
         if (!customizeHob)
         {
-            // Lock HoB to Base Deck
-            hobDropAft = 0f; // Reset for visual consistency if disabled
-            
-            cachedHobMidshipPoint = cachedBaseDeckMidshipPoint;
-            cachedHobBowIntersect = cachedBaseDeckBowIntersect;
-            cachedHobSternIntersect = cachedBaseDeckSternIntersect;
-            
-            cachedHobSternCp = cachedBaseDeckSternCp;
-            cachedHobMidCpAft = cachedBaseDeckMidCpAft;
-            cachedHobMidCpFwd = cachedBaseDeckMidCpFwd;
-            cachedHobBowCp = cachedBaseDeckBowCp;
+            cachedHobMidshipPoint = cachedMainSheerMidshipPoint;
+            cachedHobBowIntersect = cachedMainSheerBowIntersect;
+            cachedHobSternIntersect = cachedMainSheerSternIntersect;
         }
         else
         {
-            // Independent HoB
-            float actualHobMidY = hobMidshipHeight;
-            float actualHobBowY = hobBowHeight;
-            float actualHobSternY = hobSternHeight;
-            
-            cachedHobMidshipPoint = new Vector3(0, actualHobMidY, hobDropAft);
+            cachedHobMidshipPoint = new Vector3(0, hobMidshipHeight, hobDropAft);
 
             // HoB Bow Intersect (Stem)
-            if (actualHobBowY <= cachedStemTopPoint.y) {
-                cachedHobBowIntersect = GetBezierPointAtY(cachedKeelBowPoint, cachedStemP1, cachedStemP2, cachedStemTopPoint, actualHobBowY);
+            if (hobBowHeight <= cachedStemTopPoint.y) {
+                cachedHobBowIntersect = GetBezierPointAtY(cachedKeelBowPoint, cachedStemP1, cachedStemP2, cachedStemTopPoint, hobBowHeight);
             } else {
-                cachedHobBowIntersect = new Vector3(0, actualHobBowY, cachedStemTopPoint.z);
+                cachedHobBowIntersect = new Vector3(0, hobBowHeight, cachedStemTopPoint.z);
             }
             
             // HoB Stern Intersect
@@ -623,16 +738,61 @@ public class SheerPlan : MonoBehaviour
             }
             float finalZ = (searchMinZ + searchMaxZ) / 2f;
             cachedHobSternIntersect = new Vector3(0, GetHobYAtZ(finalZ), finalZ);
-            
-            float hobControlDist = halfLength * hobCurveControlLength;
-            float hobFwdDist = Mathf.Min(hobControlDist, (cachedHobBowIntersect.z - hobDropAft) * 0.95f);
-            float hobAftDist = Mathf.Min(hobControlDist, -(cachedHobSternIntersect.z - hobDropAft) * 0.95f);
-            
-            cachedHobSternCp = cachedHobSternIntersect;
-            cachedHobMidCpAft = cachedHobMidshipPoint + new Vector3(0, 0, -hobAftDist);
-            cachedHobMidCpFwd = cachedHobMidshipPoint + new Vector3(0, 0, hobFwdDist);
-            cachedHobBowCp = cachedHobBowIntersect;
         }
+            
+            if (breadthPlan == null)
+            {
+                breadthPlan = GetComponentInParent<BreadthPlan>();
+                if (breadthPlan == null) breadthPlan = FindObjectOfType<BreadthPlan>();
+            }
+
+            if (slaveHobHandlesToBreadthPlan && breadthPlan != null)
+            {
+                breadthPlan.UpdateCachedCurves();
+
+                float hMidY = cachedHobMidshipPoint.y;
+                float hBowY = cachedHobBowIntersect.y;
+                float hSternY = cachedHobSternIntersect.y;
+
+                float hMidZ = cachedHobMidshipPoint.z;
+                float hBowZ = cachedHobBowIntersect.z;
+                float hSternZ = cachedHobSternIntersect.z;
+
+                // 1. Midship Forward Handle Z
+                float fwdArmDist = halfLength * breadthPlan.midshipFwdArmLength;
+                float fwdLimit = Mathf.Abs(hBowZ - hMidZ) * 0.95f;
+                float fwdDist = Mathf.Min(fwdArmDist, fwdLimit);
+                cachedHobMidCpFwd = new Vector3(0, hMidY, hMidZ + fwdDist);
+
+                // 2. Midship Aft Handle Z
+                float aftArmDist = halfLength * breadthPlan.midshipAftArmLength;
+                float aftLimit = Mathf.Abs(hMidZ - hSternZ) * 0.95f;
+                float aftDist = Mathf.Min(aftArmDist, aftLimit);
+                cachedHobMidCpAft = new Vector3(0, hMidY, hMidZ - aftDist);
+
+                // 3. Bow Stem Handle (Z-position strictly matched to BreadthPlan's Max Breadth Bow control arm cachedFwdP1.z)
+                float targetZ = breadthPlan.cachedFwdP1.z;
+                float dzTotal = cachedHobMidCpFwd.z - cachedHobBowIntersect.z;
+                float tZ = (Mathf.Abs(dzTotal) > 0.001f) ? (targetZ - cachedHobBowIntersect.z) / dzTotal : 0f;
+                tZ = Mathf.Clamp01(tZ);
+                float targetY = Mathf.Lerp(cachedHobBowIntersect.y, cachedHobMidCpFwd.y, tZ);
+
+                cachedHobBowCp = new Vector3(0, targetY, targetZ);
+
+                // 4. Stern Post Handle (Aft Curve - Quadratic, pinned to Stern Intersect)
+                cachedHobSternCp = cachedHobSternIntersect;
+            }
+            else
+            {
+                float hobControlDist = halfLength * hobCurveControlLength;
+                float hobFwdDist = Mathf.Min(hobControlDist, (cachedHobBowIntersect.z - hobDropAft) * 0.95f);
+                float hobAftDist = Mathf.Min(hobControlDist, -(cachedHobSternIntersect.z - hobDropAft) * 0.95f);
+
+                cachedHobBowCp = cachedHobBowIntersect;
+                cachedHobSternCp = cachedHobSternIntersect;
+                cachedHobMidCpAft = cachedHobMidshipPoint + new Vector3(0, 0, -hobAftDist);
+                cachedHobMidCpFwd = cachedHobMidshipPoint + new Vector3(0, 0, hobFwdDist);
+            }
 
         // --- Rising Lines ---
         if (bodyPlan == null)
@@ -650,6 +810,11 @@ public class SheerPlan : MonoBehaviour
             cachedBowRisingEnd = new Vector3(0, targetBowY, cachedStemTopPoint.z);
         }
         
+        if (slaveRisingLineHandlesToBreadthPlan && breadthPlan != null)
+        {
+            breadthPlan.UpdateCachedCurves();
+        }
+
         float maxBowControlZ = cachedKeelBowPoint.z;
         if (targetBowY <= cachedStemTopPoint.y && targetBowY > 0.001f)
         {
@@ -659,7 +824,7 @@ public class SheerPlan : MonoBehaviour
         }
         else if (targetBowY > cachedStemTopPoint.y) maxBowControlZ = cachedBowRisingEnd.z;
         
-        float controlZ = Mathf.Lerp(0f, maxBowControlZ, bowRisingLineControl);
+        float controlZ = (slaveRisingLineHandlesToBreadthPlan && breadthPlan != null) ? breadthPlan.cachedFloorBowCp.z : Mathf.Lerp(0f, maxBowControlZ, bowRisingLineControl);
         cachedBowP1Ctrl = new Vector3(0, cachedMidshipRisingPoint.y, controlZ);
 
         float targetSternY = Mathf.Lerp(cachedKeelSternPoint.y, cachedSternPostTopPoint.y, sternRisingLineEndPos);
@@ -667,57 +832,40 @@ public class SheerPlan : MonoBehaviour
         float hobSternY = enableCounter ? cachedHobSternIntersect.y : GetHobYAtZ(cachedSternPostTopPoint.z);
         if (targetSternY > hobSternY) targetSternY = hobSternY;
         
-        if (showDeadwoodRake && targetSternY <= cachedDeadwoodAftPoint.y && targetSternY >= cachedDeadwoodForePoint.y)
-        {
-            cachedSternRisingEnd = GetBezierPointAtY(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, targetSternY);
-        }
-        else if (showDeadwoodRake && targetSternY < cachedDeadwoodForePoint.y)
-        {
-            cachedSternRisingEnd = new Vector3(0, targetSternY, cachedDeadwoodForePoint.z);
-        }
-        else
-        {
-            float sternT = deadwoodSternTotalY > 0.0001f ? (targetSternY - cachedKeelSternPoint.y) / deadwoodSternTotalY : 0f;
-            cachedSternRisingEnd = new Vector3(0, targetSternY, Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, sternT));
-        }
+        float sternTotalY = cachedSternPostTopPoint.y - cachedKeelSternPoint.y;
+        float sternT = sternTotalY > 0.0001f ? (targetSternY - cachedKeelSternPoint.y) / sternTotalY : 0f;
+        cachedSternRisingEnd = new Vector3(0, targetSternY, Mathf.LerpUnclamped(cachedKeelSternPoint.z, cachedSternPostTopPoint.z, sternT));
         
         float maxSternControlZ = cachedKeelSternPoint.z;
-        if (showDeadwoodRake && targetSternY <= cachedDeadwoodAftPoint.y && targetSternY >= cachedDeadwoodForePoint.y)
-        {
-            float sternCurveT = GetBezierTAtY(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, targetSternY);
-            Vector3 sternTangent = CalculateBezierTangent(sternCurveT, cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint);
-            if (Mathf.Abs(sternTangent.y) > 0.0001f) maxSternControlZ = cachedSternRisingEnd.z - cachedSternRisingEnd.y * (sternTangent.z / sternTangent.y);
-        }
-        else if (showDeadwoodRake && targetSternY > cachedDeadwoodAftPoint.y) 
-        {
-            Vector3 sternTangent = cachedSternPostTopPoint - cachedKeelSternPoint;
-            if (Mathf.Abs(sternTangent.y) > 0.0001f) maxSternControlZ = cachedSternRisingEnd.z - cachedSternRisingEnd.y * (sternTangent.z / sternTangent.y);
-        }
+        Vector3 sternTangent = cachedSternPostTopPoint - cachedKeelSternPoint;
+        if (Mathf.Abs(sternTangent.y) > 0.0001f) maxSternControlZ = cachedSternRisingEnd.z - cachedSternRisingEnd.y * (sternTangent.z / sternTangent.y);
         else maxSternControlZ = cachedSternRisingEnd.z;
         
-        float sternControlZ = Mathf.Lerp(0f, maxSternControlZ, sternRisingLineControl);
+        float sternControlZ = (slaveRisingLineHandlesToBreadthPlan && breadthPlan != null) ? breadthPlan.cachedFloorSternCp.z : Mathf.Lerp(0f, maxSternControlZ, sternRisingLineControl);
         cachedSternP1Ctrl = new Vector3(0, cachedMidshipRisingPoint.y, sternControlZ);
 
         float aftMostZ = GetAftMostZ();
         cachedProjectedAftKeelEnd = new Vector3(0, cachedKeelSternPoint.y, aftMostZ);
 
-        // Projected Stern Rising Line (continue quadratic Bezier curve aft to aftMostZ)
+        // Projected Stern Rising Line (linear tangent extension from cachedSternRisingEnd aft to aftMostZ)
         float tAftRising = 1.0f;
         if (cachedSternRisingEnd.z > aftMostZ + 0.001f)
         {
-            float minT = 1.0f;
-            float maxT = 10.0f;
-            for (int i = 0; i < 20; i++)
-            {
-                float midT = (minT + maxT) / 2f;
-                float midZ = CalculateQuadraticBezierPoint(midT, cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd).z;
-                if (midZ > aftMostZ) minT = midT;
-                else maxT = midT;
-            }
-            tAftRising = (minT + maxT) / 2f;
+            float dz = cachedSternRisingEnd.z - cachedSternP1Ctrl.z;
+            float dy = cachedSternRisingEnd.y - cachedSternP1Ctrl.y;
+            float slopeZY = (Mathf.Abs(dz) > 0.0001f) ? (dy / dz) : 0f;
+            float targetDz = aftMostZ - cachedSternRisingEnd.z;
+            float targetY = cachedSternRisingEnd.y + slopeZY * targetDz;
+
+            cachedProjectedSternRisingEnd = new Vector3(0, targetY, aftMostZ);
+            tAftRising = 1.0f;
+        }
+        else
+        {
+            cachedProjectedSternRisingEnd = cachedSternRisingEnd;
+            tAftRising = 1.0f;
         }
         cachedSternRisingLineEndT = tAftRising;
-        cachedProjectedSternRisingEnd = CalculateQuadraticBezierPoint(tAftRising, cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd);
 
         // Projected Bow Rising Line (tangent extension forward from cachedBowRisingEnd to GetFwdMostZ)
         float fwdMostZ = GetFwdMostZ();
@@ -745,6 +893,7 @@ public class SheerPlan : MonoBehaviour
         float fwdZ = GetFwdMostZ();
         cachedProjectedTopLineStart = new Vector3(0, GetPureSheerYAtZ(aftZ), aftZ);
         cachedProjectedTopLineEnd = new Vector3(0, GetPureSheerYAtZ(fwdZ), fwdZ);
+        changeVersion++;
         }
         finally
         {
@@ -774,12 +923,8 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetDeadwoodYAtZ(float z)
     {
-        if (!showDeadwoodRake) return GetKeelYAtZ(z);
-        if (z >= cachedDeadwoodForePoint.z) return GetKeelYAtZ(z);
-        if (z <= cachedDeadwoodAftPoint.z) return GetSternProfileYAtZ(z);
-        
-        float t = GetBezierTAtZ(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, z, false);
-        return CalculateCubicBezierPoint(t, cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint).y;
+        if (z >= cachedKeelSternPoint.z) return GetKeelYAtZ(z);
+        return GetSternProfileYAtZ(z);
     }
 
     public virtual float GetStemProfileYAtZ(float z)
@@ -858,7 +1003,7 @@ public class SheerPlan : MonoBehaviour
         {
             foreach (var deck in upperDecks)
             {
-                float deckTopY = GetBaseDeckYAtZ(0) + GetAbsoluteDeckHeight(deck) + deck.bulwarkHeight;
+                float deckTopY = GetMainSheerYAtZ(0) + GetAbsoluteDeckHeight(deck) + deck.bulwarkHeight;
                 maxY = Mathf.Max(maxY, deckTopY);
             }
         }
@@ -870,74 +1015,69 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetSternProfileYAtZ(float z)
     {
-        Vector3 transomBase = (enableCounter) ? cachedCounterTopPoint : cachedSternPostTopPoint;
-        
-        float minTransomZ = Mathf.Min(transomBase.z, cachedTransomTopPoint.z);
-        float maxTransomZ = Mathf.Max(transomBase.z, cachedTransomTopPoint.z);
-        
-        float yVal = -9999f;
+        float maxY = -9999f;
         bool found = false;
 
+        // 1. Transom segment
+        Vector3 transomBase = (enableCounter) ? cachedCounterTopPoint : cachedSternPostTopPoint;
+        float minTransomZ = Mathf.Min(transomBase.z, cachedTransomTopPoint.z);
+        float maxTransomZ = Mathf.Max(transomBase.z, cachedTransomTopPoint.z);
         float actualTransomTopY = GetTopTimberYAtZ(cachedTransomTopPoint.z);
-        if (z <= minTransomZ) return (cachedTransomTopPoint.z < transomBase.z) ? actualTransomTopY : transomBase.y;
-        
-        if (z > minTransomZ && z <= maxTransomZ)
+
+        if (z >= minTransomZ - 0.001f && z <= maxTransomZ + 0.001f)
         {
             float totalZ = cachedTransomTopPoint.z - transomBase.z;
             if (Mathf.Abs(totalZ) > 0.001f)
             {
-                float t = (z - transomBase.z) / totalZ;
-                yVal = Mathf.Max(yVal, Mathf.Lerp(transomBase.y, actualTransomTopY, t));
+                float t = Mathf.Clamp01((z - transomBase.z) / totalZ);
+                maxY = Mathf.Max(maxY, Mathf.Lerp(transomBase.y, actualTransomTopY, t));
                 found = true;
             }
         }
 
-        if (z >= cachedKeelSternPoint.z) return (found) ? Mathf.Max(yVal, cachedKeelSternPoint.y) : cachedKeelSternPoint.y;
-        
-        float lowerY = -9999f;
+        // 2. Counter Curve & Counter Gap (if enabled)
         if (enableCounter)
         {
-            if (z <= cachedCounterBasePoint.z && z >= cachedCounterTopPoint.z)
+            float minCounterZ = Mathf.Min(cachedCounterBasePoint.z, cachedCounterTopPoint.z);
+            float maxCounterZ = Mathf.Max(cachedCounterBasePoint.z, cachedCounterTopPoint.z);
+            if (z >= minCounterZ - 0.001f && z <= maxCounterZ + 0.001f)
             {
                 float tb = GetBezierTAtZ(cachedCounterBasePoint, cachedCounterCp1, cachedCounterCp2, cachedCounterTopPoint, z, false);
-                lowerY = CalculateCubicBezierPoint(tb, cachedCounterBasePoint, cachedCounterCp1, cachedCounterCp2, cachedCounterTopPoint).y;
+                float counterY = CalculateCubicBezierPoint(tb, cachedCounterBasePoint, cachedCounterCp1, cachedCounterCp2, cachedCounterTopPoint).y;
+                maxY = Mathf.Max(maxY, counterY);
+                found = true;
             }
-            else if (z > cachedCounterBasePoint.z && z <= cachedSternPostTopPoint.z)
+
+            float minGapZ = Mathf.Min(cachedSternPostTopPoint.z, cachedCounterBasePoint.z);
+            float maxGapZ = Mathf.Max(cachedSternPostTopPoint.z, cachedCounterBasePoint.z);
+            if (z >= minGapZ - 0.001f && z <= maxGapZ + 0.001f)
             {
-                float gapZ = cachedSternPostTopPoint.z - cachedCounterBasePoint.z;
+                float gapZ = cachedCounterBasePoint.z - cachedSternPostTopPoint.z;
                 if (Mathf.Abs(gapZ) > 0.001f)
                 {
-                    float t = (z - cachedCounterBasePoint.z) / gapZ;
-                    lowerY = Mathf.Lerp(cachedCounterBasePoint.y, cachedSternPostTopPoint.y, t);
+                    float t = Mathf.Clamp01((z - cachedSternPostTopPoint.z) / gapZ);
+                    maxY = Mathf.Max(maxY, Mathf.Lerp(cachedSternPostTopPoint.y, cachedCounterBasePoint.y, t));
+                    found = true;
                 }
-                else
-                {
-                    lowerY = cachedCounterBasePoint.y;
-                }
-            }
-            else if (z > cachedSternPostTopPoint.z)
-            {
-                float totalZ = cachedSternPostTopPoint.z - cachedKeelSternPoint.z;
-                if (Mathf.Abs(totalZ) > 0.001f)
-                {
-                    float t = (z - cachedKeelSternPoint.z) / totalZ;
-                    lowerY = Mathf.Lerp(cachedKeelSternPoint.y, cachedSternPostTopPoint.y, t);
-                }
-            }
-        }
-        else
-        {
-            float totalZ = cachedSternPostTopPoint.z - cachedKeelSternPoint.z;
-            if (Mathf.Abs(totalZ) > 0.001f)
-            {
-                float t = (z - cachedKeelSternPoint.z) / totalZ;
-                lowerY = Mathf.Lerp(cachedKeelSternPoint.y, cachedSternPostTopPoint.y, t);
             }
         }
 
-        if (found) return Mathf.Max(yVal, lowerY);
-        return lowerY;
-        return lowerY;
+        // 3. Stern Post Rake segment (between cachedKeelSternPoint and cachedSternPostTopPoint)
+        float minPostZ = Mathf.Min(cachedKeelSternPoint.z, cachedSternPostTopPoint.z);
+        float maxPostZ = Mathf.Max(cachedKeelSternPoint.z, cachedSternPostTopPoint.z);
+        if (z >= minPostZ - 0.001f && z <= maxPostZ + 0.001f)
+        {
+            float postZ = cachedSternPostTopPoint.z - cachedKeelSternPoint.z;
+            if (Mathf.Abs(postZ) > 0.001f)
+            {
+                float t = Mathf.Clamp01((z - cachedKeelSternPoint.z) / postZ);
+                maxY = Mathf.Max(maxY, Mathf.Lerp(cachedKeelSternPoint.y, cachedSternPostTopPoint.y, t));
+                found = true;
+            }
+        }
+
+        if (found) return maxY;
+        return cachedKeelSternPoint.y;
     }
 
     public virtual float GetStemProfileZAtY(float y)
@@ -992,17 +1132,21 @@ public class SheerPlan : MonoBehaviour
 
     public virtual float GetBaseDeckYAtZ(float z)
     {
+        float deckY;
         if (z >= 0)
         {
             if (z >= cachedBaseDeckBowIntersect.z)
             {
                 float dz = cachedBaseDeckBowIntersect.z - cachedBaseDeckMidCpFwd.z;
                 float dy = cachedBaseDeckBowIntersect.y - cachedBaseDeckMidCpFwd.y;
-                if (Mathf.Abs(dz) < 0.001f) return cachedBaseDeckBowIntersect.y;
-                return cachedBaseDeckBowIntersect.y + (dy / dz) * (z - cachedBaseDeckBowIntersect.z);
+                if (Mathf.Abs(dz) < 0.001f) deckY = cachedBaseDeckBowIntersect.y;
+                else deckY = cachedBaseDeckBowIntersect.y + (dy / dz) * (z - cachedBaseDeckBowIntersect.z);
             }
-            float t = GetBezierTAtZ(cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpFwd, cachedBaseDeckBowCp, cachedBaseDeckBowIntersect, z, true);
-            return CalculateCubicBezierPoint(t, cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpFwd, cachedBaseDeckBowCp, cachedBaseDeckBowIntersect).y;
+            else
+            {
+                float t = GetBezierTAtZ(cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpFwd, cachedBaseDeckBowCp, cachedBaseDeckBowIntersect, z, true);
+                deckY = CalculateCubicBezierPoint(t, cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpFwd, cachedBaseDeckBowCp, cachedBaseDeckBowIntersect).y;
+            }
         }
         else
         {
@@ -1010,11 +1154,45 @@ public class SheerPlan : MonoBehaviour
             {
                 float dz = cachedBaseDeckSternIntersect.z - cachedBaseDeckMidCpAft.z;
                 float dy = cachedBaseDeckSternIntersect.y - cachedBaseDeckMidCpAft.y;
-                if (Mathf.Abs(dz) < 0.001f) return cachedBaseDeckSternIntersect.y;
-                return cachedBaseDeckSternIntersect.y + (dy / dz) * (z - cachedBaseDeckSternIntersect.z);
+                if (Mathf.Abs(dz) < 0.001f) deckY = cachedBaseDeckSternIntersect.y;
+                else deckY = cachedBaseDeckSternIntersect.y + (dy / dz) * (z - cachedBaseDeckSternIntersect.z);
             }
-            float t = GetBezierTAtZ(cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpAft, cachedBaseDeckSternCp, cachedBaseDeckSternIntersect, z, false);
-            return CalculateCubicBezierPoint(t, cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpAft, cachedBaseDeckSternCp, cachedBaseDeckSternIntersect).y;
+            else
+            {
+                float t = GetBezierTAtZ(cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpAft, cachedBaseDeckSternCp, cachedBaseDeckSternIntersect, z, false);
+                deckY = CalculateCubicBezierPoint(t, cachedBaseDeckMidshipPoint, cachedBaseDeckMidCpAft, cachedBaseDeckSternCp, cachedBaseDeckSternIntersect).y;
+            }
+        }
+        return Mathf.Min(deckY, GetMainSheerYAtZ(z));
+    }
+
+    public virtual float GetMainSheerYAtZ(float z)
+    {
+        if (z >= 0)
+        {
+            if (z >= cachedMainSheerBowIntersect.z)
+            {
+                Vector3 dir = (cachedMainSheerBowIntersect - cachedMainSheerBowCp);
+                if (dir.magnitude < 0.001f) dir = (cachedMainSheerBowIntersect - cachedMainSheerMidCpFwd);
+                float dz = dir.z;
+                float dy = dir.y;
+                if (Mathf.Abs(dz) < 0.001f) return cachedMainSheerBowIntersect.y;
+                return cachedMainSheerBowIntersect.y + (dy / dz) * (z - cachedMainSheerBowIntersect.z);
+            }
+            float t = GetBezierTAtZ(cachedMainSheerMidshipPoint, cachedMainSheerMidCpFwd, cachedMainSheerBowCp, cachedMainSheerBowIntersect, z, true);
+            return CalculateCubicBezierPoint(t, cachedMainSheerMidshipPoint, cachedMainSheerMidCpFwd, cachedMainSheerBowCp, cachedMainSheerBowIntersect).y;
+        }
+        else
+        {
+            if (z <= cachedMainSheerSternIntersect.z)
+            {
+                float dz = cachedMainSheerSternIntersect.z - cachedMainSheerMidCpAft.z;
+                float dy = cachedMainSheerSternIntersect.y - cachedMainSheerMidCpAft.y;
+                if (Mathf.Abs(dz) < 0.001f) return cachedMainSheerSternIntersect.y;
+                return cachedMainSheerSternIntersect.y + (dy / dz) * (z - cachedMainSheerSternIntersect.z);
+            }
+            float t = GetBezierTAtZ(cachedMainSheerMidshipPoint, cachedMainSheerMidCpAft, cachedMainSheerSternCp, cachedMainSheerSternIntersect, z, false);
+            return CalculateCubicBezierPoint(t, cachedMainSheerMidshipPoint, cachedMainSheerMidCpAft, cachedMainSheerSternCp, cachedMainSheerSternIntersect).y;
         }
     }
 
@@ -1126,7 +1304,7 @@ public class SheerPlan : MonoBehaviour
 
     public float GetHighestDeckYAtZ(float z)
     {
-        return GetBaseDeckYAtZ(z) + GetUpperDecksHeightAtZ(z);
+        return GetMainSheerYAtZ(z) + GetUpperDecksHeightAtZ(z);
     }
 
     public float GetGlobalSheerOffsetAtZ(float z)
@@ -1152,8 +1330,10 @@ public class SheerPlan : MonoBehaviour
         {
             if (z >= cachedTopTimberBowIntersect.z)
             {
-                float dz = cachedTopTimberBowIntersect.z - cachedTopTimberMidCpFwd.z;
-                float dy = cachedTopTimberBowIntersect.y - cachedTopTimberMidCpFwd.y;
+                Vector3 dir = (cachedTopTimberBowIntersect - cachedTopTimberBowCp);
+                if (dir.magnitude < 0.001f) dir = (cachedTopTimberBowIntersect - cachedTopTimberMidCpFwd);
+                float dz = dir.z;
+                float dy = dir.y;
                 if (Mathf.Abs(dz) < 0.001f) baseTopTimberY = cachedTopTimberBowIntersect.y;
                 else baseTopTimberY = cachedTopTimberBowIntersect.y + (dy / dz) * (z - cachedTopTimberBowIntersect.z);
             }
@@ -1181,6 +1361,21 @@ public class SheerPlan : MonoBehaviour
         return baseTopTimberY;
     }
 
+    public virtual float GetUpperDeckFloorYAtZ(float z)
+    {
+        ModularUpperDeck highestDeck = GetHighestActiveDeckAtZ(z);
+        if (highestDeck != null)
+        {
+            return GetBaseDeckYAtZ(z) + GetAbsoluteDeckHeight(highestDeck);
+        }
+        return GetBaseDeckYAtZ(z);
+    }
+
+    public virtual float GetUpperDeckSheerYAtZ(float z, bool ignoreBeakhead = false)
+    {
+        return GetTopTimberYAtZ(z, ignoreBeakhead);
+    }
+
     public virtual float GetTopTimberYAtZ(float z, bool ignoreBeakhead = false)
     {
         float globalSheerOffset = GetGlobalSheerOffsetAtZ(z);
@@ -1191,8 +1386,8 @@ public class SheerPlan : MonoBehaviour
 
         if (highestDeck != null)
         {
-            float baseDeckY = GetBaseDeckYAtZ(z);
-            finalBulwarkY = baseDeckY + GetAbsoluteDeckHeight(highestDeck) + highestDeck.bulwarkHeight;
+            float mainSheerY = GetMainSheerYAtZ(z);
+            finalBulwarkY = mainSheerY + GetAbsoluteDeckHeight(highestDeck) + highestDeck.bulwarkHeight;
         }
         else
         {
@@ -1240,7 +1435,7 @@ public class SheerPlan : MonoBehaviour
                         float t = GetBezierTAtZ(p0, p1, p2, p3, z, true);
                         float dynamicBulwarkHeight = CalculateCubicBezierPoint(t, p0, p1, p2, p3).y;
                         
-                        float dynamicBaseDeckY = GetBaseDeckYAtZ(z) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
+                        float dynamicBaseDeckY = GetMainSheerYAtZ(z) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
                         finalBulwarkY = dynamicBaseDeckY + dynamicBulwarkHeight;
                     }
                     else
@@ -1248,7 +1443,7 @@ public class SheerPlan : MonoBehaviour
                         float t = (z - startDropZ) / (bowZ - startDropZ);
                         float dynamicBulwarkHeight = Mathf.Lerp(activeBulwarkHeight, beakheadBulwarkHeight, t);
                         
-                        float dynamicBaseDeckY = GetBaseDeckYAtZ(z) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
+                        float dynamicBaseDeckY = GetMainSheerYAtZ(z) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
                         finalBulwarkY = dynamicBaseDeckY + dynamicBulwarkHeight;
                     }
                 }
@@ -1307,12 +1502,21 @@ public class SheerPlan : MonoBehaviour
         }
         else
         {
-            if (z <= cachedProjectedSternRisingEnd.z) return cachedProjectedSternRisingEnd.y;
-            float t = (z <= cachedSternRisingEnd.z)
-                ? GetBezierTAtZExt(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, z, 1.0f, cachedSternRisingLineEndT)
-                : GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
+            if (z < cachedSternRisingEnd.z) return GetProjectedSternRisingYAtZ(z);
+            float t = GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
             return CalculateQuadraticBezierPoint(t, cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd).y;
         }
+    }
+
+    public float GetProjectedSternRisingYAtZ(float z)
+    {
+        float sternZ = cachedSternRisingEnd.z;
+        float projZ = cachedProjectedSternRisingEnd.z;
+        if (z >= sternZ) return cachedSternRisingEnd.y;
+        float dz = projZ - sternZ;
+        if (Mathf.Abs(dz) < 0.0001f) return cachedSternRisingEnd.y;
+        float t = Mathf.Clamp01((z - sternZ) / dz);
+        return Mathf.Lerp(cachedSternRisingEnd.y, cachedProjectedSternRisingEnd.y, t);
     }
 
     public float GetProjectedBowRisingYAtZ(float z)
@@ -1335,11 +1539,7 @@ public class SheerPlan : MonoBehaviour
         }
         else
         {
-            if (z <= cachedProjectedSternRisingEnd.z) return cachedSternRisingLineEndT;
-            if (z <= cachedSternRisingEnd.z)
-            {
-                return GetBezierTAtZExt(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, z, 1.0f, cachedSternRisingLineEndT);
-            }
+            if (z <= cachedSternRisingEnd.z) return 1f;
             return GetBezierTAtZ(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, Vector3.zero, z, false);
         }
     }
@@ -1479,16 +1679,7 @@ public class SheerPlan : MonoBehaviour
         Gizmos.DrawLine(cachedKeelSternPoint, cachedSternPostTopPoint);
         Gizmos.color = Color.red; Gizmos.DrawSphere(cachedSternPostTopPoint, 0.2f);
         
-        // Deadwood Rake
-        if (showDeadwoodRake)
-        {
-            Color purple = new Color(0.6f, 0.2f, 0.8f, 1f);
-            DrawCubicBezierCurve(cachedDeadwoodForePoint, cachedDeadwoodP1, cachedDeadwoodP2, cachedDeadwoodAftPoint, purple);
-            Gizmos.color = purple;
-            Gizmos.DrawSphere(cachedDeadwoodForePoint, 0.15f);
-            Gizmos.DrawSphere(cachedDeadwoodAftPoint, 0.15f);
-        }
-        
+
         // Counter
         if (enableCounter)
         {
@@ -1539,13 +1730,47 @@ public class SheerPlan : MonoBehaviour
         Gizmos.DrawSphere(cachedBaseDeckMidshipPoint, 0.2f);
         Gizmos.DrawSphere(cachedBaseDeckSternIntersect, 0.2f);
 
+        // 4b. Main Sheer Line
+        DrawCubicBezierCurve(cachedMainSheerMidshipPoint, cachedMainSheerMidCpFwd, cachedMainSheerBowCp, cachedMainSheerBowIntersect, mainSheerLineColor);
+        DrawCubicBezierCurve(cachedMainSheerMidshipPoint, cachedMainSheerMidCpAft, cachedMainSheerSternCp, cachedMainSheerSternIntersect, mainSheerLineColor);
+        Gizmos.color = mainSheerLineColor;
+        Gizmos.DrawSphere(cachedMainSheerBowIntersect, 0.18f);
+        Gizmos.DrawSphere(cachedMainSheerMidshipPoint, 0.18f);
+        Gizmos.DrawSphere(cachedMainSheerSternIntersect, 0.18f);
+
         // 5. HoB
-        DrawCubicBezierCurve(cachedHobMidshipPoint, cachedHobMidCpFwd, cachedHobBowCp, cachedHobBowIntersect, Color.cyan);
-        DrawCubicBezierCurve(cachedHobMidshipPoint, cachedHobMidCpAft, cachedHobSternCp, cachedHobSternIntersect, Color.cyan);
-        Gizmos.color = Color.cyan;
+        DrawCubicBezierCurve(cachedHobMidshipPoint, cachedHobMidCpFwd, cachedHobBowCp, cachedHobBowIntersect, hobLineColor);
+        DrawCubicBezierCurve(cachedHobMidshipPoint, cachedHobMidCpAft, cachedHobSternCp, cachedHobSternIntersect, hobLineColor);
+        Gizmos.color = hobLineColor;
         Gizmos.DrawSphere(cachedHobBowIntersect, 0.15f);
         Gizmos.DrawSphere(cachedHobMidshipPoint, 0.15f);
         Gizmos.DrawSphere(cachedHobSternIntersect, 0.15f);
+        if (showControlArms)
+        {
+            Gizmos.color = new Color(hobLineColor.r, hobLineColor.g, hobLineColor.b, 0.6f);
+            
+            // Midship Forward Handle
+            Gizmos.DrawLine(cachedHobMidshipPoint, cachedHobMidCpFwd);
+            Gizmos.DrawSphere(cachedHobMidCpFwd, 0.12f);
+            
+            // Midship Aft Handle
+            Gizmos.DrawLine(cachedHobMidshipPoint, cachedHobMidCpAft);
+            Gizmos.DrawSphere(cachedHobMidCpAft, 0.12f);
+
+            // Bow Stem Handle
+            if (Vector3.Distance(cachedHobBowCp, cachedHobBowIntersect) > 0.001f)
+            {
+                Gizmos.DrawLine(cachedHobBowIntersect, cachedHobBowCp);
+                Gizmos.DrawSphere(cachedHobBowCp, 0.12f);
+            }
+
+            // Stern Post Handle
+            if (Vector3.Distance(cachedHobSternCp, cachedHobSternIntersect) > 0.001f)
+            {
+                Gizmos.DrawLine(cachedHobSternIntersect, cachedHobSternCp);
+                Gizmos.DrawSphere(cachedHobSternCp, 0.12f);
+            }
+        }
 
         // Top Timber Line (Bulwark)
         Gizmos.color = new Color(0.8f, 0.8f, 1f);
@@ -1559,7 +1784,7 @@ public class SheerPlan : MonoBehaviour
         for (int i = 0; i <= baseSegs; i++)
         {
             float z = Mathf.Lerp(startZ, endZ, i / (float)baseSegs);
-            float baseDeckY = GetBaseDeckYAtZ(z);
+            float baseDeckY = GetMainSheerYAtZ(z);
             float baseBulwarkY = baseDeckY + bulwarkHeight + GetGlobalSheerOffsetAtZ(z);
             
             if (enableBeakheadBulwark)
@@ -1590,7 +1815,7 @@ public class SheerPlan : MonoBehaviour
                 for (int i = 0; i <= upperSegs; i++)
                 {
                     float z = Mathf.Lerp(aftZ, foreZ, i / (float)upperSegs);
-                    float y = GetBaseDeckYAtZ(z) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(z);
+                    float y = GetMainSheerYAtZ(z) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(z);
                     Vector3 currPt = new Vector3(0, y, z);
                     if (prevUpperPt.HasValue) Gizmos.DrawLine(prevUpperPt.Value, currPt);
                     prevUpperPt = currPt;
@@ -1599,14 +1824,14 @@ public class SheerPlan : MonoBehaviour
                 // Vertical Bulkhead Drop Lines at Fore/Aft deck boundaries
                 if (deck.globalForeExtent < 0.999f)
                 {
-                    float yUpperFore = GetBaseDeckYAtZ(foreZ) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
-                    float yLowerFore = GetBaseDeckYAtZ(foreZ) + bulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
+                    float yUpperFore = GetMainSheerYAtZ(foreZ) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
+                    float yLowerFore = GetMainSheerYAtZ(foreZ) + bulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
                     if (deck.parentDeckID != 0)
                     {
                         var parent = upperDecks.Find(d => d.deckID == deck.parentDeckID);
                         if (parent != null)
                         {
-                            yLowerFore = GetBaseDeckYAtZ(foreZ) + GetAbsoluteDeckHeight(parent) + parent.bulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
+                            yLowerFore = GetMainSheerYAtZ(foreZ) + GetAbsoluteDeckHeight(parent) + parent.bulwarkHeight + GetGlobalSheerOffsetAtZ(foreZ);
                         }
                     }
 
@@ -1617,14 +1842,14 @@ public class SheerPlan : MonoBehaviour
 
                 if (deck.globalAftExtent > 0.001f)
                 {
-                    float yUpperAft = GetBaseDeckYAtZ(aftZ) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
-                    float yLowerAft = GetBaseDeckYAtZ(aftZ) + bulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
+                    float yUpperAft = GetMainSheerYAtZ(aftZ) + upperBulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
+                    float yLowerAft = GetMainSheerYAtZ(aftZ) + bulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
                     if (deck.parentDeckID != 0)
                     {
                         var parent = upperDecks.Find(d => d.deckID == deck.parentDeckID);
                         if (parent != null)
                         {
-                            yLowerAft = GetBaseDeckYAtZ(aftZ) + GetAbsoluteDeckHeight(parent) + parent.bulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
+                            yLowerAft = GetMainSheerYAtZ(aftZ) + GetAbsoluteDeckHeight(parent) + parent.bulwarkHeight + GetGlobalSheerOffsetAtZ(aftZ);
                         }
                     }
 
@@ -1648,10 +1873,10 @@ public class SheerPlan : MonoBehaviour
                 float bulwarkOffset = deckOffset + deck.bulwarkHeight;
 
                 // Draw Full Dashed Line for Deck spanning entire length
-                DrawDashedDeckCurve(deckOffset, new Color(0.85f, 0.85f, 0.85f, 0.8f), 80);
+                DrawDashedDeckCurve(deckOffset, new Color(0.85f, 0.85f, 0.85f, 0.8f), 80, useBaseDeckSheer: true);
 
                 // Draw Full Dashed Line for Bulwark spanning entire length
-                DrawDashedDeckCurve(bulwarkOffset, new Color(0.7f, 0.7f, 0.7f, 0.8f), 80);
+                DrawDashedDeckCurve(bulwarkOffset, new Color(0.7f, 0.7f, 0.7f, 0.8f), 80, useBaseDeckSheer: false);
 
                 float aftZ = startZ + (deck.globalAftExtent * totalLength);
                 float foreZ = startZ + (deck.globalForeExtent * totalLength);
@@ -1699,10 +1924,10 @@ public class SheerPlan : MonoBehaviour
                 float yDrop = GetLowerDeckYDrop(deck);
                 
                 // Clamp to physical hull bounds (roughly using Base Deck limits for now)
-                float aftLimit = GetSternProfileZAtY(GetBaseDeckYAtZ(aftZ) - yDrop);
+                float aftLimit = GetSternProfileZAtY(GetMainSheerYAtZ(aftZ) - yDrop);
                 if (aftZ < aftLimit) aftZ = aftLimit;
                 
-                float foreLimit = GetStemProfileZAtY(GetBaseDeckYAtZ(foreZ) - yDrop);
+                float foreLimit = GetStemProfileZAtY(GetMainSheerYAtZ(foreZ) - yDrop);
                 if (foreZ > foreLimit) foreZ = foreLimit;
 
                 Gizmos.color = new Color(0f, 0.5f, 1f, 0.5f); // semi-transparent blue
@@ -1712,13 +1937,13 @@ public class SheerPlan : MonoBehaviour
                 {
                     float t = i / 20f;
                     float z = Mathf.Lerp(aftZ, foreZ, t);
-                    Vector3 cDeck = new Vector3(0, GetBaseDeckYAtZ(z) - yDrop, z);
+                    Vector3 cDeck = new Vector3(0, GetMainSheerYAtZ(z) - yDrop, z);
                     if (pDeck.HasValue) Gizmos.DrawLine(pDeck.Value, cDeck);
                     pDeck = cDeck;
                 }
                 
-                Vector3 aftPt = new Vector3(0, GetBaseDeckYAtZ(aftZ) - yDrop, aftZ);
-                Vector3 forePt = new Vector3(0, GetBaseDeckYAtZ(foreZ) - yDrop, foreZ);
+                Vector3 aftPt = new Vector3(0, GetMainSheerYAtZ(aftZ) - yDrop, aftZ);
+                Vector3 forePt = new Vector3(0, GetMainSheerYAtZ(foreZ) - yDrop, foreZ);
 
                 if (deck.aftExtent > 0.001f) Gizmos.DrawLine(aftPt, aftPt + new Vector3(0, deck.height, 0));
                 if (deck.foreExtent < 0.999f) Gizmos.DrawLine(forePt, forePt + new Vector3(0, deck.height, 0));
@@ -1734,9 +1959,9 @@ public class SheerPlan : MonoBehaviour
         DrawQuadraticBezierCurve(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, new Color(0.6f, 0.2f, 0.8f, 1f));
 
         // Projected Stern Rising Line
-        if (showProjectedSternRisingLine && cachedSternRisingLineEndT > 1.001f)
+        if (showProjectedSternRisingLine && cachedProjectedSternRisingEnd.z < cachedSternRisingEnd.z - 0.001f)
         {
-            DrawDashedQuadraticBezierCurve(cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd, 1f, cachedSternRisingLineEndT, Color.gray, 20);
+            DrawDashedLine(cachedSternRisingEnd, cachedProjectedSternRisingEnd, Color.gray, 20);
         }
 
         // Projected Bow Rising Line
@@ -1755,8 +1980,8 @@ public class SheerPlan : MonoBehaviour
             
             ModularUpperDeck bowDeck = GetHighestActiveDeckAtZ(bowZ);
             float activeBulwarkHeight = (bowDeck != null) ? bowDeck.bulwarkHeight : bulwarkHeight;
-            float baseDeckYStart = GetBaseDeckYAtZ(startDropZ) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
-            float baseDeckYEnd = GetBaseDeckYAtZ(bowZ) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
+            float baseDeckYStart = GetMainSheerYAtZ(startDropZ) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
+            float baseDeckYEnd = GetMainSheerYAtZ(bowZ) + ((bowDeck != null) ? GetAbsoluteDeckHeight(bowDeck) : 0f);
             
             Vector3 p0 = new Vector3(0, baseDeckYStart + activeBulwarkHeight + GetGlobalSheerOffsetAtZ(startDropZ), startDropZ);
             Vector3 p3 = new Vector3(0, baseDeckYEnd + beakheadBulwarkHeight + GetGlobalSheerOffsetAtZ(bowZ), bowZ);
@@ -1809,9 +2034,9 @@ public class SheerPlan : MonoBehaviour
                 Vector3 labelPos = Vector3.Lerp(cachedKeelSternPoint, cachedProjectedAftKeelEnd, 0.5f);
                 Handles.Label(labelPos, "Projected Aft Keel Line", labelStyle);
             }
-            if (showProjectedSternRisingLine && cachedSternRisingLineEndT > 1.001f)
+            if (showProjectedSternRisingLine && cachedProjectedSternRisingEnd.z < cachedSternRisingEnd.z - 0.001f)
             {
-                Vector3 labelPos = CalculateQuadraticBezierPoint((1f + cachedSternRisingLineEndT) / 2f, cachedMidshipRisingPoint, cachedSternP1Ctrl, cachedSternRisingEnd);
+                Vector3 labelPos = Vector3.Lerp(cachedSternRisingEnd, cachedProjectedSternRisingEnd, 0.5f);
                 Handles.Label(labelPos, "Projected Stern Rising Line", labelStyle);
             }
             if (showProjectedBowRisingLine && cachedProjectedBowRisingEnd.z > cachedBowRisingEnd.z + 0.001f)
@@ -1833,21 +2058,23 @@ public class SheerPlan : MonoBehaviour
         float globalOffset = GetGlobalSheerOffsetAtZ(z);
         if (upperDecks != null && upperDecks.Count > 0)
         {
-            return GetBaseDeckYAtZ(z) + GetMaxDeckHeight() + globalOffset;
+            return GetMainSheerYAtZ(z) + GetMaxDeckHeight() + globalOffset;
         }
-        return GetBaseDeckYAtZ(z) + bulwarkHeight + globalOffset;
+        return GetMainSheerYAtZ(z) + bulwarkHeight + globalOffset;
     }
 
-    protected void DrawDashedDeckCurve(float heightOffset, Color color, int dashCount = 80)
+    protected void DrawDashedDeckCurve(float heightOffset, Color color, int dashCount = 80, bool useBaseDeckSheer = true)
     {
         float startZ = GetAftMostZ();
         float endZ = GetFwdMostZ();
         Gizmos.color = color;
-        Vector3 previousPoint = new Vector3(0, GetBaseDeckYAtZ(startZ) + heightOffset, startZ);
+        float startY = useBaseDeckSheer ? GetBaseDeckYAtZ(startZ) : GetMainSheerYAtZ(startZ);
+        Vector3 previousPoint = new Vector3(0, startY + heightOffset, startZ);
         for (int i = 1; i <= dashCount; i++)
         {
             float zCurr = Mathf.Lerp(startZ, endZ, i / (float)dashCount);
-            Vector3 currentPoint = new Vector3(0, GetBaseDeckYAtZ(zCurr) + heightOffset, zCurr);
+            float yCurr = useBaseDeckSheer ? GetBaseDeckYAtZ(zCurr) : GetMainSheerYAtZ(zCurr);
+            Vector3 currentPoint = new Vector3(0, yCurr + heightOffset, zCurr);
             if (i % 2 != 0)
             {
                 Gizmos.DrawLine(previousPoint, currentPoint);
@@ -2155,6 +2382,24 @@ public class SheerPlanEditor : Editor
                 iterator.name == "beakheadBulwarkBottomCurveAngle" ||
                 iterator.name == "beakheadBulwarkCurveLength")
             {
+                continue;
+            }
+
+            if (iterator.name == "baseDeckSheerFwd")
+            {
+                SheerPlan s = (SheerPlan)target;
+                float maxVal = Mathf.Max(0.0001f, s.mainSheerFwd);
+                SerializedProperty prop = serializedObject.FindProperty("baseDeckSheerFwd");
+                prop.floatValue = EditorGUILayout.Slider(new GUIContent("Base Deck Sheer Fwd", iterator.tooltip), prop.floatValue, 0f, maxVal);
+                continue;
+            }
+
+            if (iterator.name == "baseDeckSheerAft")
+            {
+                SheerPlan s = (SheerPlan)target;
+                float maxVal = Mathf.Max(0.0001f, s.mainSheerAft);
+                SerializedProperty prop = serializedObject.FindProperty("baseDeckSheerAft");
+                prop.floatValue = EditorGUILayout.Slider(new GUIContent("Base Deck Sheer Aft", iterator.tooltip), prop.floatValue, 0f, maxVal);
                 continue;
             }
 

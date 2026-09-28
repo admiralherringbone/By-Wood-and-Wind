@@ -104,6 +104,18 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Use Quadratic (t^2) scaling for Keel control arm to unload geometric tension and dive inward near stern/bow for a smooth rounded bilge.")]
     public bool useQuadraticScaling = true;
 
+    [Header("Longitudinal Control Point Trajectory Fairing")]
+    [Tooltip("Enable 3D C2 longitudinal spline trajectory fairing across frame control points to guarantee 100% glass-smooth frames stem-to-stern.")]
+    public bool enableLongitudinalTrajectoryFairing = true;
+
+    [Range(0f, 1f)]
+    [Tooltip("Strength blend factor for longitudinal control point trajectory fairing (0 = raw station math, 1 = 100% C2 smooth trajectories).")]
+    public float trajectoryFairingStrength = 1.0f;
+
+    [Range(5, 50)]
+    [Tooltip("Number of master longitudinal anchor stations sampled to build the smooth control point trajectories.")]
+    public int trajectoryAnchorStations = 20;
+
     [Header("Gizmo Visualization Settings")]
     public bool showLabels = true;
     public bool showBackboneSideLines = true;
@@ -127,39 +139,48 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Color of the guide line tracing the Keel Control Arm points (pL1).")]
     public Color keelControlGuideColor = new Color(1f, 0.8f, 0.2f, 0.9f);
 
-    [Header("Pseudo Frame Settings")]
-    [Tooltip("Show grey dashed pseudo frame extensions simulating vertical frame extensions down to the Keel line height.")]
-    public bool showPseudoFrames = true;
-
-    [Tooltip("Color of the grey dashed pseudo frame vertical extensions.")]
-    public Color pseudoFrameColor = Color.gray;
-
-    [Tooltip("Dash length for drawing pseudo frame lines in Scene view.")]
-    public float pseudoFrameDashLength = 0.1f;
-
-    [Tooltip("Gap length between dashes for pseudo frame lines in Scene view.")]
-    public float pseudoFrameGapLength = 0.05f;
-
     private List<List<Vector3>> cachedAngledFrameLines = new List<List<Vector3>>();
     private bool isAngledFrameCacheDirty = true;
     private List<float> cachedStationList = new List<float>();
     private bool isStationListDirty = true;
+
+    private struct TrajectoryCachePoint
+    {
+        public Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+    }
+
+    private struct TrajectoryCache
+    {
+        public bool isBuilt;
+        public float[] zStations;
+        public TrajectoryCachePoint[] portPoints;
+        public TrajectoryCachePoint[] stbdPoints;
+    }
+
+    private TrajectoryCache m_TrajectoryCache;
+    private bool isTrajectoryCacheDirty = true;
 
     private void Awake()
     {
         FindReferences();
     }
 
+    [HideInInspector] public int changeVersion = 0;
+
     private void OnValidate()
     {
         isAngledFrameCacheDirty = true;
         isStationListDirty = true;
+        isTrajectoryCacheDirty = true;
+        changeVersion++;
         FindReferences();
     }
 
     public void MarkStationsDirty()
     {
         isStationListDirty = true;
+        isTrajectoryCacheDirty = true;
+        changeVersion++;
     }
 
     public void FindReferences()
@@ -240,6 +261,9 @@ public class FramingModel : MonoBehaviour
         // Master Frame at Z = 0
         stations.Add(0f);
 
+        // Furthest forward station at bow
+        stations.Add(fwdZ);
+
         if (frameSpacingMode == FrameSpacingMode.PrimaryBreadthCurve && breadthPlan != null)
         {
             breadthPlan.UpdateCachedCurves();
@@ -290,7 +314,7 @@ public class FramingModel : MonoBehaviour
         {
             // Forward Stations (Z > 0)
             float curZ = frameSpacing;
-            while (curZ < fwdZ - 0.001f)
+            while (curZ <= fwdZ)
             {
                 stations.Add(curZ);
                 curZ += frameSpacing;
@@ -328,49 +352,28 @@ public class FramingModel : MonoBehaviour
             }
         }
 
-        // Stem & Stern Profile Auxiliary Frame Stations for all Strakes
-        StrakesModel strakesModel = GetComponent<StrakesModel>() ?? FindObjectOfType<StrakesModel>();
-        if (strakesModel != null)
-        {
-            strakesModel.CollectProfileIntersectionZs(stations);
-        }
-
-        float[] profileKeyZs = new float[]
-        {
-            sheerPlan.GetAftMostZ(),
-            sheerPlan.GetFwdMostZ(),
-            sheerPlan.cachedTopTimberBowIntersect.z,
-            sheerPlan.cachedHobBowIntersect.z,
-            sheerPlan.cachedBowRisingEnd.z,
-            sheerPlan.cachedUpperStemTopPoint.z,
-            sheerPlan.cachedTopTimberSternIntersect.z,
-            sheerPlan.cachedHobSternIntersect.z,
-            sheerPlan.cachedSternRisingEnd.z,
-            sheerPlan.cachedTransomTopPoint.z,
-            sheerPlan.cachedCounterTopPoint.z,
-            sheerPlan.cachedSternPostTopPoint.z
-        };
-
-        foreach (float pZ in profileKeyZs)
-        {
-            if (pZ >= aftZ - 0.001f && pZ <= fwdZ + 0.001f)
-            {
-                stations.Add(pZ);
-            }
-        }
-
         stations.Sort();
 
-        // Filter out near-duplicate stations (within 2.5cm) and exclude out-of-bounds stations (outside aftZ to fwdZ range)
+        // Filter out near-duplicate stations (within 2.5cm)
         List<float> uniqueStations = new List<float>();
         foreach (float s in stations)
         {
-            if (s >= fwdZ - 0.001f) continue;
-            if (s < aftZ - 0.001f) continue;
-
             if (uniqueStations.Count == 0 || Mathf.Abs(s - uniqueStations[uniqueStations.Count - 1]) > 0.025f)
             {
                 uniqueStations.Add(s);
+            }
+        }
+
+        // Ensure the absolute furthest forward station (fwdZ) is always included
+        if (uniqueStations.Count > 0 && Mathf.Abs(uniqueStations[uniqueStations.Count - 1] - fwdZ) > 0.0001f)
+        {
+            if (Mathf.Abs(uniqueStations[uniqueStations.Count - 1] - fwdZ) <= 0.005f)
+            {
+                uniqueStations[uniqueStations.Count - 1] = fwdZ;
+            }
+            else
+            {
+                uniqueStations.Add(fwdZ);
             }
         }
 
@@ -412,22 +415,29 @@ public class FramingModel : MonoBehaviour
         return EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
     }
 
-    public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
+    public Vector3 GetTransverseFramePointAtYFromControlPoints(
+        Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3,
+        Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
+        float targetY)
     {
-        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-            return Vector3.zero;
-
         float minU = 0f;
         float maxU = 1.0f;
 
         Vector3 minPt = EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
         Vector3 maxPt = EvaluateFramePointFromControlPoints(maxU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
 
-        if (targetY <= minPt.y) return minPt;
+        if (targetY < minPt.y - 0.0005f)
+        {
+            float keelY = GetFrameBottomYAtZ(minPt.z);
+            if (targetY >= keelY - 0.05f)
+            {
+                return new Vector3(minPt.x, targetY, minPt.z);
+            }
+            return minPt;
+        }
         if (targetY >= maxPt.y) return maxPt;
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 25; i++)
         {
             float midU = (minU + maxU) * 0.5f;
             Vector3 midPt = EvaluateFramePointFromControlPoints(midU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
@@ -436,6 +446,15 @@ public class FramingModel : MonoBehaviour
         }
 
         return EvaluateFramePointFromControlPoints((minU + maxU) * 0.5f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+    }
+
+    public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
+    {
+        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            return Vector3.zero;
+
+        return GetTransverseFramePointAtYFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, targetY);
     }
 
     public List<Vector3> GetAllTransverseFramePointsAtX(float z, float side, float targetX)
@@ -557,20 +576,19 @@ public class FramingModel : MonoBehaviour
         float hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(z);
 
         profileY = keelY;
-        float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
         if (sheerPlan != null)
         {
             if (z > sheerPlan.cachedKeelBowPoint.z)
             {
                 profileY = sheerPlan.GetStemProfileYAtZ(z);
             }
-            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sternRisingZ - 0.001f)
-            {
-                profileY = sheerPlan.GetDeadwoodYAtZ(z);
-            }
-            else if (z < sternRisingZ - 0.001f)
+            else if (z < sheerPlan.cachedSternRisingEnd.z - 0.001f)
             {
                 profileY = sheerPlan.GetRisingLineYAtZ(z);
+            }
+            else
+            {
+                profileY = sheerPlan.GetKeelYAtZ(z);
             }
         }
 
@@ -580,15 +598,21 @@ public class FramingModel : MonoBehaviour
         pL0_curve = backboneKeelPoint;
 
         // --- CONNECTION POINT (pLR) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
-        float floorX = breadthPlan.GetFloorLineXAtZ(z);
-        float risingY = sheerPlan.GetProjectedBowRisingYAtZ(z);
-
+        float floorX = Mathf.Min(breadthPlan.GetFloorLineXAtZ(z), hobBreadth - 0.001f);
+        float risingY = sheerPlan.GetRisingLineYAtZ(z);
         float pLR_Y = Mathf.Max(risingY, profileY);
-        pLR = new Vector3(side * floorX, pLR_Y, z);
 
-        if (profileY >= risingY - 0.001f)
+        float diffY = risingY - profileY;
+        if (diffY <= 0.001f)
         {
             pLR = backboneKeelPoint;
+        }
+        else
+        {
+            float blendRange = 0.15f;
+            float tBlend = Mathf.Clamp01(diffY / blendRange);
+            float effectiveFloorX = Mathf.Lerp(hw, floorX, tBlend);
+            pLR = new Vector3(side * effectiveFloorX, pLR_Y, z);
         }
 
         // --- EQUAL FLOOR BREADTH SPACING OR QUADRATIC t^2 SCALED CONTROL ARMS AT CONNECTION POINT (pLR) ---
@@ -644,12 +668,13 @@ public class FramingModel : MonoBehaviour
         float pL1_Y = Mathf.Max(profileY, pLR.y - dx_abs * slope);
         pL1 = new Vector3(side * pL1_X_abs, pL1_Y, z);
 
-        // Edge case override when profile cutoff exceeds rising line height
-        if (profileY >= risingY - 0.001f)
+        float bowRisingZ = (sheerPlan != null) ? sheerPlan.cachedBowRisingEnd.z : 0f;
+        // Edge case override beyond Bow End of Rising Line or when profile cutoff exceeds rising line height:
+        // Collapse floor control arms (pL0, pL1, pLR) to backboneKeelPoint while preserving HOB (pL2, pL3)
+        if (profileY >= risingY - 0.001f || (bowRisingZ > 0.001f && z >= bowRisingZ - 0.001f))
         {
             pLR = backboneKeelPoint;
             pL1 = backboneKeelPoint;
-            pL2.y = Mathf.Max(pL2.y, profileY);
         }
 
         return true;
@@ -788,7 +813,7 @@ public class FramingModel : MonoBehaviour
         return points;
     }
 
-    public bool GetFrameControlPointsAtZ(float z, float side,
+    public bool GetRawFrameControlPointsAtZ(float z, float side,
         out Vector3 pL0, out Vector3 pL1, out Vector3 pLR, out Vector3 pL2, out Vector3 pL3,
         out Vector3 pU0, out Vector3 pU1, out Vector3 pU2, out Vector3 pU3)
     {
@@ -817,10 +842,183 @@ public class FramingModel : MonoBehaviour
         Vector3 masterU1Offset = bodyPlan.cachedU1 - bodyPlan.cachedU0;
         Vector3 masterU2Offset = bodyPlan.cachedU2 - bodyPlan.cachedU3;
 
-        pU1 = pU0 + new Vector3(side * masterU1Offset.x * sXUpper, masterU1Offset.y * sYUpper, 0);
+        Vector3 lowerTangentDir = (pL3 - pL2).sqrMagnitude > 0.00001f ? (pL3 - pL2).normalized : Vector3.up;
+
+        float armLen = Mathf.Max(0.05f, masterU1Offset.magnitude * sYUpper);
+        pU1 = pU0 + lowerTangentDir * armLen;
+
         pU2 = pU3 + new Vector3(side * masterU2Offset.x * sXUpper, masterU2Offset.y * sYUpper, 0);
 
         return true;
+    }
+
+    public bool GetFrameControlPointsAtZ(float z, float side,
+        out Vector3 pL0, out Vector3 pL1, out Vector3 pLR, out Vector3 pL2, out Vector3 pL3,
+        out Vector3 pU0, out Vector3 pU1, out Vector3 pU2, out Vector3 pU3)
+    {
+        bool success = GetRawFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3);
+        if (!success) return false;
+
+        if (enableLongitudinalTrajectoryFairing && trajectoryFairingStrength > 0.0001f)
+        {
+            Vector3 fL0, fL1, fLR, fL2, fL3, fU0, fU1, fU2, fU3;
+            EvaluateFairedControlPoints(z, side, out fL0, out fL1, out fLR, out fL2, out fL3, out fU0, out fU1, out fU2, out fU3);
+
+            float alpha = Mathf.Clamp01(trajectoryFairingStrength);
+            // Smooth interior handles (pL1, pU2) and vertical height drops/rises (pL2.y, pU1.y)
+            pL1 = Vector3.Lerp(pL1, fL1, alpha);
+            pU2 = Vector3.Lerp(pU2, fU2, alpha);
+            pL2.y = Mathf.Lerp(pL2.y, fL2.y, alpha);
+            pU1.y = Mathf.Lerp(pU1.y, fU1.y, alpha);
+
+            // Boundary points (pL0, pLR, pL3, pU3) stay 100% locked to BreadthPlan & SheerPlan
+            pU0 = pL3;
+        }
+
+        // --- ENFORCE ABSOLUTE PLAN, VERTICAL HOB, & CONNECTION TANGENT LOCKS ---
+        // 1. HOB Control Arms (pL2 & pU1) remain PERFECTLY VERTICAL on the Y-axis (pL2.x = pL3.x, pU1.x = pL3.x)
+        pL2.x = pL3.x;
+        pU1.x = pL3.x;
+
+        // 2. Re-enforce 100% G1 Tangent Alignment at Connection Point (pLR)
+        // Adjust pL1.y so incoming ray (pLR - pL1) matches outgoing ray (pL2 - pLR) slope
+        float deltaX_hob = Mathf.Max(0.0001f, Mathf.Abs(pL3.x) - Mathf.Abs(pLR.x));
+        float deltaY_hob = pL2.y - pLR.y;
+        float tangentSlope = deltaY_hob / deltaX_hob;
+
+        float pL1_X_abs = Mathf.Abs(pL1.x);
+        float dx_abs = Mathf.Abs(pLR.x) - pL1_X_abs;
+        if (dx_abs > 0.0001f)
+        {
+            float profileY = GetFrameBottomYAtZ(z);
+            if (sheerPlan != null && z > sheerPlan.cachedKeelBowPoint.z)
+            {
+                profileY = sheerPlan.GetStemProfileYAtZ(z);
+            }
+            pL1.y = Mathf.Max(profileY, pLR.y - dx_abs * tangentSlope);
+        }
+
+        // 3. For bow frames beyond Bow End of Rising Line (or profileY >= risingY),
+        // collapse Keel Arms (pL0, pL1, pLR) to backboneKeelPoint while leaving HoB control arms (pL2, pL3) untouched.
+        float profileY_final = GetFrameBottomYAtZ(z);
+        if (sheerPlan != null && z > sheerPlan.cachedKeelBowPoint.z)
+        {
+            profileY_final = sheerPlan.GetStemProfileYAtZ(z);
+        }
+        float risingY_final = (sheerPlan != null) ? sheerPlan.GetRisingLineYAtZ(z) : profileY_final;
+        float bowRisingZ_final = (sheerPlan != null) ? sheerPlan.cachedBowRisingEnd.z : 0f;
+        float hw_final = GetKeelHalfWidth();
+        Vector3 backboneKeelPoint = new Vector3(side * hw_final, profileY_final, z);
+
+        if (profileY_final >= risingY_final - 0.001f || (bowRisingZ_final > 0.001f && z >= bowRisingZ_final - 0.001f))
+        {
+            pL0 = backboneKeelPoint;
+            pL1 = backboneKeelPoint;
+            pLR = backboneKeelPoint;
+        }
+
+        // 4. Transverse frames sit 100% flat in their station plane at Z = z
+        pL0.z = z;
+        pL1.z = z;
+        pLR.z = z;
+        pL2.z = z;
+        pL3.z = z;
+        pU0.z = z;
+        pU1.z = z;
+        pU2.z = z;
+        pU3.z = z;
+
+        return true;
+    }
+
+    private void RebuildTrajectoryCacheIfNeeded()
+    {
+        if (!isTrajectoryCacheDirty && m_TrajectoryCache.isBuilt && m_TrajectoryCache.zStations != null && m_TrajectoryCache.zStations.Length > 0)
+            return;
+
+        FindReferences();
+        if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
+
+        sheerPlan.UpdateCachedValues();
+        bodyPlan.UpdateCachedCurves();
+        breadthPlan.UpdateCachedCurves();
+
+        float sternZ = sheerPlan.GetAftMostZ();
+        float bowZ = sheerPlan.GetFwdMostZ();
+
+        int numAnchors = Mathf.Clamp(trajectoryAnchorStations, 5, 60);
+        m_TrajectoryCache.zStations = new float[numAnchors];
+        m_TrajectoryCache.portPoints = new TrajectoryCachePoint[numAnchors];
+        m_TrajectoryCache.stbdPoints = new TrajectoryCachePoint[numAnchors];
+
+        for (int i = 0; i < numAnchors; i++)
+        {
+            float t = (float)i / (numAnchors - 1);
+            float z = Mathf.Lerp(sternZ, bowZ, t);
+            m_TrajectoryCache.zStations[i] = z;
+
+            TrajectoryCachePoint stbdPt;
+            GetRawFrameControlPointsAtZ(z, 1f, out stbdPt.pL0, out stbdPt.pL1, out stbdPt.pLR, out stbdPt.pL2, out stbdPt.pL3, out stbdPt.pU0, out stbdPt.pU1, out stbdPt.pU2, out stbdPt.pU3);
+            m_TrajectoryCache.stbdPoints[i] = stbdPt;
+
+            TrajectoryCachePoint portPt;
+            GetRawFrameControlPointsAtZ(z, -1f, out portPt.pL0, out portPt.pL1, out portPt.pLR, out portPt.pL2, out portPt.pL3, out portPt.pU0, out portPt.pU1, out portPt.pU2, out portPt.pU3);
+            m_TrajectoryCache.portPoints[i] = portPt;
+        }
+
+        m_TrajectoryCache.isBuilt = true;
+        isTrajectoryCacheDirty = false;
+    }
+
+    private void EvaluateFairedControlPoints(float z, float side,
+        out Vector3 pL0, out Vector3 pL1, out Vector3 pLR, out Vector3 pL2, out Vector3 pL3,
+        out Vector3 pU0, out Vector3 pU1, out Vector3 pU2, out Vector3 pU3)
+    {
+        pL0 = pL1 = pLR = pL2 = pL3 = pU0 = pU1 = pU2 = pU3 = Vector3.zero;
+        RebuildTrajectoryCacheIfNeeded();
+
+        if (m_TrajectoryCache.zStations == null || m_TrajectoryCache.zStations.Length < 2) return;
+
+        int n = m_TrajectoryCache.zStations.Length;
+        TrajectoryCachePoint[] array = (side < 0f) ? m_TrajectoryCache.portPoints : m_TrajectoryCache.stbdPoints;
+
+        int idx = 0;
+        while (idx < n - 2 && m_TrajectoryCache.zStations[idx + 1] < z)
+        {
+            idx++;
+        }
+
+        float z0 = m_TrajectoryCache.zStations[idx];
+        float z1 = m_TrajectoryCache.zStations[idx + 1];
+        float t = (z1 > z0 + 0.0001f) ? Mathf.Clamp01((z - z0) / (z1 - z0)) : 0f;
+
+        int i0 = Mathf.Max(0, idx - 1);
+        int i1 = idx;
+        int i2 = idx + 1;
+        int i3 = Mathf.Min(n - 1, idx + 2);
+
+        pL0 = EvaluateCatmullRom3D(array[i0].pL0, array[i1].pL0, array[i2].pL0, array[i3].pL0, t);
+        pL1 = EvaluateCatmullRom3D(array[i0].pL1, array[i1].pL1, array[i2].pL1, array[i3].pL1, t);
+        pLR = EvaluateCatmullRom3D(array[i0].pLR, array[i1].pLR, array[i2].pLR, array[i3].pLR, t);
+        pL2 = EvaluateCatmullRom3D(array[i0].pL2, array[i1].pL2, array[i2].pL2, array[i3].pL2, t);
+        pL3 = EvaluateCatmullRom3D(array[i0].pL3, array[i1].pL3, array[i2].pL3, array[i3].pL3, t);
+        pU0 = pL3;
+        pU1 = EvaluateCatmullRom3D(array[i0].pU1, array[i1].pU1, array[i2].pU1, array[i3].pU1, t);
+        pU2 = EvaluateCatmullRom3D(array[i0].pU2, array[i1].pU2, array[i2].pU2, array[i3].pU2, t);
+        pU3 = EvaluateCatmullRom3D(array[i0].pU3, array[i1].pU3, array[i2].pU3, array[i3].pU3, t);
+    }
+
+    private Vector3 EvaluateCatmullRom3D(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+    {
+        float t2 = t * t;
+        float t3 = t2 * t;
+
+        return 0.5f * (
+            (2f * p1) +
+            (-p0 + p2) * t +
+            (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+            (-p0 + 3f * p1 - 3f * p2 + p3) * t3
+        );
     }
 
     public Vector3 GetAngledFramePointAtU(float angleDeg, float side, float u)
@@ -948,25 +1146,6 @@ public class FramingModel : MonoBehaviour
 
                 Color c = isMaster ? masterFrameColor : frameColor;
                 DrawFrameAtZ(z, c, isMaster);
-            }
-
-            // Bow Apex Pseudo Frame (Single line at the very bow apex from Keel to Top Timber sheer height)
-            if (showPseudoFrames || showFrames)
-            {
-                float fwdZ = sheerPlan.GetFwdMostZ();
-                float keelY = GetFrameBottomYAtZ(fwdZ);
-                Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-                if (GetFrameControlPointsAtZ(fwdZ, 1f, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-                {
-                    float topY = pU3.y > pL3.y + 0.001f ? pU3.y : sheerPlan.GetTopTimberYAtZ(fwdZ);
-                    Vector3 stbdKeelPt = new Vector3(hw, keelY, fwdZ);
-                    Vector3 stbdTopPt = new Vector3(hw, topY, fwdZ);
-                    Vector3 portKeelPt = new Vector3(-hw, keelY, fwdZ);
-                    Vector3 portTopPt = new Vector3(-hw, topY, fwdZ);
-
-                    DrawDashedLine(stbdKeelPt, stbdTopPt, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
-                    DrawDashedLine(portKeelPt, portTopPt, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
-                }
             }
 
 #if UNITY_EDITOR
@@ -1191,20 +1370,23 @@ public class FramingModel : MonoBehaviour
         float keelY = GetFrameBottomYAtZ(z);
         float hobY = pL3.y;
         float profileY = keelY;
-
         if (sheerPlan != null)
         {
             if (z > sheerPlan.cachedKeelBowPoint.z)
             {
                 profileY = sheerPlan.GetStemProfileYAtZ(z);
             }
-            else if (sheerPlan.showDeadwoodRake && z <= sheerPlan.cachedDeadwoodForePoint.z && z >= sheerPlan.cachedSternRisingEnd.z - 0.001f)
+            else if (z < sheerPlan.cachedSternRisingEnd.z - 0.001f)
             {
-                profileY = sheerPlan.GetDeadwoodYAtZ(z);
+                profileY = sheerPlan.GetRisingLineYAtZ(z);
+            }
+            else
+            {
+                profileY = sheerPlan.GetKeelYAtZ(z);
             }
         }
 
-        // BOTTOM CUTOFF HEIGHT (STEM PROFILE AT BOW, FASHION TIMBER AT STERN)
+        // BOTTOM CUTOFF HEIGHT (STEM PROFILE AT BOW, STERN PROFILE AT STERN)
         float yCutoff = keelY;
         if (!disableFrameCutoffs && sheerPlan != null)
         {
@@ -1215,16 +1397,12 @@ public class FramingModel : MonoBehaviour
                     yCutoff = profileY;
                 }
             }
-            else if (cutFramesAtFashionTimber)
+            else
             {
-                float ftMaxZ = (fashionTimberModel != null) ? fashionTimberModel.GetMaxZ() : sheerPlan.cachedTransomTopPoint.z;
-                if (z <= ftMaxZ + 0.001f)
+                float sternY = sheerPlan.GetSternProfileYAtZ(z);
+                if (sternY > keelY + 0.001f)
                 {
-                    float ftY = sheerPlan.GetSternProfileYAtZ(z);
-                    if (ftY > keelY)
-                    {
-                        yCutoff = ftY;
-                    }
+                    yCutoff = sternY;
                 }
             }
         }
@@ -1235,7 +1413,7 @@ public class FramingModel : MonoBehaviour
         if (yCutoff < hobY - 0.001f)
         {
             float lowerMinT = 0f;
-            if (yCutoff > profileY + 0.001f)
+            if (yCutoff > keelY + 0.001f)
             {
                 float minT = 0f;
                 float maxT = 1f;
@@ -1298,19 +1476,6 @@ public class FramingModel : MonoBehaviour
         if (upperMinT < upperTopCutoffT)
         {
             DrawCubicBezierCurve(pU0, pU1, pU2, pU3, color, 15, upperMinT, upperTopCutoffT);
-        }
-
-        // PSEUDO FRAME VERTICAL EXTENSION (SIMULATE EXTENDING DOWN TO KEEL LINE HEIGHT)
-        if (showPseudoFrames && pL0_curve.y > keelY + 0.001f)
-        {
-            Vector3 keelBaselinePt = new Vector3(side * hw, keelY, z);
-            DrawDashedLine(keelBaselinePt, pL0_curve, pseudoFrameColor, pseudoFrameDashLength, pseudoFrameGapLength);
-
-            if (showFrameControlPoints)
-            {
-                Gizmos.color = pseudoKeelPointColor;
-                Gizmos.DrawSphere(keelBaselinePt, controlPointRadius * 0.8f);
-            }
         }
 
         // CONTROL POINT VISUALIZATION (Keel Point, Connection Point, HOB Point)
@@ -1417,21 +1582,7 @@ public class FramingModel : MonoBehaviour
         // --- Stern Post Rake Line ---
         Vector3 sternPostTop = OffsetX(sheerPlan.cachedSternPostTopPoint, xOffset);
         
-        if (sheerPlan.showDeadwoodRake)
-        {
-            Vector3 dwFore = OffsetX(sheerPlan.cachedDeadwoodForePoint, xOffset);
-            Vector3 dwP1 = OffsetX(sheerPlan.cachedDeadwoodP1, xOffset);
-            Vector3 dwP2 = OffsetX(sheerPlan.cachedDeadwoodP2, xOffset);
-            Vector3 dwAft = OffsetX(sheerPlan.cachedDeadwoodAftPoint, xOffset);
-
-            Gizmos.DrawLine(keelStern, dwFore);
-            DrawCubicBezierCurve(dwFore, dwP1, dwP2, dwAft, color);
-            Gizmos.DrawLine(dwAft, sternPostTop);
-        }
-        else
-        {
-            Gizmos.DrawLine(keelStern, sternPostTop);
-        }
+        Gizmos.DrawLine(keelStern, sternPostTop);
 
         // --- Counter Line (if enabled) ---
         if (sheerPlan.enableCounter)
@@ -1475,29 +1626,6 @@ public class FramingModel : MonoBehaviour
             Vector3 currentPoint = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
             Gizmos.DrawLine(previousPoint, currentPoint);
             previousPoint = currentPoint;
-        }
-    }
-
-    private void DrawDashedLine(Vector3 start, Vector3 end, Color color, float dashLength = 0.1f, float gapLength = 0.05f)
-    {
-        Gizmos.color = color;
-        Vector3 dir = end - start;
-        float dist = dir.magnitude;
-        if (dist < 0.0001f) return;
-        Vector3 nDir = dir / dist;
-
-        dashLength = Mathf.Max(0.01f, dashLength);
-        gapLength = Mathf.Max(0.005f, gapLength);
-        float step = dashLength + gapLength;
-
-        float current = 0f;
-        while (current < dist)
-        {
-            float drawLen = Mathf.Min(dashLength, dist - current);
-            Vector3 p1 = start + nDir * current;
-            Vector3 p2 = p1 + nDir * drawLen;
-            Gizmos.DrawLine(p1, p2);
-            current += step;
         }
     }
 

@@ -121,6 +121,7 @@ public class BodyPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedU1;
     [HideInInspector] public Vector3 cachedU2;
     [HideInInspector] public Vector3 cachedU3;
+    [HideInInspector] public int changeVersion = 0;
 
     private bool isUpdatingCurves = false;
 
@@ -232,6 +233,7 @@ public class BodyPlan : MonoBehaviour
             u2MaxDist = Mathf.Min(distToBot, distToSide);
         }
         cachedU2 = cachedU3 + new Vector3(u2DirX, u2DirY, 0) * (u2MaxDist * topTimberArmLength);
+        changeVersion++;
         }
         finally
         {
@@ -278,6 +280,14 @@ public class BodyPlan : MonoBehaviour
             float localT = (t - 0.5f) * 2f;
             return CalculateQuadraticBezierPoint(localT, cachedLR, cachedL2, cachedL3);
         }
+    }
+
+    /// <summary>
+    /// Evaluates the upper mould at parameter t [0, 1].
+    /// </summary>
+    public Vector3 EvaluateUpperMouldAtT(float t)
+    {
+        return CalculateCubicBezierPoint(t, cachedU0, cachedU1, cachedU2, cachedU3);
     }
 
     public float GetUpperMouldXAtY(float targetY)

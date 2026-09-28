@@ -14,10 +14,10 @@ public class FashionTimberModel : MonoBehaviour
     [Tooltip("Show the 3D Fashion Timber lines along Port and Starboard sides.")]
     public bool showFashionTimbers = true;
 
-    [Tooltip("Show Lower Mould segment (Deadwood/Stern Post to HoB).")]
+    [Tooltip("Show Lower Mould segment (Keel to HoB line).")]
     public bool showLowerMould = true;
 
-    [Tooltip("Show Upper Mould segment (HoB to Transom Top).")]
+    [Tooltip("Show Upper Mould segment (HoB line to Transom Top).")]
     public bool showUpperMould = true;
 
     public Color fashionColor = Color.magenta;
@@ -92,9 +92,7 @@ public class FashionTimberModel : MonoBehaviour
 
     public void DrawFashionTimbers()
     {
-        Vector3 lowerBound = (sheerPlan.showDeadwoodRake)
-            ? sheerPlan.cachedDeadwoodAftPoint
-            : sheerPlan.cachedKeelSternPoint;
+        Vector3 lowerBound = sheerPlan.cachedKeelSternPoint;
 
         Vector3 risingEnd = lowerBound;
         Vector3 hobIntersect = sheerPlan.cachedHobSternIntersect;
@@ -178,7 +176,7 @@ public class FashionTimberModel : MonoBehaviour
         float hobBreadth = breadthPlan.GetTheoreticalBreadthXAtZ(originalZ);
         float xTop = breadthPlan.GetTopTimberXAtZ(originalZ);
 
-        float maxSheerYAtZ = sheerPlan.GetBaseDeckYAtZ(originalZ);
+        float maxSheerYAtZ = sheerPlan.GetMainSheerYAtZ(originalZ);
         if (sheerPlan.upperDecks != null && sheerPlan.upperDecks.Count > 0)
         {
             maxSheerYAtZ += sheerPlan.GetMaxDeckHeight() + sheerPlan.GetGlobalSheerOffsetAtZ(originalZ);
@@ -321,17 +319,19 @@ public class FashionTimberModel : MonoBehaviour
             Vector3 pLR = Vector3.Lerp(pL1, pL2, bodyPlan.GetConnectionPointPositionAtZ(originalZ));
 
             float profileY = keelY;
-            float sternRisingZ = (sheerPlan != null) ? sheerPlan.cachedSternRisingEnd.z : 0f;
-
             if (sheerPlan != null)
             {
                 if (originalZ > sheerPlan.cachedKeelBowPoint.z)
                 {
                     profileY = sheerPlan.GetStemProfileYAtZ(originalZ);
                 }
-                else if (originalZ < sternRisingZ - 0.001f && sheerPlan.showDeadwoodRake && originalZ <= sheerPlan.cachedDeadwoodForePoint.z && originalZ >= sheerPlan.cachedSternPostTopPoint.z)
+                else if (originalZ < sheerPlan.cachedSternRisingEnd.z - 0.001f)
                 {
-                    profileY = sheerPlan.GetDeadwoodYAtZ(originalZ);
+                    profileY = sheerPlan.GetRisingLineYAtZ(originalZ);
+                }
+                else
+                {
+                    profileY = sheerPlan.GetKeelYAtZ(originalZ);
                 }
             }
 
@@ -382,9 +382,7 @@ public class FashionTimberModel : MonoBehaviour
         List<Vector3> pts = new List<Vector3>();
         if (sheerPlan == null) return pts;
 
-        Vector3 lowerBound = (sheerPlan.showDeadwoodRake)
-            ? sheerPlan.cachedDeadwoodAftPoint
-            : sheerPlan.cachedKeelSternPoint;
+        Vector3 lowerBound = sheerPlan.cachedKeelSternPoint;
 
         Vector3 risingEnd = lowerBound;
         float startZ = risingEnd.z;

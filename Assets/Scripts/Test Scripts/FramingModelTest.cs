@@ -376,19 +376,26 @@ public class FramingModelTest : MonoBehaviour
         return EvaluateFramePointFromControlPoints(u, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
     }
 
-    public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
+    public Vector3 GetTransverseFramePointAtYFromControlPoints(
+        Vector3 pL0, Vector3 pL1, Vector3 pLR, Vector3 pL2, Vector3 pL3,
+        Vector3 pU0, Vector3 pU1, Vector3 pU2, Vector3 pU3,
+        float targetY)
     {
-        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
-        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
-            return Vector3.zero;
-
         float minU = 0f;
         float maxU = 1.0f;
 
         Vector3 minPt = EvaluateFramePointFromControlPoints(minU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
         Vector3 maxPt = EvaluateFramePointFromControlPoints(maxU, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
 
-        if (targetY <= minPt.y) return minPt;
+        if (targetY < minPt.y - 0.0005f)
+        {
+            float keelY = GetFrameBottomYAtZ(minPt.z);
+            if (targetY >= keelY - 0.05f)
+            {
+                return new Vector3(minPt.x, targetY, minPt.z);
+            }
+            return minPt;
+        }
         if (targetY >= maxPt.y) return maxPt;
 
         for (int i = 0; i < 10; i++)
@@ -400,6 +407,15 @@ public class FramingModelTest : MonoBehaviour
         }
 
         return EvaluateFramePointFromControlPoints((minU + maxU) * 0.5f, pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3);
+    }
+
+    public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
+    {
+        Vector3 pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3;
+        if (!GetFrameControlPointsAtZ(z, side, out pL0, out pL1, out pLR, out pL2, out pL3, out pU0, out pU1, out pU2, out pU3))
+            return Vector3.zero;
+
+        return GetTransverseFramePointAtYFromControlPoints(pL0, pL1, pLR, pL2, pL3, pU0, pU1, pU2, pU3, targetY);
     }
 
     public List<Vector3> GetAllTransverseFramePointsAtX(float z, float side, float targetX)
@@ -544,7 +560,7 @@ public class FramingModelTest : MonoBehaviour
         pL0_curve = backboneKeelPoint;
 
         // --- CONNECTION POINT (pLR) FOLLOWS FLOOR BREADTH LINE & RISING LINE ---
-        float floorX = breadthPlan.GetFloorLineXAtZ(z);
+        float floorX = Mathf.Min(breadthPlan.GetFloorLineXAtZ(z), hobBreadth - 0.001f);
         float risingY = sheerPlan.GetRisingLineYAtZ(z);
 
         float pLR_Y = Mathf.Max(risingY, profileY);
