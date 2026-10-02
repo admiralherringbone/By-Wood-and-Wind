@@ -7,47 +7,72 @@ using UnityEditor;
 [ExecuteInEditMode]
 public class BodyPlan : MonoBehaviour
 {
-    [Tooltip("Reference to the ModularSheerPlan to get hull heights.")]
+    [Tooltip("Reference to the SheerPlan to get hull heights.")]
     public SheerPlan sheerPlan;
 
-    [Tooltip("Reference to the ModularBreadthPlan to get max beam.")]
+    [Tooltip("Reference to the BreadthPlan to get max beam.")]
     public BreadthPlan breadthPlan;
+
+    [Header("Section Architecture & Fairness")]
+    [Tooltip("Select the mathematical curve formulation for evaluating hull section sweeps.")]
+    public SectionCurveMode curveMode = SectionCurveMode.FairSplineBatten;
+
+    [Tooltip("Influence magnitude / flexibility of the spline curve between nodes (0.5 = stiff/flat, 1.0 = natural wooden batten, 1.5 = full sweeping hull curves).")]
+    [Range(0.5f, 2.0f)] public float splineTension = 1.0f;
 
     [Header("Gizmo Settings")]
     public bool showLabels = true;
+    [Tooltip("Show dashed straight lines connecting the section nodes (p0 -> p1 -> p2 -> p3 -> p4) to visualize the pure polygonal skeleton.")]
+    public bool showPolygonSkeleton = true;
+    [Tooltip("Show the tangent control arms for the section curve in Scene view.")]
+    public bool showControlArms = true;
+    [Tooltip("Length scale of the rendered tangent control arms.")]
+    [Range(0.1f, 2f)] public float controlArmLengthScale = 0.6f;
+    [Tooltip("Render all alternative curve modes simultaneously in translucent colors for side-by-side visual comparison.")]
+    public bool showComparisonOverlay = false;
 
-    [Header("Lower Curve Controls")]
-    [Tooltip("Angle of the Keel control arm (0 = Horizontal, 90 = Vertical).")]
-    [Range(0f, 90f)]
-    public float keelArmAngle = 0f;
+    private static Dictionary<SectionCurveMode, ISectionCurveEvaluator> evaluators;
 
-    [Tooltip("Length of the Keel control arm as a percentage (0 to 1) of the bounding box intersection.")]
-    [Range(0f, 1f)]
-    public float keelArmLength = 1f;
-
-    [Tooltip("Length of the HoB downward control arm as a percentage (0 to 1) of the total HoB height.")]
-    [Range(0f, 1f)]
-    public float hobLowerArmLength = 0.5f;
-
-    [Header("Connection Point")]
-    [Tooltip("Position of the Connection Point at Master Frame along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
-    [Range(0f, 1f)]
-    public float connectionPointPosition = 0.5f;
-
-    [Tooltip("Position of the Connection Point at the Bow End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
-    [Range(0f, 1f)]
-    public float bowConnectionPointPosition = 0.5f;
-
-    [Tooltip("Position of the Connection Point at the Stern End along the line from Keel Control to HoB Control (0 = at Keel Control, 1 = at HoB Control).")]
-    [Range(0f, 1f)]
-    public float sternConnectionPointPosition = 0.5f;
-
-    [System.Obsolete("Use connectionPointPosition instead.")]
-    public float risingLinePosition
+    private static void EnsureEvaluatorsInitialized()
     {
-        get => connectionPointPosition;
-        set => connectionPointPosition = value;
+        if (evaluators == null || evaluators.Count == 0)
+        {
+            evaluators = new Dictionary<SectionCurveMode, ISectionCurveEvaluator>
+            {
+                { SectionCurveMode.FairSplineBatten, new FairSplineBattenEvaluator() },
+                { SectionCurveMode.BiArcTangentSweeps, new BiArcTangentSweepEvaluator() },
+                { SectionCurveMode.AkimaSpline, new AkimaSplineEvaluator() },
+                { SectionCurveMode.NurbsBSpline, new NurbsSectionEvaluator() },
+                { SectionCurveMode.QuarticBezier, new QuarticBezierEvaluator() }
+            };
+        }
     }
+
+    public static ISectionCurveEvaluator GetEvaluator(SectionCurveMode mode)
+    {
+        EnsureEvaluatorsInitialized();
+        if (evaluators.TryGetValue(mode, out var eval)) return eval;
+        return evaluators[SectionCurveMode.FairSplineBatten];
+    }
+
+    [Header("Keel & Master Dimensions")]
+    [Tooltip("The width of the physical Keel (P/S distance). The mould will start at keelWidth / 2.")]
+    public float keelWidth = 0.5f;
+
+    [Header("Floor Hollow (Keel to Floor Arc)")]
+    [Tooltip("Curvature of the Floor Hollow between Keel (p0) and Floor (p1). (0 = Straight deadrise, 1 = Full Bi-Arc hollow curve).")]
+    [Range(0f, 1f)] public float floorHollow = 0.5f;
+
+    [Header("Backward Compatibility Settings")]
+    [Tooltip("Length of the HoB downward control arm as a percentage (0 to 1) of the total HoB height.")]
+    [Range(0f, 1f)] public float hobLowerArmLength = 0.5f;
+    [Range(0f, 1f)] public float connectionPointPosition = 0.5f;
+    [Range(0f, 1f)] public float bowConnectionPointPosition = 0.5f;
+    [Range(0f, 1f)] public float sternConnectionPointPosition = 0.5f;
+    [HideInInspector] public bool useQuarticBezier = false;
+    [HideInInspector] public bool useQuinticBezier = false;
+    [HideInInspector] public float innerKeelPosition = 0.5f;
+    [HideInInspector] public float middleControlPosition = 0.5f;
 
     public float GetConnectionPointPositionAtZ(float z)
     {
@@ -69,54 +94,16 @@ public class BodyPlan : MonoBehaviour
         }
     }
 
-    [Header("Upper Mould Controls")]
-    [Tooltip("The maximum half-width of the ship at the Top Timber line as a percentage of the Primary Max Beam. 1.0 = Straight. < 1.0 = Tumblehome. > 1.0 = Flare (Max 2.0 = 50% further out).")]
-    [Range(0f, 2f)]
-    public float flareTumblehomePercentage = 1f;
+    [Header("Visualization Settings")]
+    public Color starboardColor = Color.green;
+    public Color portColor = Color.red;
+    public Color nodeColor = Color.cyan;
 
-    [Tooltip("Angle of the HoB Upper control arm. 0 = Straight Up. Positive = Flare Out, Negative = Tumblehome In.")]
-    [Range(-90f, 90f)]
-    public float upperHobArmAngle = 0f;
-
-    [Tooltip("Length of the HoB Upper control arm as a percentage (0 to 1) of the upper bounding box height.")]
-    [Range(0f, 1f)]
-    public float upperHobArmLength = 0.5f;
-
-    [Tooltip("Angle of the Top Timber control arm. 0 = Straight Down. Positive = Flare Out, Negative = Tumblehome In.")]
-    [Range(-90f, 90f)]
-    public float topTimberArmAngle = 0f;
-
-    [Tooltip("Length of the Top Timber control arm as a percentage (0 to 1) of the upper bounding box height.")]
-    [Range(0f, 1f)]
-    public float topTimberArmLength = 0.5f;
-
-    [Header("Keel & Stem Width")]
-    [Tooltip("The width of the physical Keel (P/S distance). The mould will start at keelWidth / 2.")]
-    public float keelWidth = 0.5f;
-
-    [Header("Inner Frame")]
-    [Tooltip("Perpendicular thickness of the inner frame spline at the Keel.")]
-    public float baseFrameThickness = 0.3f;
-    [Tooltip("Perpendicular thickness of the inner frame spline at the Top Timber.")]
-    public float topFrameThickness = 0.15f;
-    public bool showInnerFrame = true;
-    public Color innerFrameColor = Color.magenta;
-
-
-    // --- BACKWARD COMPATIBILITY FIELDS (for legacy reference scripts) ---
-    [HideInInspector] public bool useQuarticBezier = false;
-    [HideInInspector] public bool useQuinticBezier = false;
-    [HideInInspector] public float innerKeelPosition = 0.5f;
-    [HideInInspector] public float middleControlPosition = 0.5f;
-
-
-    // --- CACHED POINTS ---
     [HideInInspector] public Vector3 cachedL0;
     [HideInInspector] public Vector3 cachedL1;
     [HideInInspector] public Vector3 cachedLR;
     [HideInInspector] public Vector3 cachedL2;
     [HideInInspector] public Vector3 cachedL3;
-    
     [HideInInspector] public Vector3 cachedU0;
     [HideInInspector] public Vector3 cachedU1;
     [HideInInspector] public Vector3 cachedU2;
@@ -133,107 +120,28 @@ public class BodyPlan : MonoBehaviour
     public virtual void UpdateCachedCurves()
     {
         if (isUpdatingCurves) return;
+        FindReferences();
         if (sheerPlan == null || breadthPlan == null) return;
 
         isUpdatingCurves = true;
         try
         {
-            // Push the Flare/Tumblehome value to the Breadth Plan BEFORE it calculates its curves
-            breadthPlan.topTimberMaxBeam = breadthPlan.maxBeam * flareTumblehomePercentage;
-            
-            // Ensure dependent plans are updated
             sheerPlan.UpdateCachedValues();
             breadthPlan.UpdateCachedCurves();
 
-        float keelY = sheerPlan.GetKeelYAtZ(0f);
-        float hobY = sheerPlan.cachedHobMidshipPoint.y;
-        float maxBeam = breadthPlan.maxBeam;
-        float boxHeight = hobY - keelY;
+            SectionNodes master = GetSectionNodesAtZ(0f, 1f);
+            cachedL0 = master.p0;
+            cachedL1 = master.p1;
+            cachedLR = master.p2;
+            cachedL2 = master.p2;
+            cachedL3 = master.p3;
 
-        float keelAngleRad = keelArmAngle * Mathf.Deg2Rad;
-        float keelDirX = Mathf.Cos(keelAngleRad);
-        float keelDirY = Mathf.Sin(keelAngleRad);
+            cachedU0 = master.p3;
+            cachedU1 = master.p3;
+            cachedU2 = master.p4;
+            cachedU3 = master.p4;
 
-        float keelHalfWidth = keelWidth / 2f;
-        float availableBeam = maxBeam - keelHalfWidth;
-
-        float keelMaxDist;
-        if (keelArmAngle >= 89.999f) keelMaxDist = boxHeight;
-        else if (keelArmAngle <= 0.001f) keelMaxDist = availableBeam;
-        else
-        {
-            float distToRight = availableBeam / keelDirX;
-            float distToTop = boxHeight / keelDirY;
-            keelMaxDist = Mathf.Min(distToRight, distToTop);
-        }
-
-        // Cache Lower Mould points
-        // Segment 1: Keel (L0) → Keel Control (L1) → Connection Point (LR)
-        cachedL0 = new Vector3(keelHalfWidth, keelY, 0);
-        cachedL1 = cachedL0 + new Vector3(keelDirX, keelDirY, 0) * (keelMaxDist * keelArmLength);
-
-        // Segment 2: Connection Point (LR) → HoB Control (L2) → HoB (L3)
-        float hobDrop = boxHeight * hobLowerArmLength;
-        cachedL3 = new Vector3(maxBeam, hobY, 0);
-        cachedL2 = new Vector3(maxBeam, hobY - hobDrop, 0);
-
-        // Connection Point — constrained to lie on the line from L1 to L2
-        // This guarantees G1 tangent continuity at the join between the two quadratic segments
-        cachedLR = Vector3.Lerp(cachedL1, cachedL2, connectionPointPosition);
-
-        // Re-update SheerPlan cached values now that cachedLR is finalized
-        sheerPlan.UpdateCachedValues();
-
-        // UPPER MOULD
-        // Find the absolute highest part of the hull for the master Upper Mould
-        float topTimberY = sheerPlan.cachedBaseDeckMidshipPoint.y;
-        if (sheerPlan.upperDecks != null && sheerPlan.upperDecks.Count > 0)
-        {
-            topTimberY += sheerPlan.GetMaxDeckHeight();
-        }
-        else
-        {
-            topTimberY = sheerPlan.cachedTopTimberMidshipPoint.y;
-        }
-
-        float topTimberMaxBeam = breadthPlan.topTimberMaxBeam;
-        float upperBoxHeight = topTimberY - hobY;
-
-        cachedU0 = cachedL3; // Starts at HoB
-        cachedU3 = new Vector3(topTimberMaxBeam, topTimberY, 0);
-
-        // U1 (HoB Upper Arm)
-        float u1AngleRad = upperHobArmAngle * Mathf.Deg2Rad;
-        float u1DirX = Mathf.Sin(u1AngleRad);
-        float u1DirY = Mathf.Cos(u1AngleRad);
-        
-        float u1MaxDist;
-        if (Mathf.Abs(u1DirX) < 0.0001f) u1MaxDist = upperBoxHeight;
-        else if (Mathf.Abs(u1DirY) < 0.0001f) u1MaxDist = maxBeam; // Arbitrary wide limit
-        else
-        {
-            float distToTop = upperBoxHeight / Mathf.Abs(u1DirY);
-            float distToSide = maxBeam / Mathf.Abs(u1DirX);
-            u1MaxDist = Mathf.Min(distToTop, distToSide);
-        }
-        cachedU1 = cachedU0 + new Vector3(u1DirX, u1DirY, 0) * (u1MaxDist * upperHobArmLength);
-
-        // U2 (Top Timber Downward Arm)
-        float u2AngleRad = topTimberArmAngle * Mathf.Deg2Rad;
-        float u2DirX = Mathf.Sin(u2AngleRad);
-        float u2DirY = -Mathf.Cos(u2AngleRad); // Points DOWN
-        
-        float u2MaxDist;
-        if (Mathf.Abs(u2DirX) < 0.0001f) u2MaxDist = upperBoxHeight;
-        else if (Mathf.Abs(u2DirY) < 0.0001f) u2MaxDist = topTimberMaxBeam;
-        else
-        {
-            float distToBot = upperBoxHeight / Mathf.Abs(u2DirY);
-            float distToSide = topTimberMaxBeam / Mathf.Abs(u2DirX);
-            u2MaxDist = Mathf.Min(distToBot, distToSide);
-        }
-        cachedU2 = cachedU3 + new Vector3(u2DirX, u2DirY, 0) * (u2MaxDist * topTimberArmLength);
-        changeVersion++;
+            changeVersion++;
         }
         finally
         {
@@ -241,344 +149,545 @@ public class BodyPlan : MonoBehaviour
         }
     }
 
-    // --- MATHEMATICAL EVALUATION METHODS ---
-
-    public float GetLowerMouldXAtY(float targetY)
+    public void FindReferences()
     {
-        float t = GetLowerMouldTAtY(targetY);
-        return EvaluateLowerMouldAtT(t).x;
-    }
+        if (sheerPlan == null) sheerPlan = GetComponentInParent<SheerPlan>();
+        if (sheerPlan == null) sheerPlan = FindFirstObjectByType<SheerPlan>();
 
-    public float GetLowerMouldTAtY(float targetY)
-    {
-        float min = 0f;
-        float max = 1f;
-        for (int i = 0; i < 20; i++)
-        {
-            float mid = (min + max) / 2f;
-            float y = EvaluateLowerMouldAtT(mid).y;
-
-            if (y < targetY) min = mid;
-            else max = mid;
-        }
-        return (min + max) / 2f;
+        if (breadthPlan == null) breadthPlan = GetComponentInParent<BreadthPlan>();
+        if (breadthPlan == null) breadthPlan = FindFirstObjectByType<BreadthPlan>();
     }
 
     /// <summary>
-    /// Evaluates the lower mould at a unified t parameter [0, 1] spanning both quadratic segments.
-    /// t [0, 0.5] = Segment 1 (Keel → Connection Point), t [0.5, 1] = Segment 2 (Connection Point → HoB).
+    /// Samples the 5 paired 3D structural nodes at station Z for specified side (+1 Starboard, -1 Port).
     /// </summary>
-    public Vector3 EvaluateLowerMouldAtT(float t)
+    public SectionNodes GetSectionNodesAtZ(float z, float side)
     {
-        if (t <= 0.5f)
+        FindReferences();
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        float hw = keelWidth / 2f;
+
+        float keelY = (sheerPlan != null) ? sheerPlan.GetKeelYAtZ(z) : 0f;
+        float floorY = (sheerPlan != null) ? sheerPlan.GetRisingLineYAtZ(z) : 0.5f;
+        float floorX = (breadthPlan != null) ? breadthPlan.GetFloorLineXAtZ(z) : (hw + 1f);
+
+        float bilgeY = (sheerPlan != null) ? sheerPlan.GetBilgeYAtZ(z) : (floorY + 1f);
+        float bilgeX = (breadthPlan != null) ? breadthPlan.GetBilgeXAtZ(z) : (floorX + 1f);
+
+        float hobY = (sheerPlan != null) ? sheerPlan.GetTheoreticalHobYAtZ(z) : (bilgeY + 1f);
+        float hobX = (breadthPlan != null) ? breadthPlan.GetTheoreticalBreadthXAtZ(z) : (bilgeX + 1f);
+
+        float sheerY = (sheerPlan != null) ? sheerPlan.GetTopLineYAtZ(z) : (hobY + 1f);
+        float sheerX = (breadthPlan != null) ? breadthPlan.GetTopTimberXAtZ(z) : hobX;
+
+        // Floor point (p1) X position directly follows the Floor line from BreadthPlan (clamped to keel half-width hw)
+        floorX = Mathf.Max(floorX, hw);
+
+        // Restriction 1: Bilge point (p2) can never go inward past the line segment p1 -> p3
+        float dy = hobY - floorY;
+        if (Mathf.Abs(dy) > 0.0001f)
         {
-            float localT = t * 2f;
-            return CalculateQuadraticBezierPoint(localT, cachedL0, cachedL1, cachedLR);
+            float tY = Mathf.Clamp01((bilgeY - floorY) / dy);
+            float minBilgeX = Mathf.Lerp(floorX, hobX, tY);
+            bilgeX = Mathf.Max(bilgeX, minBilgeX);
+        }
+
+        // Restriction 3: Bilge point (p2) can never go outward past HOB vertical boundary (p3)
+        Vector3 checkP1 = new Vector3(floorX, floorY, z);
+        Vector3 checkP3 = new Vector3(hobX, hobY, z);
+        Vector3 checkP2 = new Vector3(bilgeX, bilgeY, z);
+        float d13 = Vector3.Distance(checkP1, checkP3);
+        float d23 = Vector3.Distance(checkP2, checkP3);
+        if (d13 > 0.0001f)
+        {
+            float tangentOffset = (hobX - floorX) / d13 * (d23 / 3f);
+            float maxBilgeX = hobX - tangentOffset;
+            bilgeX = Mathf.Min(bilgeX, maxBilgeX);
+        }
+
+        // Restriction 4: Non-sagging Bilge Y height restriction (bilgeY must not dip below floorY)
+        float d13_y = Vector3.Distance(checkP1, checkP3);
+        float d12_y = Vector3.Distance(checkP1, checkP2);
+        if (d13_y > 0.0001f && (hobY - floorY) > 0.0001f)
+        {
+            float minBilgeY = floorY + (hobY - floorY) * (d12_y / (3f * d13_y));
+            bilgeY = Mathf.Max(bilgeY, minBilgeY);
+        }
+
+        // Restriction 5: Tumblehome / Topsides boundary restriction (sheerX / p4 must not narrow by more than 40% of HOB max breadth p3)
+        float minTumblehomeX = hobX * 0.60f;
+        sheerX = Mathf.Max(sheerX, minTumblehomeX);
+
+        SectionNodes nodes = new SectionNodes();
+        nodes.p0 = new Vector3(sideSign * hw, keelY, z);
+        nodes.p1 = new Vector3(sideSign * floorX, floorY, z);
+        nodes.p2 = new Vector3(sideSign * bilgeX, bilgeY, z);
+        nodes.p3 = new Vector3(sideSign * hobX, hobY, z);
+        nodes.p4 = new Vector3(sideSign * sheerX, sheerY, z);
+        return nodes;
+    }
+
+    /// <summary>
+    /// Evaluates a 3D section point at parameter u [0, 1] across the 5 nodes using G1 Bi-Arc Tangent Sweeps.
+    /// u [0.00, 0.25] = Keel Flat (p0 -> p1)
+    /// u [0.25, 0.50] = Futtock Sweep Arc (p1 -> p2)
+    /// u [0.50, 0.75] = Reconciling Sweep Arc (p2 -> p3)
+    /// u [0.75, 1.00] = Top Timber Arc (p3 -> p4)
+    /// </summary>
+    /// <summary>
+    /// Evaluates a 3D section point at parameter u [0, 1] across the 5 nodes using the active Curve Mode evaluator.
+    /// </summary>
+    public Vector3 EvaluateBodySectionAtU(float u, SectionNodes nodes)
+    {
+        Vector3 pt = GetEvaluator(curveMode).EvaluateSectionPoint(u, nodes, floorHollow, splineTension);
+
+        // Restriction 2: Section curve points sweeping toward the Keel (p0) can never cross inward past the vertical line extending upward from the Keel point (p0)
+        float sideSign = Mathf.Sign(nodes.p3.x);
+        float keelX = nodes.p0.x;
+        if (sideSign > 0f)
+        {
+            pt.x = Mathf.Max(keelX, pt.x);
+        }
+        else if (sideSign < 0f)
+        {
+            pt.x = Mathf.Min(keelX, pt.x);
+        }
+        return pt;
+    }
+
+    /// <summary>
+    /// Evaluates 3D section point at station Z for parameter u [0, 1] on given side.
+    /// </summary>
+    public Vector3 EvaluateBodySectionAtZ(float z, float side, float u)
+    {
+        SectionNodes nodes = GetSectionNodesAtZ(z, side);
+        return EvaluateBodySectionAtU(u, nodes);
+    }
+
+    private Vector3 EvaluateBiArcSegment(Vector3 pA, Vector3 tA, Vector3 pB, Vector3 tB, float t)
+    {
+        t = Mathf.Clamp01(t);
+        Vector3 d = pB - pA;
+        float dist = d.magnitude;
+        if (dist <= 0.0001f) return pA;
+
+        Vector3 control;
+        float denom = tA.x * tB.y - tA.y * tB.x;
+        if (Mathf.Abs(denom) > 0.0001f)
+        {
+            float s = ((pB.x - pA.x) * tB.y - (pB.y - pA.y) * tB.x) / denom;
+            s = Mathf.Clamp(s, 0.01f, dist * 1.5f);
+            control = pA + tA * s;
         }
         else
         {
-            float localT = (t - 0.5f) * 2f;
-            return CalculateQuadraticBezierPoint(localT, cachedLR, cachedL2, cachedL3);
+            control = (pA + pB) * 0.5f;
         }
+
+        float u = 1f - t;
+        return (u * u * pA) + (2f * u * t * control) + (t * t * pB);
     }
-
-    /// <summary>
-    /// Evaluates the upper mould at parameter t [0, 1].
-    /// </summary>
-    public Vector3 EvaluateUpperMouldAtT(float t)
-    {
-        return CalculateCubicBezierPoint(t, cachedU0, cachedU1, cachedU2, cachedU3);
-    }
-
-    public float GetUpperMouldXAtY(float targetY)
-    {
-        float t = GetUpperMouldTAtY(targetY);
-        return CalculateCubicBezierPoint(t, cachedU0, cachedU1, cachedU2, cachedU3).x;
-    }
-
-    public float GetUpperMouldTAtY(float targetY)
-    {
-        float min = 0f;
-        float max = 1f;
-        for (int i = 0; i < 20; i++)
-        {
-            float mid = (min + max) / 2f;
-            float y = CalculateCubicBezierPoint(mid, cachedU0, cachedU1, cachedU2, cachedU3).y;
-            if (y < targetY) min = mid;
-            else max = mid;
-        }
-        return (min + max) / 2f;
-    }
-
-    // --- UTILITIES ---
-
-    private Vector3 CalculateQuadraticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2)
-    {
-        float u = 1 - t;
-        return (u * u * p0) + (2 * u * t * p1) + (t * t * p2);
-    }
-
-    private Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
-    {
-        float u = 1 - t;
-        float tt = t * t;
-        float uu = u * u;
-        float uuu = uu * u;
-        float ttt = tt * t;
-
-        Vector3 p = uuu * p0;
-        p += 3 * uu * t * p1;
-        p += 3 * u * tt * p2;
-        p += ttt * p3;
-        return p;
-    }
-
-    // --- GIZMOS ---
 
     private void OnDrawGizmos()
     {
+        FindReferences();
         if (sheerPlan == null || breadthPlan == null) return;
         UpdateCachedCurves();
 
-        // Draw Keel Cross-Section Block
-        float keelHalfWidth = keelWidth / 2f;
+        // Keel Block
+        float hw = keelWidth / 2f;
         float keelTopY = sheerPlan.GetKeelYAtZ(0f);
         float keelThickness = sheerPlan.keelThickness;
         float keelBottomY = keelTopY - keelThickness;
 
-        Gizmos.color = new Color(0.5f, 0.25f, 0f); // Brown
-        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
-        Gizmos.DrawLine(new Vector3(keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelBottomY, 0));
-        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelBottomY, 0), new Vector3(-keelHalfWidth, keelBottomY, 0));
-        Gizmos.DrawLine(new Vector3(-keelHalfWidth, keelTopY, 0), new Vector3(keelHalfWidth, keelTopY, 0));
+        Gizmos.color = new Color(0.5f, 0.25f, 0f);
+        Gizmos.DrawLine(new Vector3(-hw, keelTopY, 0), new Vector3(-hw, keelBottomY, 0));
+        Gizmos.DrawLine(new Vector3(hw, keelTopY, 0), new Vector3(hw, keelBottomY, 0));
+        Gizmos.DrawLine(new Vector3(-hw, keelBottomY, 0), new Vector3(hw, keelBottomY, 0));
+        Gizmos.DrawLine(new Vector3(-hw, keelTopY, 0), new Vector3(hw, keelTopY, 0));
 
-        // Draw Starboard (Green)
-        DrawMirroredMould(1f, Color.green);
-        if (showInnerFrame) DrawInnerMirroredMould(1f, innerFrameColor);
-
-        // Draw Port (Red)
-        DrawMirroredMould(-1f, Color.red);
-        if (showInnerFrame) DrawInnerMirroredMould(-1f, innerFrameColor);
+        // Draw Starboard (+1) and Port (-1) Master Frame Section
+        DrawMasterSectionHalf(1f, starboardColor);
+        DrawMasterSectionHalf(-1f, portColor);
     }
 
-    protected void DrawMirroredMould(float flipX, Color curveColor)
+    public Color GetCurveModeColor(SectionCurveMode mode)
     {
-        // Lower Points
-        Vector3 m0 = new Vector3(cachedL0.x * flipX, cachedL0.y, cachedL0.z);
-        Vector3 m1 = new Vector3(cachedL1.x * flipX, cachedL1.y, cachedL1.z);
-        Vector3 mR = new Vector3(cachedLR.x * flipX, cachedLR.y, cachedLR.z);
-        Vector3 m2 = new Vector3(cachedL2.x * flipX, cachedL2.y, cachedL2.z);
-        Vector3 m3 = new Vector3(cachedL3.x * flipX, cachedL3.y, cachedL3.z);
+        switch (mode)
+        {
+            case SectionCurveMode.FairSplineBatten: return Color.green;
+            case SectionCurveMode.BiArcTangentSweeps: return Color.red;
+            case SectionCurveMode.AkimaSpline: return Color.yellow;
+            case SectionCurveMode.NurbsBSpline: return Color.cyan;
+            case SectionCurveMode.QuarticBezier: return Color.magenta;
+            default: return Color.white;
+        }
+    }
 
-        // Upper Points
-        Vector3 u0 = new Vector3(cachedU0.x * flipX, cachedU0.y, cachedU0.z);
-        Vector3 u1 = new Vector3(cachedU1.x * flipX, cachedU1.y, cachedU1.z);
-        Vector3 u2 = new Vector3(cachedU2.x * flipX, cachedU2.y, cachedU2.z);
-        Vector3 u3 = new Vector3(cachedU3.x * flipX, cachedU3.y, cachedU3.z);
+    private void DrawMasterSectionHalf(float sideSign, Color color)
+    {
+        SectionNodes nodes = GetSectionNodesAtZ(0f, sideSign);
+        const int steps = 60;
 
-        // Draw Lower Curves (Two Quadratic Segments)
-        DrawQuadraticBezierCurve(m0, m1, mR, curveColor, 20);
-        DrawQuadraticBezierCurve(mR, m2, m3, curveColor, 20);
+        // Render Comparison Overlay Curves (if enabled)
+        if (showComparisonOverlay)
+        {
+            SectionCurveMode[] modes = (SectionCurveMode[])System.Enum.GetValues(typeof(SectionCurveMode));
+            foreach (var mode in modes)
+            {
+                if (mode == curveMode) continue;
+                ISectionCurveEvaluator altEval = GetEvaluator(mode);
+                Color overlayColor = GetCurveModeColor(mode);
+                overlayColor.a = 0.45f;
+                Gizmos.color = overlayColor;
 
-        // Draw Upper Curve
-        DrawCubicBezierCurve(u0, u1, u2, u3, new Color(0.8f, 0.8f, 1f), 40);
+                Vector3 prevAlt = altEval.EvaluateSectionPoint(0f, nodes, floorHollow, splineTension);
+                for (int i = 1; i <= steps; i++)
+                {
+                    float u = (float)i / steps;
+                    Vector3 currAlt = altEval.EvaluateSectionPoint(u, nodes, floorHollow, splineTension);
+                    Gizmos.DrawLine(prevAlt, currAlt);
+                    prevAlt = currAlt;
+                }
+            }
+        }
 
-        // Draw Handles
-        Gizmos.color = new Color(curveColor.r, curveColor.g, curveColor.b, 0.3f);
-        Gizmos.DrawLine(m0, m1);
-        Gizmos.DrawLine(m1, mR);
-        Gizmos.DrawLine(mR, m2);
-        Gizmos.DrawLine(m2, m3);
-        
-        Gizmos.color = new Color(0.8f, 0.8f, 1f, 0.3f);
-        Gizmos.DrawLine(u0, u1);
-        Gizmos.DrawLine(u3, u2);
+        // Render Active Main Section Curve
+        Vector3 prevPt = nodes.p0;
+        Gizmos.color = color;
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = (float)i / steps;
+            Vector3 currPt = EvaluateBodySectionAtU(u, nodes);
+            Gizmos.DrawLine(prevPt, currPt);
+            prevPt = currPt;
+        }
 
-        // Draw Nodes
-        Gizmos.color = Color.green;
-        Gizmos.DrawSphere(m1, 0.1f);
-        Gizmos.DrawSphere(m2, 0.1f);
-        Gizmos.DrawSphere(u1, 0.1f);
-        Gizmos.DrawSphere(u2, 0.1f);
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(m0, 0.15f);
-        Gizmos.DrawSphere(mR, 0.15f);
-        Gizmos.DrawSphere(m3, 0.15f);
-        Gizmos.DrawSphere(u3, 0.15f);
+        // Draw the 5 Master Node Spheres
+        Gizmos.color = Color.yellow; Gizmos.DrawSphere(nodes.p0, 0.14f); // Keel
+        Gizmos.color = new Color(1f, 0.5f, 0f); Gizmos.DrawSphere(nodes.p1, 0.14f); // Floor
+        Gizmos.color = new Color(0.1f, 0.9f, 0.4f); Gizmos.DrawSphere(nodes.p2, 0.14f); // Diagonal Bilge
+        Gizmos.color = Color.cyan; Gizmos.DrawSphere(nodes.p3, 0.14f); // HOB
+        Gizmos.color = Color.magenta; Gizmos.DrawSphere(nodes.p4, 0.14f); // Sheer
 
 #if UNITY_EDITOR
-        if (showLabels && flipX > 0) // Only draw labels on Starboard to prevent clutter
+        // Render Dashed Lines for Pure Polygonal Hull Skeleton (Lower & Upper Moulds)
+        if (showPolygonSkeleton)
+        {
+            Handles.color = new Color(1f, 1f, 1f, 0.55f);
+            Handles.DrawDottedLine(nodes.p0, nodes.p1, 4f); // Keel -> Floor
+            Handles.DrawDottedLine(nodes.p1, nodes.p2, 4f); // Floor -> Bilge
+            Handles.DrawDottedLine(nodes.p2, nodes.p3, 4f); // Bilge -> HOB
+            Handles.DrawDottedLine(nodes.p3, nodes.p4, 4f); // HOB -> Sheer
+
+            // Draw Floor (p1) to HOB (p3) Bilge Inward Boundary Constraint Line
+            Handles.color = new Color(1f, 0.45f, 0f, 0.5f);
+            Handles.DrawDottedLine(nodes.p1, nodes.p3, 2f);
+
+            // Draw Keel (p0) Vertical Upward Floor-to-Keel Non-Crossing Boundary Line
+            Handles.color = new Color(1f, 0.25f, 0.25f, 0.5f);
+            Handles.DrawDottedLine(nodes.p0, nodes.p0 + new Vector3(0f, 15f, 0f), 2f);
+
+            // Draw Vertical HOB (p3) Downward Max Breadth Boundary Line
+            Handles.color = new Color(0.1f, 0.8f, 0.9f, 0.5f);
+            Handles.DrawDottedLine(nodes.p3, nodes.p3 - new Vector3(0f, 15f, 0f), 2f);
+
+            // Draw Non-Sagging Bilge Minimum Height Boundary Line
+            float d13_g = Vector3.Distance(nodes.p1, nodes.p3);
+            float d12_g = Vector3.Distance(nodes.p1, nodes.p2);
+            if (d13_g > 0.0001f)
+            {
+                float minY = nodes.p1.y + (nodes.p3.y - nodes.p1.y) * (d12_g / (3f * d13_g));
+                Handles.color = new Color(1f, 0.8f, 0.1f, 0.5f);
+                Handles.DrawDottedLine(new Vector3(0f, minY, nodes.p0.z), new Vector3(nodes.p3.x * 1.2f, minY, nodes.p0.z), 2f);
+            }
+
+            // Draw Tumblehome / Topsides Minimum Boundary Line
+            float minTTX = Mathf.Abs(nodes.p3.x) * 0.60f * Mathf.Sign(nodes.p3.x);
+            Handles.color = new Color(0.9f, 0.2f, 0.9f, 0.5f);
+            Handles.DrawDottedLine(new Vector3(minTTX, nodes.p3.y, nodes.p0.z), new Vector3(minTTX, nodes.p4.y + 2f, nodes.p0.z), 2f);
+        }
+#endif
+
+        // Draw Tangent Control Arm Handle Visualization
+        ISectionCurveEvaluator currentEval = GetEvaluator(curveMode);
+        if (showControlArms && currentEval.UsesControlArms)
+        {
+            Vector3 P0 = nodes.p0;
+            Vector3 P1 = nodes.p1;
+            Vector3 P2 = nodes.p2;
+            Vector3 P3 = nodes.p3;
+            Vector3 P4 = nodes.p4;
+
+            float d01 = Vector3.Distance(P0, P1);
+            float d12 = Vector3.Distance(P1, P2);
+            float d23 = Vector3.Distance(P2, P3);
+            float d34 = Vector3.Distance(P3, P4);
+
+            Vector3 T0 = currentEval.GetNodeTangent(0, nodes);
+            Vector3 T1 = currentEval.GetNodeTangent(1, nodes);
+            Vector3 T2 = currentEval.GetNodeTangent(2, nodes);
+            Vector3 T3 = currentEval.GetNodeTangent(3, nodes);
+            Vector3 T4 = currentEval.GetNodeTangent(4, nodes);
+
+            DrawControlArmHandle(P0, T0, "T0 (Keel)", Color.yellow, d01, false, true);
+            DrawControlArmHandle(P1, T1, "T1 (Floor)", new Color(1f, 0.5f, 0f), (d01 + d12) * 0.5f, true, true);
+            DrawControlArmHandle(P2, T2, "T2 (Bilge)", new Color(0.1f, 0.9f, 0.4f), (d12 + d23) * 0.5f, true, true);
+            DrawControlArmHandle(P3, T3, "T3 (HOB)", Color.cyan, (d23 + d34) * 0.5f, true, true);
+            DrawControlArmHandle(P4, T4, "T4 (Sheer)", Color.magenta, d34, true, false);
+        }
+
+#if UNITY_EDITOR
+        if (showLabels && sideSign > 0)
         {
             GUIStyle labelStyle = new GUIStyle();
             labelStyle.normal.textColor = Color.white;
-            
-            Handles.Label(m0, " Keel", labelStyle);
-            Handles.Label(mR, " Connection Point", labelStyle);
-            Handles.Label(m3, " HoB Midship", labelStyle);
-            Handles.Label(u3, " Top Timber Midship", labelStyle);
-            Handles.Label(m1, " Keel Control", labelStyle);
-            Handles.Label(m2, " HoB Lower Control", labelStyle);
-            Handles.Label(u1, " HoB Upper Control", labelStyle);
-            Handles.Label(u2, " Top Timber Lower Control", labelStyle);
+            labelStyle.alignment = TextAnchor.MiddleLeft;
+            labelStyle.fontSize = 11;
+            labelStyle.fontStyle = FontStyle.Bold;
+
+            Handles.Label(nodes.p0 + new Vector3(0.08f, 0, 0), " p0: Keel Baseline", labelStyle);
+            Handles.Label(nodes.p1 + new Vector3(0.08f, 0, 0), " p1: Floor Line", labelStyle);
+            Handles.Label(nodes.p2 + new Vector3(0.08f, 0, 0), " p2: Diagonal Bilge", labelStyle);
+            Handles.Label(nodes.p3 + new Vector3(0.08f, 0, 0), " p3: Max Breadth (HOB)", labelStyle);
+            Handles.Label(nodes.p4 + new Vector3(0.08f, 0, 0), " p4: Top Timber (Sheer)", labelStyle);
         }
 #endif
     }
 
-    protected void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments)
+    private void DrawControlArmHandle(Vector3 nodePos, Vector3 tangent, string label, Color color, float segDist = 1f, bool drawPrevArm = true, bool drawNextArm = true)
     {
-        Gizmos.color = color;
-        Vector3 previousPoint = p0;
-        for (int i = 1; i <= segments; i++)
-        {
-            float t = i / (float)segments;
-            Vector3 point = CalculateQuadraticBezierPoint(t, p0, p1, p2);
-            Gizmos.DrawLine(previousPoint, point);
-            previousPoint = point;
-        }
-    }
+        float tensionFactor = Mathf.Clamp(splineTension, 0.5f, 2.0f);
+        float d = segDist * 0.4f * tensionFactor * controlArmLengthScale;
+        Vector3 handleA = nodePos - tangent * d;
+        Vector3 handleB = nodePos + tangent * d;
 
-    protected void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments)
-    {
-        Gizmos.color = color;
-        Vector3 previousPoint = p0;
-        for (int i = 1; i <= segments; i++)
-        {
-            float t = i / (float)segments;
-            Vector3 point = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
-            Gizmos.DrawLine(previousPoint, point);
-            previousPoint = point;
-        }
-    }
-
-    protected void DrawInnerMirroredMould(float flipX, Color curveColor)
-    {
-        Gizmos.color = curveColor;
-
-        List<Vector2> rawPoints = new List<Vector2>();
-        int segments = 100;
-
-        float topTimberY = cachedU3.y;
-
-        for (int i = 0; i <= segments; i++)
-        {
-            float t = i / (float)segments;
-            
-            // Re-parameterize t across Lower (0-0.5) and Upper (0.5-1.0) curves
-            Vector2 outerPt;
-            Vector2 nextPt;
-            
-            float rawT = t * 2f;
-            if (rawT <= 1f)
-            {
-                outerPt = GetLowerMouldPoint(rawT, flipX);
-                nextPt = GetLowerMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
-            }
-            else
-            {
-                rawT -= 1f;
-                outerPt = GetUpperMouldPoint(rawT, flipX);
-                nextPt = GetUpperMouldPoint(Mathf.Min(1f, rawT + 0.01f), flipX);
-            }
-
-            Vector2 tangent = (nextPt - outerPt).normalized;
-            if (tangent == Vector2.zero) tangent = Vector2.up; // Fallback
-            
-            // Calculate normal pointing inwards. 
-            Vector2 normal = new Vector2(-tangent.y, tangent.x);
-            
-            // Ensure normal always points towards the centerline
-            if (flipX > 0 && normal.x > 0) normal = -normal;
-            if (flipX < 0 && normal.x < 0) normal = -normal;
-
-            float currentThickness = Mathf.Lerp(baseFrameThickness, topFrameThickness, t);
-            Vector2 innerPt = outerPt + normal * currentThickness;
-            rawPoints.Add(innerPt);
-        }
-
-        // Remove self-intersections (swallowtail loops)
-        bool intersectionFound = true;
-        while (intersectionFound)
-        {
-            intersectionFound = false;
-            for (int i = 0; i < rawPoints.Count - 3; i++)
-            {
-                for (int j = i + 2; j < rawPoints.Count - 1; j++)
-                {
-                    if (LineIntersection(rawPoints[i], rawPoints[i+1], rawPoints[j], rawPoints[j+1], out Vector2 intersect))
-                    {
-                        int removeCount = j - i;
-                        rawPoints.RemoveRange(i + 1, removeCount);
-                        rawPoints.Insert(i + 1, intersect);
-                        intersectionFound = true;
-                        break;
-                    }
-                }
-                if (intersectionFound) break;
-            }
-        }
-
-        Vector3 previousPoint = Vector3.zero;
-        bool first = true;
-
-        for (int i = 0; i < rawPoints.Count; i++)
-        {
-            Vector3 point = new Vector3(rawPoints[i].x, rawPoints[i].y, 0f);
-
-            // Clamp to Top Timber
-            if (point.y >= topTimberY)
-            {
-                point.y = topTimberY;
-                if (!first) Gizmos.DrawLine(previousPoint, point);
-                break;
-            }
-
-            if (!first)
-            {
-                Gizmos.DrawLine(previousPoint, point);
-            }
-            
-            previousPoint = point;
-            first = false;
-        }
-    }
-    
-    private Vector2 GetLowerMouldPoint(float t, float flipX)
-    {
-        // t [0, 1] spans both quadratic segments
-        Vector3 pt;
-        if (t <= 0.5f)
-        {
-            float localT = t * 2f;
-            pt = CalculateQuadraticBezierPoint(localT, cachedL0, cachedL1, cachedLR);
-        }
-        else
-        {
-            float localT = (t - 0.5f) * 2f;
-            pt = CalculateQuadraticBezierPoint(localT, cachedLR, cachedL2, cachedL3);
-        }
-        return new Vector2(pt.x * flipX, pt.y);
-    }
-    
-    private Vector2 GetUpperMouldPoint(float t, float flipX)
-    {
-        Vector3 pt = CalculateCubicBezierPoint(t, cachedU0, cachedU1, cachedU2, cachedU3);
-        return new Vector2(pt.x * flipX, pt.y);
-    }
-
-    private bool LineIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection)
-    {
-        intersection = Vector2.zero;
-        float d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
-        if (d == 0f) return false;
+        Gizmos.color = new Color(color.r, color.g, color.b, 0.85f);
         
-        float u = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
-        float v = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
-        
-        if (u < 0f || u > 1f || v < 0f || v > 1f) return false;
-        
-        intersection.x = p1.x + u * (p2.x - p1.x);
-        intersection.y = p1.y + u * (p2.y - p1.y);
-        return true;
+        if (drawPrevArm && drawNextArm)
+        {
+            Gizmos.DrawLine(handleA, handleB);
+            Gizmos.DrawSphere(handleA, 0.05f);
+            Gizmos.DrawSphere(handleB, 0.05f);
+        }
+        else if (drawNextArm)
+        {
+            Gizmos.DrawLine(nodePos, handleB);
+            Gizmos.DrawSphere(handleB, 0.05f);
+        }
+        else if (drawPrevArm)
+        {
+            Gizmos.DrawLine(nodePos, handleA);
+            Gizmos.DrawSphere(handleA, 0.05f);
+        }
+
+#if UNITY_EDITOR
+        // Render Dotted Line along the Angle Bisector Normal (Perpendicular to Tangent Control Arm)
+        Vector3 bisectorNormal = new Vector3(-tangent.y, tangent.x, 0f).normalized;
+        Handles.color = new Color(color.r, color.g, color.b, 0.35f);
+        Handles.DrawDottedLine(nodePos - bisectorNormal * (d * 0.75f), nodePos + bisectorNormal * (d * 0.75f), 2f);
+
+        if (showLabels)
+        {
+            GUIStyle style = new GUIStyle();
+            style.normal.textColor = color;
+            style.fontSize = 9;
+            style.fontStyle = FontStyle.Bold;
+            Vector3 labelPos = drawNextArm ? handleB : handleA;
+            Handles.Label(labelPos + new Vector3(0.02f, 0.02f, 0), label, style);
+        }
+#endif
+    }
+
+    [Header("Interactive Node Handles")]
+    [Tooltip("Enable interactive click-and-drag handles in Scene view to sculpt Floor (p1) and Bilge (p2) nodes directly on the Body Plan.")]
+    public bool enableInteractiveNodeHandles = true;
+
+    // Direct C# Proxy Properties to manipulate Floor Line (p1) and Bilge Line (p2) parameters directly from BodyPlan
+    public float FloorRisingHeight
+    {
+        get => (sheerPlan != null) ? sheerPlan.midshipRisingHeight : 0.5f;
+        set
+        {
+            if (sheerPlan != null)
+            {
+                sheerPlan.midshipRisingHeight = Mathf.Max(0f, value);
+                sheerPlan.UpdateCachedValues();
+                UpdateCachedCurves();
+            }
+        }
+    }
+
+    public float FloorWidth
+    {
+        get => (breadthPlan != null) ? breadthPlan.midshipFloorWidth : 2.0f;
+        set
+        {
+            if (breadthPlan != null)
+            {
+                float hw = keelWidth / 2f;
+                float maxB = (breadthPlan != null) ? breadthPlan.maxBeam : 5.0f;
+                breadthPlan.midshipFloorWidth = Mathf.Clamp(value, hw + 0.01f, maxB - 0.01f);
+                breadthPlan.UpdateCachedCurves();
+                UpdateCachedCurves();
+            }
+        }
+    }
+
+    public float BilgeHeightRatio
+    {
+        get => (sheerPlan != null) ? sheerPlan.bilgeHeightRatio : 0.5f;
+        set
+        {
+            if (sheerPlan != null)
+            {
+                sheerPlan.bilgeHeightRatio = Mathf.Clamp(value, 0.05f, 0.95f);
+                sheerPlan.UpdateCachedValues();
+                UpdateCachedCurves();
+            }
+        }
+    }
+
+    public float BilgeWidthRatio
+    {
+        get => (breadthPlan != null) ? breadthPlan.bilgeWidthRatio : 0.5f;
+        set
+        {
+            if (breadthPlan != null)
+            {
+                breadthPlan.bilgeWidthRatio = Mathf.Clamp(value, 0.05f, 0.95f);
+                breadthPlan.UpdateCachedCurves();
+                UpdateCachedCurves();
+            }
+        }
     }
 }
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(BodyPlan))]
+public class BodyPlanEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+
+        BodyPlan plan = (BodyPlan)target;
+        if (plan.sheerPlan == null || plan.breadthPlan == null) return;
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Midship Master Shape Controls (Direct Proxy)", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+
+        float floorY = plan.FloorRisingHeight;
+        float newFloorY = EditorGUILayout.FloatField(new GUIContent("Floor Rising Height (Y)", "Midship Floor Line height on SheerPlan"), floorY);
+
+        float floorX = plan.FloorWidth;
+        float newFloorX = EditorGUILayout.FloatField(new GUIContent("Floor Half-Width (X)", "Midship Floor Line half-width on BreadthPlan"), floorX);
+
+        float bilgeYRatio = plan.BilgeHeightRatio;
+        float newBilgeYRatio = EditorGUILayout.Slider(new GUIContent("Diagonal Bilge Height Ratio (Y)", "Bilge Line height ratio on SheerPlan (0.05 - 0.95)"), bilgeYRatio, 0.05f, 0.95f);
+
+        float bilgeXRatio = plan.BilgeWidthRatio;
+        float newBilgeXRatio = EditorGUILayout.Slider(new GUIContent("Diagonal Bilge Width Ratio (X)", "Bilge Line width ratio on BreadthPlan (0.05 - 0.95)"), bilgeXRatio, 0.05f, 0.95f);
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObjects(new Object[] { plan.sheerPlan, plan.breadthPlan, plan }, "Modify BodyPlan Midship Shapes");
+            plan.FloorRisingHeight = newFloorY;
+            plan.FloorWidth = newFloorX;
+            plan.BilgeHeightRatio = newBilgeYRatio;
+            plan.BilgeWidthRatio = newBilgeXRatio;
+            EditorUtility.SetDirty(plan.sheerPlan);
+            EditorUtility.SetDirty(plan.breadthPlan);
+            EditorUtility.SetDirty(plan);
+        }
+    }
+
+    private void OnSceneGUI()
+    {
+        BodyPlan plan = (BodyPlan)target;
+        if (plan.sheerPlan == null || plan.breadthPlan == null || !plan.enableInteractiveNodeHandles) return;
+
+        SectionNodes stbdNodes = plan.GetSectionNodesAtZ(0f, 1f);
+
+        // Floor Point (p1) Interactive Scene Handle
+        Handles.color = new Color(1f, 0.5f, 0f, 0.9f);
+        EditorGUI.BeginChangeCheck();
+        Vector3 newP1 = Handles.FreeMoveHandle(stbdNodes.p1, 0.15f, Vector3.zero, Handles.SphereHandleCap);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObjects(new Object[] { plan.sheerPlan, plan.breadthPlan, plan }, "Drag Midship Floor Point");
+            float hw = plan.keelWidth / 2f;
+            float minFloorX = hw;
+            float d02 = Vector3.Distance(stbdNodes.p0, stbdNodes.p2);
+            float d01 = Vector3.Distance(stbdNodes.p0, stbdNodes.p1);
+            if (d02 > 0.0001f)
+            {
+                float tangentOffset = (stbdNodes.p2.x - hw) / d02 * (d01 / 3f);
+                minFloorX = hw + tangentOffset;
+            }
+            plan.FloorWidth = Mathf.Max(minFloorX, Mathf.Abs(newP1.x));
+            plan.FloorRisingHeight = Mathf.Max(0f, newP1.y);
+            EditorUtility.SetDirty(plan.sheerPlan);
+            EditorUtility.SetDirty(plan.breadthPlan);
+            EditorUtility.SetDirty(plan);
+        }
+
+        // Diagonal Bilge Point (p2) Interactive Scene Handle
+        Handles.color = new Color(0.1f, 0.9f, 0.4f, 0.9f);
+        EditorGUI.BeginChangeCheck();
+        Vector3 newP2 = Handles.FreeMoveHandle(stbdNodes.p2, 0.15f, Vector3.zero, Handles.SphereHandleCap);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObjects(new Object[] { plan.sheerPlan, plan.breadthPlan, plan }, "Drag Midship Bilge Point");
+            float p1x = stbdNodes.p1.x;
+            float p3x = stbdNodes.p3.x;
+            float p1y = stbdNodes.p1.y;
+            float p3y = stbdNodes.p3.y;
+
+            if (Mathf.Abs(p3x - p1x) > 0.001f)
+            {
+                // Clamp handle X to not go inward past line p1 -> p3 nor outward past HOB vertical boundary
+                float dy = p3y - p1y;
+                float tY = (Mathf.Abs(dy) > 0.0001f) ? Mathf.Clamp01((newP2.y - p1y) / dy) : 0.5f;
+                float minP2x = Mathf.Lerp(p1x, p3x, tY);
+
+                float d13 = Vector3.Distance(stbdNodes.p1, stbdNodes.p3);
+                float d23 = Vector3.Distance(newP2, stbdNodes.p3);
+                float maxP2x = p3x;
+                if (d13 > 0.0001f)
+                {
+                    float offset = (p3x - p1x) / d13 * (d23 / 3f);
+                    maxP2x = p3x - offset;
+                }
+
+                float clampedX = Mathf.Clamp(Mathf.Abs(newP2.x), minP2x, maxP2x);
+
+                float xRatio = (clampedX - p1x) / (p3x - p1x);
+                plan.BilgeWidthRatio = Mathf.Clamp(xRatio, 0.05f, 0.95f);
+            }
+
+            if (Mathf.Abs(p3y - p1y) > 0.001f)
+            {
+                float dy = p3y - p1y;
+                float d13 = Vector3.Distance(stbdNodes.p1, stbdNodes.p3);
+                float d12 = Vector3.Distance(stbdNodes.p1, newP2);
+                float minBilgeY = p1y;
+                if (d13 > 0.0001f)
+                {
+                    minBilgeY = p1y + dy * (d12 / (3f * d13));
+                }
+
+                float clampedY = Mathf.Max(newP2.y, minBilgeY);
+                float yRatio = (clampedY - p1y) / dy;
+                plan.BilgeHeightRatio = Mathf.Clamp(yRatio, 0.05f, 0.95f);
+            }
+
+            EditorUtility.SetDirty(plan.sheerPlan);
+            EditorUtility.SetDirty(plan.breadthPlan);
+            EditorUtility.SetDirty(plan);
+        }
+    }
+}
+#endif

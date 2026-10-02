@@ -72,11 +72,25 @@ public class BreadthPlan : MonoBehaviour
     [Tooltip("Color of the Floor Line curves.")]
     public Color floorLineColor = new Color(1f, 0.85f, 0.2f, 0.9f);
 
+    [Tooltip("Half-width of the Floor Line at Midships (Z = 0). Must sit between Keel half-width and Max Beam.")]
+    public float midshipFloorWidth = 2.0f;
+
     [Tooltip("Control arm bias for the forward Floor Line quadratic curve (0 = straight/narrow, 1 = full width/curve).")]
     [Range(0f, 1f)] public float floorBowControl = 0.5f;
 
     [Tooltip("Control arm bias for the aft Floor Line quadratic curve (0 = straight/narrow, 1 = full width/curve).")]
     [Range(0f, 1f)] public float floorSternControl = 0.5f;
+
+    [Header("Diagonal Bilge Line Controls")]
+    [Tooltip("Show the Diagonal Bilge Width curves in Scene view gizmos.")]
+    public bool showBilgeCurve = true;
+
+    [Tooltip("Color of the Diagonal Bilge Width curve.")]
+    public Color bilgeCurveColor = new Color(0.1f, 0.9f, 0.4f, 0.9f);
+
+    [Tooltip("Relative width of the Diagonal Bilge Line between Floor Line (0.0) and Max Breadth (1.0).")]
+    [Range(0.05f, 0.95f)]
+    public float bilgeWidthRatio = 0.6f;
 
     // --- CACHED POINTS FOR FAST ACCESS ---
     [HideInInspector] public Vector3 cachedFwdP0;
@@ -112,6 +126,9 @@ public class BreadthPlan : MonoBehaviour
 
     private void OnValidate()
     {
+        float hw = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.1f;
+        midshipFloorWidth = Mathf.Clamp(midshipFloorWidth, hw + 0.01f, Mathf.Max(hw + 0.05f, maxBeam - 0.01f));
+        bilgeWidthRatio = Mathf.Clamp(bilgeWidthRatio, 0.05f, 0.95f);
         UpdateCachedCurves();
     }
 
@@ -272,11 +289,11 @@ public class BreadthPlan : MonoBehaviour
         cachedTTAftP0 = ttAftP0; cachedTTAftP1 = ttAftP1; cachedTTAftP2 = ttAftP2; cachedTTAftP3 = ttAftP3;
         cachedIsTTAftCubic = isTTAftCubic;
 
-        // FLOOR LINE (QUADRATIC BEZIERS FOR BOW AND AFT CURVES - FLAT 2D PLANE AT KEEL CONTROL Y)
+        // FLOOR LINE (QUADRATIC BEZIERS FOR BOW AND AFT CURVES - FLAT 2D PLANE AT RISING LINE Y)
         float floorBowZ = sheerPlan.cachedBowRisingEnd.z;
         float floorSternZ = sheerPlan.cachedSternRisingEnd.z;
-        float floorMaxBeam = (bodyPlan != null) ? bodyPlan.cachedLR.x : (maxBeam * 0.5f);
-        float floorBaseY = (bodyPlan != null) ? bodyPlan.cachedLR.y : sheerPlan.GetKeelYAtZ(0f);
+        float floorMaxBeam = Mathf.Clamp(midshipFloorWidth, hw + 0.01f, Mathf.Max(hw + 0.05f, maxBeam - 0.01f));
+        float floorBaseY = sheerPlan.GetRisingLineYAtZ(0f);
 
         Vector3 floorBowPoint = new Vector3(hw, floorBaseY, floorBowZ);
         Vector3 floorMidshipPoint = new Vector3(floorMaxBeam, floorBaseY, midshipZ);
@@ -367,27 +384,42 @@ public class BreadthPlan : MonoBehaviour
 
     public float GetTopTimberXAtZ(float z)
     {
+        float rawX;
         if (z >= 0)
         {
-            if (z >= cachedTTFwdP0.z) return cachedTTFwdP0.x;
-            float t = GetBezierTAtZ(cachedTTFwdP0, cachedTTFwdP1, cachedTTFwdP2, cachedTTFwdP3, z, false);
-            return CalculateCubicBezierPoint(t, cachedTTFwdP0, cachedTTFwdP1, cachedTTFwdP2, cachedTTFwdP3).x;
+            if (z >= cachedTTFwdP0.z) rawX = cachedTTFwdP0.x;
+            else
+            {
+                float t = GetBezierTAtZ(cachedTTFwdP0, cachedTTFwdP1, cachedTTFwdP2, cachedTTFwdP3, z, false);
+                rawX = CalculateCubicBezierPoint(t, cachedTTFwdP0, cachedTTFwdP1, cachedTTFwdP2, cachedTTFwdP3).x;
+            }
         }
         else
         {
             if (cachedIsTTAftCubic)
             {
-                if (z <= cachedTTAftP3.z) return cachedTTAftP3.x;
-                float t = GetBezierTAtZ(cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, cachedTTAftP3, z, false);
-                return CalculateCubicBezierPoint(t, cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, cachedTTAftP3).x;
+                if (z <= cachedTTAftP3.z) rawX = cachedTTAftP3.x;
+                else
+                {
+                    float t = GetBezierTAtZ(cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, cachedTTAftP3, z, false);
+                    rawX = CalculateCubicBezierPoint(t, cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, cachedTTAftP3).x;
+                }
             }
             else
             {
-                if (z <= cachedTTAftP2.z) return cachedTTAftP2.x;
-                float t = GetBezierTAtZ(cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, Vector3.zero, z, false);
-                return CalculateQuadraticBezierPoint(t, cachedTTAftP0, cachedTTAftP1, cachedTTAftP2).x;
+                if (z <= cachedTTAftP2.z) rawX = cachedTTAftP2.x;
+                else
+                {
+                    float t = GetBezierTAtZ(cachedTTAftP0, cachedTTAftP1, cachedTTAftP2, Vector3.zero, z, false);
+                    rawX = CalculateQuadraticBezierPoint(t, cachedTTAftP0, cachedTTAftP1, cachedTTAftP2).x;
+                }
             }
         }
+
+        // Restriction 5: Tumblehome / Topsides boundary restriction (p4 must not narrow by more than 40% of HOB max breadth)
+        float hobX = GetTheoreticalBreadthXAtZ(z);
+        float minTumblehomeX = hobX * 0.60f;
+        return Mathf.Max(rawX, minTumblehomeX);
     }
 
     public float GetFloorLineXAtZ(float z)
@@ -411,10 +443,53 @@ public class BreadthPlan : MonoBehaviour
                 rawX = CalculateQuadraticBezierPoint(t, cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint).x;
             }
         }
-        return Mathf.Min(rawX, GetTheoreticalBreadthXAtZ(z));
+
+        float minKeelX = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
+        return Mathf.Clamp(rawX, minKeelX, GetTheoreticalBreadthXAtZ(z));
     }
 
+    /// <summary>
+    /// Computes the 3D Diagonal Bilge Width at station Z.
+    /// Positioned smoothly between Floor Line width and Max Breadth.
+    /// </summary>
+    public float GetBilgeXAtZ(float z)
+    {
+        float floorX = GetFloorLineXAtZ(z);
+        float hobX = GetTheoreticalBreadthXAtZ(z);
+        float ratio = Mathf.Clamp(bilgeWidthRatio, 0.05f, 0.95f);
+        float bilgeX = Mathf.Lerp(floorX, hobX, ratio);
 
+        if (sheerPlan != null)
+        {
+            float floorY = sheerPlan.GetRisingLineYAtZ(z);
+            float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
+            float ratioY = Mathf.Clamp(sheerPlan.bilgeHeightRatio, 0.05f, 0.95f);
+            float approxBilgeY = Mathf.Lerp(floorY, hobY, ratioY);
+
+            // Inward clamp (line p1 -> p3)
+            float dy = hobY - floorY;
+            if (Mathf.Abs(dy) > 0.0001f)
+            {
+                float tY = Mathf.Clamp01((approxBilgeY - floorY) / dy);
+                float minBilgeX = Mathf.Lerp(floorX, hobX, tY);
+                bilgeX = Mathf.Max(bilgeX, minBilgeX);
+            }
+
+            // Restriction 3: Bilge point (p2) can never go outward past HOB vertical boundary (p3)
+            Vector3 p1 = new Vector3(floorX, floorY, z);
+            Vector3 p3 = new Vector3(hobX, hobY, z);
+            Vector3 approxP2 = new Vector3(bilgeX, approxBilgeY, z);
+            float d13 = Vector3.Distance(p1, p3);
+            float d23 = Vector3.Distance(approxP2, p3);
+            if (d13 > 0.0001f)
+            {
+                float tangentOffset = (hobX - floorX) / d13 * (d23 / 3f);
+                float maxBilgeX = hobX - tangentOffset;
+                bilgeX = Mathf.Min(bilgeX, maxBilgeX);
+            }
+        }
+        return bilgeX;
+    }
 
     // --- UTILITIES ---
 
@@ -543,11 +618,28 @@ public class BreadthPlan : MonoBehaviour
         if (showFloorLine)
         {
             Gizmos.color = floorLineColor;
-            DrawQuadraticBezierCurve(cachedFloorBowPoint, cachedFloorBowCp, cachedFloorMidshipPoint, floorLineColor);
-            DrawQuadraticBezierCurve(cachedFloorMidshipPoint, cachedFloorSternCp, cachedFloorSternPoint, floorLineColor);
+            const int floorSamples = 80;
+            float fAftZ = cachedFloorSternPoint.z;
+            float fFwdZ = cachedFloorBowPoint.z;
+            Vector3 prevStbd = Vector3.zero;
+            Vector3 prevPort = Vector3.zero;
+            for (int i = 0; i <= floorSamples; i++)
+            {
+                float t = i / (float)floorSamples;
+                float z = Mathf.Lerp(fAftZ, fFwdZ, t);
+                float x = GetFloorLineXAtZ(z);
+                float y = (sheerPlan != null) ? sheerPlan.GetRisingLineYAtZ(z) : cachedFloorMidshipPoint.y;
 
-            DrawQuadraticBezierCurve(MirrorX(cachedFloorBowPoint), MirrorX(cachedFloorBowCp), MirrorX(cachedFloorMidshipPoint), floorLineColor);
-            DrawQuadraticBezierCurve(MirrorX(cachedFloorMidshipPoint), MirrorX(cachedFloorSternCp), MirrorX(cachedFloorSternPoint), floorLineColor);
+                Vector3 currStbd = new Vector3(x, y, z);
+                Vector3 currPort = new Vector3(-x, y, z);
+                if (i > 0)
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
+                prevStbd = currStbd;
+                prevPort = currPort;
+            }
 
             Gizmos.color = new Color(floorLineColor.r, floorLineColor.g, floorLineColor.b, 0.4f);
             Gizmos.DrawLine(cachedFloorMidshipPoint, cachedFloorBowCp);
@@ -561,6 +653,33 @@ public class BreadthPlan : MonoBehaviour
             Gizmos.DrawSphere(cachedFloorMidshipPoint, 0.12f);
             Gizmos.DrawSphere(cachedFloorSternCp, 0.08f);
             Gizmos.DrawSphere(cachedFloorSternPoint, 0.12f);
+        }
+
+        // Draw Diagonal Bilge Width Curves (Starboard & Port Mirrored)
+        if (showBilgeCurve)
+        {
+            Gizmos.color = bilgeCurveColor;
+            float sternZ = (sheerPlan != null) ? sheerPlan.GetBilgeSternZ() : -10f;
+            float bowZ = (sheerPlan != null) ? sheerPlan.GetBilgeBowZ() : 10f;
+            const int samples = 80;
+            Vector3 prevStbd = Vector3.zero;
+            Vector3 prevPort = Vector3.zero;
+            for (int i = 0; i <= samples; i++)
+            {
+                float t = i / (float)samples;
+                float z = Mathf.Lerp(sternZ, bowZ, t);
+                float x = GetBilgeXAtZ(z);
+                float y = (sheerPlan != null) ? sheerPlan.GetBilgeYAtZ(z) : sheerPlan.cachedHobMidshipPoint.y;
+                Vector3 currStbd = new Vector3(x, y, z);
+                Vector3 currPort = new Vector3(-x, y, z);
+                if (i > 0)
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
+                prevStbd = currStbd;
+                prevPort = currPort;
+            }
         }
 
 #if UNITY_EDITOR
