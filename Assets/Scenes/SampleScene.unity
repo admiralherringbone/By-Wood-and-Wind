@@ -152,46 +152,31 @@ MonoBehaviour:
   bodyPlan: {fileID: 722911565}
   breadthPlan: {fileID: 1109839672}
   fashionTimberModel: {fileID: 900456903}
+  showMasterFrame: 1
+  masterFrameColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showMasterFrameNodes: 1
+  showRibbands: 1
+  showTopTimberRibband: 1
+  topTimberRibbandColor: {r: 0.9, g: 0.2, b: 0.9, a: 0.85}
+  showMaxBreadthRibband: 1
+  maxBreadthRibbandColor: {r: 0.1, g: 0.85, b: 0.9, a: 0.85}
+  showBilgeRibband: 1
+  bilgeRibbandColor: {r: 0.1, g: 0.9, b: 0.3, a: 0.85}
+  showFloorRibband: 1
+  floorRibbandColor: {r: 1, g: 0.6, b: 0.1, a: 0.85}
   frameSpacingMode: 1
   frameSpacing: 0.8
   cutFramesAtFashionTimber: 0
   disableFrameCutoffs: 0
-  showAngledFrames: 0
-  angledFrameAngleStep: 15
-  angledFrameResolution: 150
-  angledFrameColor: {r: 1, g: 0.9, b: 0.2, a: 0.9}
-  showAngledFrameLabels: 1
-  connectionPointFwdBlend: 0.546
-  connectionPointAftBlend: 0.5
-  showFrameControlPoints: 0
-  showProjectedRisingMarkPoints: 1
-  showFrameControlArms: 0
-  controlPointRadius: 0.05
-  keelPointColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  pseudoKeelPointColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  connectionPointColor: {r: 0, g: 1, b: 0, a: 1}
-  projectedRisingMarkColor: {r: 1, g: 0, b: 0, a: 1}
-  projectedRisingMarkSegments: 4
-  hobPointColor: {r: 0, g: 0, b: 0, a: 1}
-  controlArmColor: {r: 1, g: 0.5, b: 0, a: 0.8}
-  controlArmPointColor: {r: 1, g: 0.8, b: 0.2, a: 1}
-  useQuadraticScaling: 1
   enableLongitudinalTrajectoryFairing: 1
   trajectoryFairingStrength: 1
   trajectoryAnchorStations: 20
   showLabels: 1
-  showBackboneSideLines: 1
-  showMasterFrame: 1
   showFrames: 1
-  showRisingLineGuide: 1
-  showKeelControlGuide: 1
   starboardColor: {r: 0, g: 1, b: 1, a: 1}
   portColor: {r: 1, g: 0, b: 1, a: 1}
-  masterFrameColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   frameColor: {r: 0.2, g: 0.8, b: 1, a: 0.7}
-  risingLineGuideColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  keelControlGuideColor: {r: 1, g: 0.8, b: 0.2, a: 0.9}
-  changeVersion: 212
+  changeVersion: 242
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -538,15 +523,15 @@ MonoBehaviour:
   portColor: {r: 1, g: 0, b: 0, a: 1}
   nodeColor: {r: 0, g: 1, b: 1, a: 1}
   cachedL0: {x: 0.125, y: 0, z: 0}
-  cachedL1: {x: 0.8429317, y: 0.994784, z: 0}
-  cachedLR: {x: 2.3639226, y: 1.7508173, z: 0}
-  cachedL2: {x: 2.3639226, y: 1.7508173, z: 0}
+  cachedL1: {x: 1.6209968, y: 0.46635365, z: 0}
+  cachedLR: {x: 2.5390306, y: 1.2926463, z: 0}
+  cachedL2: {x: 2.5390306, y: 1.2926463, z: 0}
   cachedL3: {x: 3, y: 3, z: 0}
   cachedU0: {x: 3, y: 3, z: 0}
   cachedU1: {x: 3, y: 3, z: 0}
   cachedU2: {x: 2.4, y: 6, z: 0}
   cachedU3: {x: 2.4, y: 6, z: 0}
-  changeVersion: 61150237
+  changeVersion: 61212789
   enableInteractiveNodeHandles: 1
 --- !u!1 &832575517
 GameObject:
@@ -716,12 +701,12 @@ MonoBehaviour:
   topTimberSternArmLength: 1
   showFloorLine: 1
   floorLineColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
-  midshipFloorWidth: 0.8429317
-  floorBowControl: 0.5
+  midshipFloorWidth: 1.6209968
+  floorBowControl: 0.455
   floorSternControl: 0.522
   showBilgeCurve: 1
   bilgeCurveColor: {r: 0.1, g: 0.9, b: 0.4, a: 0.9}
-  bilgeWidthRatio: 0.7051195
+  bilgeWidthRatio: 0.6657227
   cachedFwdP0: {x: 0.125, y: 3, z: 10}
   cachedFwdP1: {x: 2.435, y: 3, z: 9.26823}
   cachedFwdP2: {x: 3, y: 3, z: 6.57}
@@ -740,12 +725,17 @@ MonoBehaviour:
   cachedTTAftP2: {x: 1.0944, y: 6, z: -11.307542}
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
-  cachedFloorBowPoint: {x: 0.125, y: 0.994784, z: 9.589458}
-  cachedFloorBowCp: {x: 0.8429317, y: 0.994784, z: 4.794729}
-  cachedFloorMidshipPoint: {x: 0.8429317, y: 0.994784, z: 0}
-  cachedFloorSternCp: {x: 0.8429317, y: 0.994784, z: -5.0453467}
-  cachedFloorSternPoint: {x: 0.125, y: 0.994784, z: -9.665415}
-  changeVersion: 825512549
+  cachedFloorBowPoint: {x: 0.125, y: 0.46635365, z: 9.589458}
+  cachedFloorBowCp: {x: 1.6209968, y: 0.46635365, z: 4.3632035}
+  cachedFloorMidshipPoint: {x: 1.6209968, y: 0.46635365, z: 0}
+  cachedFloorSternCp: {x: 1.6209968, y: 0.46635365, z: -5.0453467}
+  cachedFloorSternPoint: {x: 0.125, y: 0.46635365, z: -9.665415}
+  cachedBilgeBowPoint: {x: 0.125, y: 2.442702, z: 9.825077}
+  cachedBilgeBowCp: {x: 2.5390306, y: 1.2926463, z: 4.4704103}
+  cachedBilgeMidshipPoint: {x: 2.5390306, y: 1.2926463, z: 0}
+  cachedBilgeSternCp: {x: 2.5390306, y: 1.2926463, z: -5.105016}
+  cachedBilgeSternPoint: {x: 0.125, y: 2.7290516, z: -9.779724}
+  changeVersion: 827893826
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -872,8 +862,8 @@ MonoBehaviour:
   slaveHobHandlesToBreadthPlan: 1
   breadthPlan: {fileID: 1109839672}
   bodyPlan: {fileID: 722911565}
-  midshipRisingHeight: 0.994784
-  bilgeHeightRatio: 0.37703332
+  midshipRisingHeight: 0.46635365
+  bilgeHeightRatio: 0.32612786
   slaveRisingLineHandlesToBreadthPlan: 1
   bowRisingLineEndPos: 0.537
   bowRisingLineControl: 0.856
@@ -882,19 +872,19 @@ MonoBehaviour:
   cachedKeelSternPoint: {x: 0, y: 0, z: -9}
   cachedKeelBowPoint: {x: 0, y: 0, z: 7}
   cachedMidshipKeel: {x: 0, y: -0, z: 0}
-  cachedMidshipRisingPoint: {x: 0, y: 0.994784, z: 0}
+  cachedMidshipRisingPoint: {x: 0, y: 0.46635365, z: 0}
   cachedProjectedAftKeelEnd: {x: 0, y: 0, z: -11.307542}
   cachedProjectedTopLineStart: {x: 0, y: 3.5, z: -10.216921}
   cachedProjectedTopLineEnd: {x: 0, y: 3.5, z: 10}
   cachedBowRisingEnd: {x: 0, y: 1.8795006, z: 9.589458}
-  cachedBowP1Ctrl: {x: 0, y: 0.994784, z: 4.794729}
+  cachedBowP1Ctrl: {x: 0, y: 0.46635365, z: 4.3632035}
   cachedBowRisingLineEndT: 9.999996
-  cachedProjectedBowRisingEnd: {x: 0, y: 1.9552531, z: 10}
+  cachedProjectedBowRisingEnd: {x: 0, y: 1.9905086, z: 10}
   cachedSternRisingEnd: {x: 0, y: 2.3289495, z: -9.665415}
-  cachedSternP1Ctrl: {x: 0, y: 0.994784, z: -5.0453467}
-  cachedProjectedSternRisingEnd: {x: 0, y: 2.8031566, z: -11.307542}
+  cachedSternP1Ctrl: {x: 0, y: 0.46635365, z: -5.0453467}
+  cachedProjectedSternRisingEnd: {x: 0, y: 2.9909785, z: -11.307542}
   cachedSternRisingLineEndT: 1
-  changeVersion: 354030919
+  changeVersion: 354913257
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 2.826395, z: -9.807542}
   cachedCounterBasePoint: {x: 0, y: 2.826395, z: -9.807542}

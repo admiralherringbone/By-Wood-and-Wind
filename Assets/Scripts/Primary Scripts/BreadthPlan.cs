@@ -120,6 +120,12 @@ public class BreadthPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedFloorMidshipPoint;
     [HideInInspector] public Vector3 cachedFloorSternCp;
     [HideInInspector] public Vector3 cachedFloorSternPoint;
+
+    [HideInInspector] public Vector3 cachedBilgeBowPoint;
+    [HideInInspector] public Vector3 cachedBilgeBowCp;
+    [HideInInspector] public Vector3 cachedBilgeMidshipPoint;
+    [HideInInspector] public Vector3 cachedBilgeSternCp;
+    [HideInInspector] public Vector3 cachedBilgeSternPoint;
     [HideInInspector] public int changeVersion = 0;
 
     private bool isUpdatingCurves = false;
@@ -310,6 +316,34 @@ public class BreadthPlan : MonoBehaviour
         cachedFloorMidshipPoint = floorMidshipPoint;
         cachedFloorSternCp = floorSternCp;
         cachedFloorSternPoint = floorSternPoint;
+
+        // BILGE LINE (DEDICATED QUADRATIC BEZIERS FOR BOW AND AFT CURVES)
+        float bilgeBowZ = sheerPlan.GetBilgeBowZ();
+        float bilgeSternZ = sheerPlan.GetBilgeSternZ();
+
+        float ratio = Mathf.Clamp(bilgeWidthRatio, 0.05f, 0.95f);
+        float bilgeMaxBeam = Mathf.Lerp(floorMaxBeam, maxBeam, ratio);
+
+        float bilgeBaseY = sheerPlan.GetBilgeYAtZ(0f);
+        float bilgeBowY = sheerPlan.GetBilgeYAtZ(bilgeBowZ);
+        float bilgeSternY = sheerPlan.GetBilgeYAtZ(bilgeSternZ);
+
+        Vector3 bilgeBowPoint = new Vector3(hw, bilgeBowY, bilgeBowZ);
+        Vector3 bilgeMidshipPoint = new Vector3(bilgeMaxBeam, bilgeBaseY, midshipZ);
+        Vector3 bilgeSternPoint = new Vector3(hw, bilgeSternY, bilgeSternZ);
+
+        float bilgeBowControlZ = Mathf.Lerp(midshipZ, bilgeBowZ, Mathf.Clamp(floorBowControl, 0f, 0.95f));
+        Vector3 bilgeBowCp = new Vector3(bilgeMaxBeam, bilgeBaseY, bilgeBowControlZ);
+
+        float bilgeSternControlZ = Mathf.Lerp(midshipZ, bilgeSternZ, Mathf.Clamp(floorSternControl, 0f, 0.95f));
+        Vector3 bilgeSternCp = new Vector3(bilgeMaxBeam, bilgeBaseY, bilgeSternControlZ);
+
+        cachedBilgeBowPoint = bilgeBowPoint;
+        cachedBilgeBowCp = bilgeBowCp;
+        cachedBilgeMidshipPoint = bilgeMidshipPoint;
+        cachedBilgeSternCp = bilgeSternCp;
+        cachedBilgeSternPoint = bilgeSternPoint;
+
         changeVersion++;
         }
         finally
@@ -454,41 +488,41 @@ public class BreadthPlan : MonoBehaviour
     /// </summary>
     public float GetBilgeXAtZ(float z)
     {
+        float minKeelX = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
         float floorX = GetFloorLineXAtZ(z);
         float hobX = GetTheoreticalBreadthXAtZ(z);
         float ratio = Mathf.Clamp(bilgeWidthRatio, 0.05f, 0.95f);
+
+        // 1. Proportional ratio between Floor Line and Max Breadth Line
         float bilgeX = Mathf.Lerp(floorX, hobX, ratio);
 
+        // 2. Smooth terminal transition to stem and stern centerline
         if (sheerPlan != null)
         {
-            float floorY = sheerPlan.GetRisingLineYAtZ(z);
-            float hobY = sheerPlan.GetTheoreticalHobYAtZ(z);
-            float ratioY = Mathf.Clamp(sheerPlan.bilgeHeightRatio, 0.05f, 0.95f);
-            float approxBilgeY = Mathf.Lerp(floorY, hobY, ratioY);
+            float bilgeBowZ = sheerPlan.GetBilgeBowZ();
+            float bilgeSternZ = sheerPlan.GetBilgeSternZ();
 
-            // Inward clamp (line p1 -> p3)
-            float dy = hobY - floorY;
-            if (Mathf.Abs(dy) > 0.0001f)
+            if (z >= bilgeBowZ) return minKeelX;
+            if (z <= bilgeSternZ) return minKeelX;
+
+            float bowStartZ = cachedFloorBowPoint.z;
+            float sternStartZ = cachedFloorSternPoint.z;
+
+            if (z > bowStartZ && bilgeBowZ > bowStartZ)
             {
-                float tY = Mathf.Clamp01((approxBilgeY - floorY) / dy);
-                float minBilgeX = Mathf.Lerp(floorX, hobX, tY);
-                bilgeX = Mathf.Max(bilgeX, minBilgeX);
+                float t = Mathf.Clamp01((z - bowStartZ) / (bilgeBowZ - bowStartZ));
+                float smoothT = t * t * (3f - 2f * t);
+                bilgeX = Mathf.Lerp(bilgeX, minKeelX, smoothT);
             }
-
-            // Restriction 3: Bilge point (p2) can never go outward past HOB vertical boundary (p3)
-            Vector3 p1 = new Vector3(floorX, floorY, z);
-            Vector3 p3 = new Vector3(hobX, hobY, z);
-            Vector3 approxP2 = new Vector3(bilgeX, approxBilgeY, z);
-            float d13 = Vector3.Distance(p1, p3);
-            float d23 = Vector3.Distance(approxP2, p3);
-            if (d13 > 0.0001f)
+            else if (z < sternStartZ && bilgeSternZ < sternStartZ)
             {
-                float tangentOffset = (hobX - floorX) / d13 * (d23 / 3f);
-                float maxBilgeX = hobX - tangentOffset;
-                bilgeX = Mathf.Min(bilgeX, maxBilgeX);
+                float t = Mathf.Clamp01((z - sternStartZ) / (bilgeSternZ - sternStartZ));
+                float smoothT = t * t * (3f - 2f * t);
+                bilgeX = Mathf.Lerp(bilgeX, minKeelX, smoothT);
             }
         }
-        return bilgeX;
+
+        return Mathf.Clamp(bilgeX, minKeelX, hobX);
     }
 
     // --- UTILITIES ---

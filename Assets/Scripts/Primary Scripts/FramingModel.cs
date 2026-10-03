@@ -62,23 +62,6 @@ public class FramingModel : MonoBehaviour
     [Tooltip("Disable all frame cutoffs to display frames completely whole and uncut by Fashion Timbers, Upper Decks, or Sheer line profile.")]
     public bool disableFrameCutoffs = false;
 
-    [Header("Angled Frames Overlay Settings")]
-    [Tooltip("Overlay angled frame lines radiating from the Bow End of the Rising Line to the Stem atop the primary transverse frames.")]
-    public bool showAngledFrames = true;
-
-    [Tooltip("Angle increment (degrees) between adjacent angled frames radiating from the Bow End of the Rising Line.")]
-    public float angledFrameAngleStep = 15f;
-
-    [Range(10, 300)]
-    [Tooltip("Line segment resolution / detail steps for drawing angled frames.")]
-    public int angledFrameResolution = 100;
-
-    [Tooltip("Color of the overlaid angled frame lines.")]
-    public Color angledFrameColor = new Color(1f, 0.9f, 0.2f, 0.9f);
-
-    [Tooltip("Display degree labels for angled frames in the Scene View.")]
-    public bool showAngledFrameLabels = true;
-
     [Header("Longitudinal Control Point Trajectory Fairing")]
     [Tooltip("Enable 3D C2 longitudinal spline trajectory fairing across frame control points to guarantee 100% glass-smooth frames stem-to-stern.")]
     public bool enableLongitudinalTrajectoryFairing = true;
@@ -158,6 +141,31 @@ public class FramingModel : MonoBehaviour
     public float GetFrameBottomYAtZ(float z)
     {
         if (sheerPlan == null) return 0f;
+        sheerPlan.UpdateCachedValues();
+
+        // For any frames at or aft of Stern End of Rising Line:
+        if (z <= sheerPlan.cachedSternRisingEnd.z)
+        {
+            float ftY = sheerPlan.GetSternProfileYAtZ(z);
+            float minPostZ = Mathf.Min(sheerPlan.cachedKeelSternPoint.z, sheerPlan.cachedSternPostTopPoint.z);
+            if (z > minPostZ && z <= sheerPlan.cachedSternRisingEnd.z)
+            {
+                float dz = sheerPlan.cachedSternRisingEnd.z - minPostZ;
+                if (Mathf.Abs(dz) > 0.0001f)
+                {
+                    float t = (z - minPostZ) / dz;
+                    float interpY = Mathf.Lerp(sheerPlan.cachedKeelSternPoint.y, sheerPlan.cachedSternRisingEnd.y, t);
+                    ftY = Mathf.Max(ftY, interpY);
+                }
+            }
+            return ftY;
+        }
+
+        if (z >= sheerPlan.cachedBowRisingEnd.z)
+        {
+            return sheerPlan.GetStemProfileYAtZ(z);
+        }
+
         return sheerPlan.GetKeelYAtZ(z);
     }
 
@@ -256,6 +264,23 @@ public class FramingModel : MonoBehaviour
         return cachedStationList;
     }
 
+    public SectionNodes GetSectionNodesForFrame(float z, float side)
+    {
+        if (bodyPlan == null) return new SectionNodes();
+        SectionNodes nodes = bodyPlan.GetSectionNodesAtZ(z, side);
+
+        // For any frames aft of Stern end of Rising Line (z < cachedSternRisingEnd.z):
+        // p0 and p1 sit on the Projected Stern Rising Line, NOT climbing the Stern Profile curve!
+        if (sheerPlan != null && z < sheerPlan.cachedSternRisingEnd.z)
+        {
+            float projRisingY = sheerPlan.GetProjectedSternRisingYAtZ(z);
+            nodes.p0.y = projRisingY;
+            nodes.p1.y = projRisingY;
+        }
+
+        return nodes;
+    }
+
     public bool GetFrameControlPointsAtZ(float z, float side,
         out Vector3 pL0, out Vector3 pL1, out Vector3 pLR, out Vector3 pL2, out Vector3 pL3,
         out Vector3 pU0, out Vector3 pU1, out Vector3 pU2, out Vector3 pU3)
@@ -263,7 +288,7 @@ public class FramingModel : MonoBehaviour
         pL0 = pL1 = pLR = pL2 = pL3 = pU0 = pU1 = pU2 = pU3 = Vector3.zero;
         if (bodyPlan == null) return false;
 
-        SectionNodes nodes = bodyPlan.GetSectionNodesAtZ(z, side);
+        SectionNodes nodes = GetSectionNodesForFrame(z, side);
         pL0 = nodes.p0;
         pL1 = nodes.p1;
         pLR = nodes.p1;
@@ -282,7 +307,7 @@ public class FramingModel : MonoBehaviour
         float side = Mathf.Sign(pL0.x);
         if (bodyPlan != null)
         {
-            SectionNodes nodes = bodyPlan.GetSectionNodesAtZ(z, side);
+            SectionNodes nodes = GetSectionNodesForFrame(z, side);
             return bodyPlan.EvaluateBodySectionAtU(u, nodes);
         }
         return Vector3.Lerp(pL0, pU3, u);
@@ -301,7 +326,7 @@ public class FramingModel : MonoBehaviour
     public Vector3 GetTransverseFramePointAtY(float z, float side, float targetY)
     {
         if (bodyPlan == null) return Vector3.zero;
-        SectionNodes nodes = bodyPlan.GetSectionNodesAtZ(z, side);
+        SectionNodes nodes = GetSectionNodesForFrame(z, side);
 
         float minU = 0f;
         float maxU = 1f;
@@ -323,18 +348,25 @@ public class FramingModel : MonoBehaviour
         FindReferences();
         if (sheerPlan == null || bodyPlan == null || breadthPlan == null) return;
 
-        // 1. Draw Master Frame at Z = 0
+        // 1. Master Frame at Z = 0
         if (showMasterFrame)
         {
             DrawMasterFrameHalf(1f, starboardColor);
             DrawMasterFrameHalf(-1f, portColor);
         }
 
-        // 2. Draw Longitudinal Ribband Lines (Strakes / Skeleton Guides)
+        // 2. Longitudinal Ribband Lines (Strakes / Skeleton Guides)
         if (showRibbands)
         {
             DrawRibbands();
         }
+
+        // 3. Transverse Frames
+        if (showFrames)
+        {
+            DrawTransverseFrames();
+        }
+
     }
 
     private void DrawMasterFrameHalf(float sideSign, Color color)
@@ -380,8 +412,6 @@ public class FramingModel : MonoBehaviour
 
     private void DrawRibbands()
     {
-        float aftZ = sheerPlan.GetAftMostZ();
-        float fwdZ = sheerPlan.GetFwdMostZ();
         const int samples = 100;
 
         // 1. Top Timber Ribband (Sheer / Top Line p4)
@@ -492,4 +522,104 @@ public class FramingModel : MonoBehaviour
             }
         }
     }
+
+    private void DrawTransverseFrames()
+    {
+        if (!showFrames || bodyPlan == null) return;
+
+        List<float> stations = CalculateFrameStations();
+        const int steps = 60;
+
+        foreach (float z in stations)
+        {
+            SectionNodes nodesStbd = GetSectionNodesForFrame(z, 1f);
+            SectionNodes nodesPort = GetSectionNodesForFrame(z, -1f);
+
+            bool applyCutoff = !disableFrameCutoffs && sheerPlan != null;
+            float bottomY = applyCutoff ? GetFrameBottomYAtZ(z) : -9999f;
+
+            // Starboard Frame Half
+            Gizmos.color = starboardColor;
+            Vector3 prevStbd = nodesStbd.p0;
+            for (int i = 1; i <= steps; i++)
+            {
+                float u = (float)i / steps;
+                Vector3 currStbd = bodyPlan.EvaluateBodySectionAtU(u, nodesStbd);
+
+                if (applyCutoff)
+                {
+                    if (currStbd.y < bottomY - 0.0001f && prevStbd.y < bottomY - 0.0001f)
+                    {
+                        prevStbd = currStbd;
+                        continue;
+                    }
+
+                    Vector3 drawStart = prevStbd;
+                    Vector3 drawEnd = currStbd;
+
+                    if (prevStbd.y < bottomY && currStbd.y >= bottomY)
+                    {
+                        float dy = currStbd.y - prevStbd.y;
+                        float t = (Mathf.Abs(dy) > 0.00001f) ? Mathf.Clamp01((bottomY - prevStbd.y) / dy) : 0f;
+                        drawStart = Vector3.Lerp(prevStbd, currStbd, t);
+                    }
+                    else if (prevStbd.y >= bottomY && currStbd.y < bottomY)
+                    {
+                        float dy = currStbd.y - prevStbd.y;
+                        float t = (Mathf.Abs(dy) > 0.00001f) ? Mathf.Clamp01((bottomY - prevStbd.y) / dy) : 0f;
+                        drawEnd = Vector3.Lerp(prevStbd, currStbd, t);
+                    }
+
+                    Gizmos.DrawLine(drawStart, drawEnd);
+                }
+                else
+                {
+                    Gizmos.DrawLine(prevStbd, currStbd);
+                }
+                prevStbd = currStbd;
+            }
+
+            // Port Frame Half
+            Gizmos.color = portColor;
+            Vector3 prevPort = nodesPort.p0;
+            for (int i = 1; i <= steps; i++)
+            {
+                float u = (float)i / steps;
+                Vector3 currPort = bodyPlan.EvaluateBodySectionAtU(u, nodesPort);
+
+                if (applyCutoff)
+                {
+                    if (currPort.y < bottomY - 0.0001f && prevPort.y < bottomY - 0.0001f)
+                    {
+                        prevPort = currPort;
+                        continue;
+                    }
+
+                    Vector3 drawStart = prevPort;
+                    Vector3 drawEnd = currPort;
+
+                    if (prevPort.y < bottomY && currPort.y >= bottomY)
+                    {
+                        float dy = currPort.y - prevPort.y;
+                        float t = (Mathf.Abs(dy) > 0.00001f) ? Mathf.Clamp01((bottomY - prevPort.y) / dy) : 0f;
+                        drawStart = Vector3.Lerp(prevPort, currPort, t);
+                    }
+                    else if (prevPort.y >= bottomY && currPort.y < bottomY)
+                    {
+                        float dy = currPort.y - prevPort.y;
+                        float t = (Mathf.Abs(dy) > 0.00001f) ? Mathf.Clamp01((bottomY - prevPort.y) / dy) : 0f;
+                        drawEnd = Vector3.Lerp(prevPort, currPort, t);
+                    }
+
+                    Gizmos.DrawLine(drawStart, drawEnd);
+                }
+                else
+                {
+                    Gizmos.DrawLine(prevPort, currPort);
+                }
+                prevPort = currPort;
+            }
+        }
+    }
+
 }

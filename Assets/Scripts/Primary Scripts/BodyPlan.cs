@@ -183,29 +183,13 @@ public class BodyPlan : MonoBehaviour
         // Floor point (p1) X position directly follows the Floor line from BreadthPlan (clamped to keel half-width hw)
         floorX = Mathf.Max(floorX, hw);
 
-        // Restriction 1: Bilge point (p2) can never go inward past the line segment p1 -> p3
-        float dy = hobY - floorY;
-        if (Mathf.Abs(dy) > 0.0001f)
-        {
-            float tY = Mathf.Clamp01((bilgeY - floorY) / dy);
-            float minBilgeX = Mathf.Lerp(floorX, hobX, tY);
-            bilgeX = Mathf.Max(bilgeX, minBilgeX);
-        }
-
-        // Restriction 3: Bilge point (p2) can never go outward past HOB vertical boundary (p3)
-        Vector3 checkP1 = new Vector3(floorX, floorY, z);
-        Vector3 checkP3 = new Vector3(hobX, hobY, z);
-        Vector3 checkP2 = new Vector3(bilgeX, bilgeY, z);
-        float d13 = Vector3.Distance(checkP1, checkP3);
-        float d23 = Vector3.Distance(checkP2, checkP3);
-        if (d13 > 0.0001f)
-        {
-            float tangentOffset = (hobX - floorX) / d13 * (d23 / 3f);
-            float maxBilgeX = hobX - tangentOffset;
-            bilgeX = Mathf.Min(bilgeX, maxBilgeX);
-        }
+        // Bilge point (p2) X position directly follows the Bilge line from BreadthPlan (clamped between keel half-width hw and hobX)
+        bilgeX = Mathf.Clamp(bilgeX, hw, hobX);
 
         // Restriction 4: Non-sagging Bilge Y height restriction (bilgeY must not dip below floorY)
+        Vector3 checkP1 = new Vector3(floorX, floorY, z);
+        Vector3 checkP2 = new Vector3(bilgeX, bilgeY, z);
+        Vector3 checkP3 = new Vector3(hobX, hobY, z);
         float d13_y = Vector3.Distance(checkP1, checkP3);
         float d12_y = Vector3.Distance(checkP1, checkP2);
         if (d13_y > 0.0001f && (hobY - floorY) > 0.0001f)
