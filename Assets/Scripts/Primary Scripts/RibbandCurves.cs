@@ -231,7 +231,7 @@ public class RibbandCurves : MonoBehaviour
             // 3. Stern Corner Point (aftP2): Bound directly to FashionCurves if uRib >= 0.25f
             if (fashionCurves != null && uRib >= 0.25f)
             {
-                float tFashion = Mathf.Clamp01((uRib - 0.25f) / 0.50f);
+                float tFashion = Mathf.Clamp01((uRib - 0.25f) / 0.75f);
                 rib.aftP2 = fashionCurves.GetFashionPointAtT(tFashion, 1f);
             }
             else

@@ -26,6 +26,7 @@ public class BreadthCurves : MonoBehaviour
 
     [Header("Gizmo Settings")]
     public bool showLabels = true;
+    public bool showAftProjectionLine = true;
     public Color breadthCurveColor = new Color(0.1f, 0.95f, 0.4f, 0.95f);
 
     [Header("Initialization State")]
@@ -308,23 +309,53 @@ public class BreadthCurves : MonoBehaviour
         if (cachedIsAftCubic)
         {
             if (z > cachedAftP3.z) return GetBreadthXAtZ(z);
-
-            float dz = cachedAftP3.z - cachedAftP2.z;
-            float dx = cachedAftP3.x - cachedAftP2.x;
-            if (Mathf.Abs(dz) < 0.001f) return cachedAftP3.x;
-
-            return cachedAftP3.x + (dx / dz) * (z - cachedAftP3.z);
+            return GetAftProjectionPointAtZ(z).x;
         }
         else
         {
             if (z > cachedAftP2.z) return GetBreadthXAtZ(z);
-
-            float dz = cachedAftP2.z - cachedAftP1.z;
-            float dx = cachedAftP2.x - cachedAftP1.x;
-            if (Mathf.Abs(dz) < 0.001f) return cachedAftP2.x;
-
-            return cachedAftP2.x + (dx / dz) * (z - cachedAftP2.z);
+            return GetAftProjectionPointAtZ(z).x;
         }
+    }
+
+    /// <summary>
+    /// Solves for Bezier parameter t (t >= 1.0) along the aft curve for an extrapolated station Z.
+    /// </summary>
+    public float GetAftBezierTAtExtrapolatedZ(float targetZ)
+    {
+        float t = 1.0f;
+        for (int i = 0; i < 10; i++)
+        {
+            Vector3 pt = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                          : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+            float error = pt.z - targetZ;
+            if (Mathf.Abs(error) < 0.0001f) break;
+
+            float delta = 0.001f;
+            Vector3 ptPlus = cachedIsAftCubic ? CalculateCubicBezierPoint(t + delta, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                              : CalculateQuadraticBezierPoint(t + delta, cachedAftP0, cachedAftP1, cachedAftP2);
+            float dzdt = (ptPlus.z - pt.z) / delta;
+            if (Mathf.Abs(dzdt) > 0.0001f)
+            {
+                t -= error / dzdt;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return Mathf.Max(1.0f, t);
+    }
+
+    /// <summary>
+    /// Evaluates 3D spatial point on the Breadth Curves Aft Curves Projection Line at station Z (extrapolated behind Transom Corner).
+    /// </summary>
+    public virtual Vector3 GetAftProjectionPointAtZ(float z)
+    {
+        UpdateCachedCurves();
+        float t = GetAftBezierTAtExtrapolatedZ(z);
+        return cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
     }
 
     // --- BEZIER MATH UTILITIES ---
@@ -509,9 +540,58 @@ public class BreadthCurves : MonoBehaviour
             Handles.DrawDottedLine(bPortBow, bPortStern, 4f);
             Handles.DrawDottedLine(bPortStern, bStbdStern, 4f);
             Handles.DrawDottedLine(bStbdStern, bStbdBow, 4f);
+
+            // 3. Render Breadth Curves Aft Curves Projection Line (Dashed continuation behind Transom Corner to Transom Top Z)
+            if (showAftProjectionLine)
+            {
+                DrawAftCurvesProjectionLine();
+            }
         }
 #endif
     }
+
+#if UNITY_EDITOR
+    private void DrawAftCurvesProjectionLine()
+    {
+        if (sheerCurves == null) return;
+        sheerCurves.UpdateCachedProfile();
+        float targetZ = sheerCurves.transomP1.z;
+        float cornerZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (targetZ >= cornerZ - 0.001f) return;
+
+        float tTarget = GetAftBezierTAtExtrapolatedZ(targetZ);
+        if (tTarget <= 1.0001f) return;
+
+        Handles.color = new Color(breadthCurveColor.r, breadthCurveColor.g, breadthCurveColor.b, 0.75f);
+
+        int steps = 20;
+        Vector3 prevStbd = cachedIsAftCubic ? cachedAftP3 : cachedAftP2;
+        Vector3 prevPort = MirrorX(prevStbd);
+
+        for (int i = 1; i <= steps; i++)
+        {
+            float t = Mathf.Lerp(1.0f, tTarget, i / (float)steps);
+            Vector3 currStbd = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                               : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+            Vector3 currPort = MirrorX(currStbd);
+
+            Handles.DrawDottedLine(prevStbd, currStbd, 4f);
+            Handles.DrawDottedLine(prevPort, currPort, 4f);
+
+            prevStbd = currStbd;
+            prevPort = currPort;
+        }
+
+        // Transverse Dotted Line connecting Starboard and Port at Transom Top Z station
+        Handles.DrawDottedLine(prevStbd, prevPort, 4f);
+
+        if (showLabels)
+        {
+            GUIStyle style = GetCachedLabelStyle();
+            Handles.Label(prevStbd + new Vector3(0, 0.2f, 0), "Breadth Curves Aft Curves Projection Line", style);
+        }
+    }
+#endif
 
     private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 40)
     {

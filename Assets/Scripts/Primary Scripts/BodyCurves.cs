@@ -28,6 +28,9 @@ public class BodyCurves : MonoBehaviour
     [Tooltip("Reference to BilgeCurves for Diagonal Bilge Line (p2) 3D spatial points.")]
     public BilgeCurves bilgeCurves;
 
+    [Tooltip("Reference to TopLineCurves for TopLine Body Point (p4) 3D spatial points.")]
+    public TopLineCurves topLineCurves;
+
     [Header("Keel & Master Dimensions")]
     [Tooltip("Physical Keel half-width offset (starts at keelWidth / 2).")]
     public float keelWidth = 0.5f;
@@ -86,6 +89,9 @@ public class BodyCurves : MonoBehaviour
 
         if (bilgeCurves == null) bilgeCurves = GetComponentInParent<BilgeCurves>();
         if (bilgeCurves == null) bilgeCurves = FindFirstObjectByType<BilgeCurves>();
+
+        if (topLineCurves == null) topLineCurves = GetComponentInParent<TopLineCurves>();
+        if (topLineCurves == null) topLineCurves = FindFirstObjectByType<TopLineCurves>();
     }
 
     public virtual void UpdateCachedCurves()
@@ -93,6 +99,7 @@ public class BodyCurves : MonoBehaviour
         FindReferences();
 
         if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
+        if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
         if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
         if (floorCurves != null) floorCurves.UpdateCachedCurves();
 
@@ -248,13 +255,19 @@ public class BodyCurves : MonoBehaviour
             }
         }
 
-        // 5. Top Timber / Sheer Point (p4): Height from SheerCurves, width from BreadthCurves
-        float sheerY = (sheerCurves != null) ? (sheerCurves.keelY + sheerCurves.stemHeight) : (hobY + 1.5f);
-        float sheerX = (breadthCurves != null) ? breadthCurves.GetTheoreticalBreadthXAtZ(z) : hobX;
-
-        // Tumblehome boundary restriction (p4 sheerX cannot narrow by more than 40% of HOB max breadth)
-        float minTumblehomeX = hobX * 0.60f;
-        sheerX = Mathf.Max(sheerX, minTumblehomeX);
+        // 5. TopLine Body Point (p4): Bound directly to TopLineCurves (Exact 3D match to TopLine Midship Point / TopLine Curve)
+        float topLineX, topLineY;
+        if (topLineCurves != null)
+        {
+            Vector3 topLinePt = topLineCurves.GetTopLinePointAtZ(z);
+            topLineX = topLinePt.x;
+            topLineY = topLinePt.y;
+        }
+        else
+        {
+            topLineX = (breadthCurves != null) ? breadthCurves.GetTheoreticalBreadthXAtZ(z) : hobX;
+            topLineY = (sheerCurves != null) ? (sheerCurves.keelY + sheerCurves.stemHeight) : (hobY + 1.5f);
+        }
 
         // Profile convergence at Stem and Stern
         if (sheerCurves != null)
@@ -267,7 +280,7 @@ public class BodyCurves : MonoBehaviour
                     floorX = hw;
                     bilgeX = hw;
                     hobX = hw;
-                    sheerX = hw;
+                    topLineX = hw;
                 }
             }
             else if (z <= sheerCurves.sternP0.z)
@@ -277,7 +290,7 @@ public class BodyCurves : MonoBehaviour
                     floorX = hw;
                     bilgeX = hw;
                     hobX = hw;
-                    sheerX = hw;
+                    topLineX = hw;
                 }
             }
         }
@@ -287,7 +300,7 @@ public class BodyCurves : MonoBehaviour
         nodes.p1 = new Vector3(sideSign * floorX, floorY, z);
         nodes.p2 = new Vector3(sideSign * bilgeX, bilgeY, z);
         nodes.p3 = new Vector3(sideSign * hobX, hobY, z);
-        nodes.p4 = new Vector3(sideSign * sheerX, sheerY, z);
+        nodes.p4 = new Vector3(sideSign * topLineX, topLineY, z);
         return nodes;
     }
 
@@ -365,7 +378,7 @@ public class BodyCurves : MonoBehaviour
         Gizmos.color = new Color(1f, 0.5f, 0f); Gizmos.DrawSphere(nodes.p1, 0.14f); // Floor
         Gizmos.color = new Color(0.1f, 0.9f, 0.4f); Gizmos.DrawSphere(nodes.p2, 0.14f); // Diagonal Bilge
         Gizmos.color = Color.cyan; Gizmos.DrawSphere(nodes.p3, 0.14f); // Max Breadth (HOB)
-        Gizmos.color = Color.magenta; Gizmos.DrawSphere(nodes.p4, 0.14f); // Sheer
+        Gizmos.color = Color.magenta; Gizmos.DrawSphere(nodes.p4, 0.14f); // TopLine Body Point
 
 #if UNITY_EDITOR
         if (showPolygonSkeleton)
@@ -429,7 +442,7 @@ public class BodyCurves : MonoBehaviour
             DrawControlArmHandle(P1, T1, "T1 (Floor)", new Color(1f, 0.5f, 0f), (d01 + d12) * 0.5f, true, true);
             DrawControlArmHandle(P2, T2, "T2 (Bilge)", new Color(0.1f, 0.9f, 0.4f), (d12 + d23) * 0.5f, true, true);
             DrawControlArmHandle(P3, T3, "T3 (HOB)", Color.cyan, (d23 + d34) * 0.5f, true, true);
-            DrawControlArmHandle(P4, T4, "T4 (Sheer)", Color.magenta, d34, true, false);
+            DrawControlArmHandle(P4, T4, "T4 (TopLine)", Color.magenta, d34, true, false);
         }
 
         if (showLabels && sideSign > 0)
@@ -444,7 +457,7 @@ public class BodyCurves : MonoBehaviour
             Handles.Label(nodes.p1 + new Vector3(0.08f, 0, 0), " p1: Floor Curves Intersect", labelStyle);
             Handles.Label(nodes.p2 + new Vector3(0.08f, 0, 0), " p2: Diagonal Bilge", labelStyle);
             Handles.Label(nodes.p3 + new Vector3(0.08f, 0, 0), " p3: Breadth Curves Intersect", labelStyle);
-            Handles.Label(nodes.p4 + new Vector3(0.08f, 0, 0), " p4: Top Timber (Sheer)", labelStyle);
+            Handles.Label(nodes.p4 + new Vector3(0.08f, 0, 0), " p4: TopLine Body Point", labelStyle);
         }
 #endif
     }
@@ -527,7 +540,7 @@ public class BodyCurvesEditor : Editor
         EditorGUILayout.LabelField($"p1 Floor Apex (FloorCurves):", $"X: {nodes.p1.x:F2}, Y: {nodes.p1.y:F2}");
         EditorGUILayout.LabelField($"p2 Diagonal Bilge:", $"X: {nodes.p2.x:F2}, Y: {nodes.p2.y:F2}");
         EditorGUILayout.LabelField($"p3 Max Breadth Apex (BreadthCurves):", $"X: {nodes.p3.x:F2}, Y: {nodes.p3.y:F2}");
-        EditorGUILayout.LabelField($"p4 Sheer Top Timber:", $"X: {nodes.p4.x:F2}, Y: {nodes.p4.y:F2}");
+        EditorGUILayout.LabelField($"p4 TopLine Body Point (TopLineCurves):", $"X: {nodes.p4.x:F2}, Y: {nodes.p4.y:F2}");
 
         EditorGUILayout.Space(10);
         if (GUILayout.Button("Update Body Curves Profile", GUILayout.Height(30)))
@@ -592,6 +605,22 @@ public class BodyCurvesEditor : Editor
         Handles.color = Color.blue;
         Vector3 zArrowP3 = Handles.Slider(stbdNodes.p3, Vector3.forward, 0.8f, Handles.ArrowHandleCap, 0.05f);
         if (Mathf.Abs(zArrowP3.z - stbdNodes.p3.z) > 0.001f) newP3.z = zArrowP3.z;
+
+        // 4. Interactive Handle for p4 (TopLine Body Point) -> Updates TopLineCurves maxBeam, fwdP3.y, & fwdP3.z
+        Handles.color = Color.magenta;
+        Vector3 newP4 = Handles.FreeMoveHandle(stbdNodes.p4, 0.18f, Vector3.zero, Handles.SphereHandleCap);
+
+        Handles.color = Color.red;
+        Vector3 xArrowP4 = Handles.Slider(stbdNodes.p4, Vector3.right, 0.8f, Handles.ArrowHandleCap, 0.05f);
+        if (Mathf.Abs(xArrowP4.x - stbdNodes.p4.x) > 0.001f) newP4.x = xArrowP4.x;
+
+        Handles.color = Color.green;
+        Vector3 yArrowP4 = Handles.Slider(stbdNodes.p4, Vector3.up, 0.8f, Handles.ArrowHandleCap, 0.05f);
+        if (Mathf.Abs(yArrowP4.y - stbdNodes.p4.y) > 0.001f) newP4.y = yArrowP4.y;
+
+        Handles.color = Color.blue;
+        Vector3 zArrowP4 = Handles.Slider(stbdNodes.p4, Vector3.forward, 0.8f, Handles.ArrowHandleCap, 0.05f);
+        if (Mathf.Abs(zArrowP4.z - stbdNodes.p4.z) > 0.001f) newP4.z = zArrowP4.z;
 
         if (EditorGUI.EndChangeCheck())
         {
@@ -700,6 +729,36 @@ public class BodyCurvesEditor : Editor
                     curves.floorCurves.UpdateCachedCurves();
                     EditorUtility.SetDirty(curves.floorCurves);
                 }
+            }
+
+            // --- HANDLE 4: TopLine Body Point (p4) ---
+            if (curves.topLineCurves != null && Vector3.Distance(newP4, stbdNodes.p4) > 0.001f)
+            {
+                Undo.RecordObjects(new Object[] { curves.topLineCurves, curves }, "Drag BodyCurves TopLine Handle");
+                float hw = curves.keelWidth / 2f;
+                float maxAllowedBeam = 20.0f;
+                if (curves.breadthCurves != null)
+                {
+                    float bX = Mathf.Max(curves.breadthCurves.maxBeam, curves.breadthCurves.fwdP3.x);
+                    if (bX > 0.1f) maxAllowedBeam = bX;
+                }
+
+                curves.topLineCurves.maxBeam = Mathf.Clamp(Mathf.Abs(newP4.x), hw, maxAllowedBeam);
+                curves.topLineCurves.fwdP3.y = newP4.y;
+
+                if (Mathf.Abs(newP4.z - stbdNodes.p4.z) > 0.001f)
+                {
+                    float bowZ = (curves.sheerCurves != null) ? curves.sheerCurves.upperStemTop.z : 15f;
+                    float sternZ = (curves.sheerCurves != null) ? curves.sheerCurves.transomP1.z : -15f;
+                    float dzTotal = bowZ - sternZ;
+                    if (dzTotal > 0.001f)
+                    {
+                        curves.topLineCurves.midshipApexZPercentage = Mathf.Clamp((newP4.z - sternZ) / dzTotal, 0.05f, 0.95f);
+                    }
+                }
+
+                curves.topLineCurves.UpdateCachedCurves();
+                EditorUtility.SetDirty(curves.topLineCurves);
             }
 
             curves.UpdateCachedCurves();

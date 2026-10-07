@@ -204,7 +204,21 @@ public class TopLineCurves : MonoBehaviour
 
         float bowZ = fwdP0.z;
         float sternZ = cachedIsAftCubic ? aftP3.z : aftP2.z;
-        float targetApexZ = Mathf.Lerp(sternZ, bowZ, Mathf.Clamp(midshipApexZPercentage, 0.05f, 0.95f));
+
+        float targetApexZ;
+        if (breadthCurves != null)
+        {
+            targetApexZ = Mathf.Clamp(breadthCurves.fwdP3.z, sternZ + 0.1f, bowZ - 0.1f);
+            float dzTotal = bowZ - sternZ;
+            if (dzTotal > 0.001f)
+            {
+                midshipApexZPercentage = Mathf.Clamp((targetApexZ - sternZ) / dzTotal, 0.05f, 0.95f);
+            }
+        }
+        else
+        {
+            targetApexZ = Mathf.Lerp(sternZ, bowZ, Mathf.Clamp(midshipApexZPercentage, 0.05f, 0.95f));
+        }
 
         float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
 
@@ -256,7 +270,14 @@ public class TopLineCurves : MonoBehaviour
         fwdP2.x = maxBeam;
         aftP1.x = maxBeam;
 
-        aftP2.x = hw + (maxBeam - hw) * transomWidth;
+        if (breadthCurves != null)
+        {
+            aftP2.x = breadthCurves.GetAftProjectionPointAtZ(aftP2.z).x;
+        }
+        else
+        {
+            aftP2.x = hw + (maxBeam - hw) * transomWidth;
+        }
         fwdP0.x = hw;
         if (cachedIsAftCubic) aftP3.x = hw;
 
@@ -697,6 +718,20 @@ public class TopLineCurvesEditor : Editor
                 plan.midshipApexZPercentage = Mathf.Clamp((newFwdP3.z - sternZ) / dzTotal, 0.05f, 0.95f);
             }
 
+            if (plan.breadthCurves != null && Mathf.Abs(newFwdP3.z - plan.fwdP3.z) > 0.001f)
+            {
+                Undo.RecordObject(plan.breadthCurves, "Drag Midship Apex Z Handle");
+                float bBowZ = (plan.sheerCurves != null) ? plan.sheerCurves.stemP3.z : 15f;
+                float bSternZ = (plan.sheerCurves != null) ? plan.sheerCurves.sternP3.z : -15f;
+                float bDz = bBowZ - bSternZ;
+                if (bDz > 0.001f)
+                {
+                    plan.breadthCurves.midshipApexZPercentage = Mathf.Clamp((newFwdP3.z - bSternZ) / bDz, 0.05f, 0.95f);
+                }
+                plan.breadthCurves.UpdateCachedCurves();
+                EditorUtility.SetDirty(plan.breadthCurves);
+            }
+
             float newFwdSpan = bowZ - newFwdP3.z;
             if (newFwdSpan > 0.001f)
             {
@@ -750,6 +785,13 @@ public class TopLineCurvesEditor : Editor
 
             plan.UpdateCachedCurves();
             EditorUtility.SetDirty(plan);
+
+            BodyCurves bodyCurves = Object.FindFirstObjectByType<BodyCurves>();
+            if (bodyCurves != null)
+            {
+                bodyCurves.UpdateCachedCurves();
+                EditorUtility.SetDirty(bodyCurves);
+            }
         }
     }
 }
