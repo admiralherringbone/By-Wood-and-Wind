@@ -365,7 +365,7 @@ public class BreadthPlan : MonoBehaviour
         return Mathf.Lerp(floorX, hobX, connRatio);
     }
 
-    public float GetBreadthXAtZ(float z)
+    public virtual float GetBreadthXAtZ(float z)
     {
         if (z >= 0)
         {
@@ -390,7 +390,7 @@ public class BreadthPlan : MonoBehaviour
         }
     }
 
-    public float GetTheoreticalBreadthXAtZ(float z)
+    public virtual float GetTheoreticalBreadthXAtZ(float z)
     {
         if (z >= 0) return GetBreadthXAtZ(z);
 
@@ -416,7 +416,7 @@ public class BreadthPlan : MonoBehaviour
         }
     }
 
-    public float GetTopTimberXAtZ(float z)
+    public virtual float GetTopTimberXAtZ(float z)
     {
         float rawX;
         if (z >= 0)
@@ -456,7 +456,7 @@ public class BreadthPlan : MonoBehaviour
         return Mathf.Max(rawX, minTumblehomeX);
     }
 
-    public float GetFloorLineXAtZ(float z)
+    public virtual float GetFloorLineXAtZ(float z)
     {
         float rawX;
         if (z >= 0)
@@ -486,7 +486,7 @@ public class BreadthPlan : MonoBehaviour
     /// Computes the 3D Diagonal Bilge Width at station Z.
     /// Positioned smoothly between Floor Line width and Max Breadth.
     /// </summary>
-    public float GetBilgeXAtZ(float z)
+    public virtual float GetBilgeXAtZ(float z)
     {
         float minKeelX = (bodyPlan != null) ? (bodyPlan.keelWidth / 2f) : 0.25f;
         float floorX = GetFloorLineXAtZ(z);

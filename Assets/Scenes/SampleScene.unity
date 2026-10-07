@@ -173,10 +173,12 @@ MonoBehaviour:
   trajectoryAnchorStations: 20
   showLabels: 1
   showFrames: 1
+  showFrameNodes: 0
+  frameNodeRadius: 0.08
   starboardColor: {r: 0, g: 1, b: 1, a: 1}
   portColor: {r: 1, g: 0, b: 1, a: 1}
   frameColor: {r: 0.2, g: 0.8, b: 1, a: 0.7}
-  changeVersion: 242
+  changeVersion: 355
 --- !u!4 &287447049
 Transform:
   m_ObjectHideFlags: 0
@@ -187,6 +189,75 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.29797, y: 7.44774, z: -0.59481}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &305155959
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 305155961}
+  - component: {fileID: 305155960}
+  m_Layer: 0
+  m_Name: BoundaryLinesPractice
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &305155960
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 305155959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5931201a8881467ab35b7e7b0b5eb27, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoundaryLinesPractice
+  bodyPlan: {fileID: 722911565}
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  spacingMode: 0
+  targetPlankWidth: 0.35
+  manualLinesFloorToKeel: 2
+  manualLinesBilgeToFloor: 3
+  manualLinesWaleToBilge: 4
+  sampleResolution: 100
+  showStarboard: 1
+  showPort: 1
+  showSpheresOnFrames: 0
+  floorToKeelColor: {r: 0.2, g: 0.85, b: 1, a: 0.95}
+  bilgeToFloorColor: {r: 0.15, g: 0.95, b: 0.45, a: 0.95}
+  waleToBilgeColor: {r: 1, g: 0.4, b: 0.1, a: 0.95}
+  enableCatmullRomFairing: 1
+  catmullRomAlpha: 0.5
+  subsegmentDensity: 8
+  derivedLinesFloorToKeel: 3
+  derivedLinesBilgeToFloor: 3
+  derivedLinesWaleToBilge: 12
+  masterFrameGirthFloorToKeel: 1.567001
+  masterFrameGirthBilgeToFloor: 1.2351297
+  masterFrameGirthWaleToBilge: 4.7094064
+--- !u!4 &305155961
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 305155959}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -531,7 +602,7 @@ MonoBehaviour:
   cachedU1: {x: 3, y: 3, z: 0}
   cachedU2: {x: 2.4, y: 6, z: 0}
   cachedU3: {x: 2.4, y: 6, z: 0}
-  changeVersion: 61212789
+  changeVersion: 61430550
   enableInteractiveNodeHandles: 1
 --- !u!1 &832575517
 GameObject:
@@ -574,6 +645,136 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 832575517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &888728994
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 888728996}
+  - component: {fileID: 888728995}
+  m_Layer: 0
+  m_Name: BreadthPlanNurbs
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &888728995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 888728994}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77b4b2009b4764b6f9cb7836211096e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BreadthPlanNurbs
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  showLabels: 1
+  maxBeam: 3
+  transomWidth: 0.5
+  bowArmAngle: 43.8
+  bowArmLength: 0.27781698
+  midshipFwdArmLength: 0.64020264
+  midshipAftArmLength: 0.5
+  sternArmAngle: 0
+  sternArmLength: 1
+  topTimberMaxBeam: 3.5
+  topTimberTransomWidth: 0.5
+  topTimberBowArmAngle: 0
+  topTimberBowArmLength: 1
+  topTimberMidshipFwdArmLength: 0.5
+  topTimberMidshipAftArmLength: 0.5
+  topTimberSternArmAngle: 0
+  topTimberSternArmLength: 1
+  showFloorLine: 1
+  floorLineColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
+  midshipFloorWidth: 1.5
+  floorBowControl: 0.5
+  floorSternControl: 0.5
+  showBilgeCurve: 1
+  bilgeCurveColor: {r: 0.1, g: 0.9, b: 0.4, a: 0.9}
+  bilgeWidthRatio: 0.6
+  cachedFwdP0: {x: 0.125, y: 3, z: 10}
+  cachedFwdP1: {x: 0.958451, y: 3, z: 9.621575}
+  cachedFwdP2: {x: 3, y: 3, z: 6.402026}
+  cachedFwdP3: {x: 3, y: 3, z: 0}
+  cachedAftP0: {x: 3, y: 3, z: 0}
+  cachedAftP1: {x: 3, y: 3, z: -5}
+  cachedAftP2: {x: 1.5, y: 3, z: -10.216921}
+  cachedAftP3: {x: 1.5, y: 3, z: -10.216921}
+  cachedIsAftCubic: 0
+  cachedTTFwdP0: {x: 0.125, y: 4.5, z: 10}
+  cachedTTFwdP1: {x: 3.625, y: 6, z: 10}
+  cachedTTFwdP2: {x: 3.5, y: 6, z: 5}
+  cachedTTFwdP3: {x: 3.5, y: 4.5, z: 0}
+  cachedTTAftP0: {x: 3.5, y: 4.5, z: 0}
+  cachedTTAftP1: {x: 3.5, y: 6, z: -5}
+  cachedTTAftP2: {x: 1.75, y: 6, z: -11.307542}
+  cachedTTAftP3: {x: 1.75, y: 4.5, z: -11.307542}
+  cachedIsTTAftCubic: 0
+  cachedFloorBowPoint: {x: 0.125, y: 0.46635365, z: 9.589458}
+  cachedFloorBowCp: {x: 0.175, y: 0.46635365, z: 4.794729}
+  cachedFloorMidshipPoint: {x: 1.5, y: 0.46635365, z: 0}
+  cachedFloorSternCp: {x: 0.175, y: 0.46635365, z: -4.8327074}
+  cachedFloorSternPoint: {x: 0.125, y: 0.46635365, z: -9.665415}
+  cachedBilgeBowPoint: {x: 0.125, y: 2.4955058, z: 9.841903}
+  cachedBilgeBowCp: {x: 1.8700001, y: 1.2926463, z: 4.9209514}
+  cachedBilgeMidshipPoint: {x: 1.8700001, y: 1.2926463, z: 0}
+  cachedBilgeSternCp: {x: 1.8700001, y: 1.2926463, z: -4.889862}
+  cachedBilgeSternPoint: {x: 0.125, y: 2.7290516, z: -9.779724}
+  changeVersion: 237745
+  enableInteractiveNodeHandles: 1
+  splineTension: 1
+  stepsPerSegment: 35
+  boundaryArcBulge: 0.2
+  isInitialized: 1
+  nurbsBreadthWaypoints:
+  - {x: 1.5, y: 3, z: -10.216921}
+  - {x: 2.25, y: 3, z: -6.743168}
+  - {x: 2.85, y: 3, z: -3.371584}
+  - {x: 3, y: 3, z: 0}
+  - {x: 3, y: 3, z: 2.3483276}
+  - {x: 2.7381315, y: 3, z: 5.4469147}
+  - {x: 1.7228103, y: 3, z: 8.484084}
+  - {x: 0.125, y: 3, z: 10}
+  nurbsTopTimberWaypoints:
+  - {x: 1.75, y: 4.5, z: -11.307542}
+  - {x: 2.625, y: 4.5, z: -7.462978}
+  - {x: 3.325, y: 4.5, z: -3.731489}
+  - {x: 3.5, y: 4.5, z: 0}
+  - {x: 3.325, y: 4.5, z: 3}
+  - {x: 2.625, y: 4.5, z: 6}
+  - {x: 1.4, y: 4.5, z: 8.5}
+  - {x: 0.125, y: 4.5, z: 10}
+  nurbsFloorWaypoints:
+  - {x: 0.125, y: 0.46635365, z: -9.665415}
+  - {x: 1.05, y: 0.46635365, z: -4.8327074}
+  - {x: 1.5, y: 0.46635365, z: 0}
+  - {x: 1.2, y: 0.46635365, z: 3.8357835}
+  - {x: 0.6, y: 0.46635365, z: 7.671567}
+  - {x: 0.125, y: 0.46635365, z: 9.589458}
+--- !u!4 &888728996
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 888728994}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -702,7 +903,7 @@ MonoBehaviour:
   showFloorLine: 1
   floorLineColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
   midshipFloorWidth: 1.6209968
-  floorBowControl: 0.455
+  floorBowControl: 0.736
   floorSternControl: 0.522
   showBilgeCurve: 1
   bilgeCurveColor: {r: 0.1, g: 0.9, b: 0.4, a: 0.9}
@@ -726,16 +927,215 @@ MonoBehaviour:
   cachedTTAftP3: {x: 0, y: 0, z: 0}
   cachedIsTTAftCubic: 0
   cachedFloorBowPoint: {x: 0.125, y: 0.46635365, z: 9.589458}
-  cachedFloorBowCp: {x: 1.6209968, y: 0.46635365, z: 4.3632035}
+  cachedFloorBowCp: {x: 1.6209968, y: 0.46635365, z: 7.0578413}
   cachedFloorMidshipPoint: {x: 1.6209968, y: 0.46635365, z: 0}
   cachedFloorSternCp: {x: 1.6209968, y: 0.46635365, z: -5.0453467}
   cachedFloorSternPoint: {x: 0.125, y: 0.46635365, z: -9.665415}
-  cachedBilgeBowPoint: {x: 0.125, y: 2.442702, z: 9.825077}
-  cachedBilgeBowCp: {x: 2.5390306, y: 1.2926463, z: 4.4704103}
+  cachedBilgeBowPoint: {x: 0.125, y: 2.4955058, z: 9.841903}
+  cachedBilgeBowCp: {x: 2.5390306, y: 1.2926463, z: 7.2436404}
   cachedBilgeMidshipPoint: {x: 2.5390306, y: 1.2926463, z: 0}
   cachedBilgeSternCp: {x: 2.5390306, y: 1.2926463, z: -5.105016}
   cachedBilgeSternPoint: {x: 0.125, y: 2.7290516, z: -9.779724}
-  changeVersion: 827893826
+  changeVersion: 833748729
+--- !u!1 &1259500289
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1259500291}
+  - component: {fileID: 1259500290}
+  m_Layer: 0
+  m_Name: StrakesPointsPractice
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1259500290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1259500289}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c177a6aea16bb4d7bbf30a62a2fbc0a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StrakesPointsPractice
+  bodyPlan: {fileID: 722911565}
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  targetInterval: 0.25
+  useFrameStations: 1
+  sampleResolution: 60
+  showStarboard: 1
+  showPort: 1
+  showPoints: 1
+  showStrakeLines: 1
+  showLabels: 1
+  showDiscardedPoints: 0
+  sphereRadius: 0.06
+  waleToBilgeColor: {r: 1, g: 0.4, b: 0.1, a: 0.95}
+  bilgeToFloorColor: {r: 0.15, g: 0.95, b: 0.45, a: 0.95}
+  floorToKeelColor: {r: 0.2, g: 0.85, b: 1, a: 0.95}
+  discardedColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.35}
+  useExtendedBoundaryCurves: 1
+--- !u!4 &1259500291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1259500289}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1463879054
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1463879056}
+  - component: {fileID: 1463879055}
+  m_Layer: 0
+  m_Name: BackboneModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1463879055
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1463879054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b52c783bf32040e68e5fb13f20a7848, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackboneModel
+  bodyPlan: {fileID: 722911565}
+  sheerPlan: {fileID: 1972862976}
+  breadthPlan: {fileID: 1109839672}
+  showCenterlineKeel: 1
+  showCenterlineStem: 1
+  showCenterlineSternPost: 1
+  showKeelSideLines: 1
+  showStemSideLines: 1
+  showSternPostSideLines: 1
+  showKeelWidthCrossBars: 1
+  showJointSpheres: 1
+  jointSphereRadius: 0.1
+  sampleResolution: 50
+  centerlineColor: {r: 1, g: 0.9, b: 0.2, a: 1}
+  starboardSideColor: {r: 0.2, g: 0.8, b: 1, a: 0.9}
+  portSideColor: {r: 1, g: 0.3, b: 0.3, a: 0.9}
+  crossBarColor: {r: 0.8, g: 0.8, b: 0.8, a: 0.7}
+  jointColor: {r: 0.2, g: 1, b: 0.4, a: 1}
+--- !u!4 &1463879056
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1463879054}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1541446019
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1541446021}
+  - component: {fileID: 1541446020}
+  m_Layer: 0
+  m_Name: StrakesModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1541446020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541446019}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7db8af214e6634d4faf299d918d6f50b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StrakesModel
+  sheerPlan: {fileID: 1972862976}
+  bodyPlan: {fileID: 722911565}
+  breadthPlan: {fileID: 1109839672}
+  framingModel: {fileID: 287447048}
+  samplingMode: 0
+  sampleResolution: 100
+  showGarboardStrake: 1
+  showFloorLineStrake: 0
+  showBilgeLineStrake: 1
+  showMainWaleStrake: 1
+  showMainSheerStrake: 1
+  showTopTimberStrake: 0
+  showDivision1Strakes: 1
+  division1TargetInterval: 0.25
+  showDivision2Strakes: 1
+  division2TargetInterval: 0.25
+  showDivision3Strakes: 1
+  division3TargetInterval: 0.25
+  showStarboard: 1
+  showPort: 1
+  showLabels: 1
+  garboardColor: {r: 0.3, g: 0.9, b: 1, a: 0.95}
+  division1Color: {r: 0.2, g: 0.85, b: 1, a: 0.9}
+  floorSeamColor: {r: 0.2, g: 1, b: 0.5, a: 0.95}
+  division2Color: {r: 0.15, g: 0.95, b: 0.45, a: 0.9}
+  bilgeSeamColor: {r: 1, g: 0.8, b: 0.1, a: 0.95}
+  division3Color: {r: 0.9, g: 0.6, b: 0.1, a: 0.9}
+  waleSeamColor: {r: 1, g: 0.4, b: 0.1, a: 0.95}
+  sheerSeamColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  topTimberColor: {r: 1, g: 0, b: 1, a: 1}
+--- !u!4 &1541446021
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541446019}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1972862974
 GameObject:
   m_ObjectHideFlags: 0
@@ -789,6 +1189,8 @@ MonoBehaviour:
   showProjectedAftKeelLine: 1
   showProjectedSternRisingLine: 1
   showProjectedBowRisingLine: 1
+  showProjectedBowBilgeLine: 1
+  showProjectedSternBilgeLine: 1
   showProjectedTopLine: 1
   lengthBetweenPerpendiculars: 20
   lowerHullHeight: 3
@@ -877,14 +1279,16 @@ MonoBehaviour:
   cachedProjectedTopLineStart: {x: 0, y: 3.5, z: -10.216921}
   cachedProjectedTopLineEnd: {x: 0, y: 3.5, z: 10}
   cachedBowRisingEnd: {x: 0, y: 1.8795006, z: 9.589458}
-  cachedBowP1Ctrl: {x: 0, y: 0.46635365, z: 4.3632035}
+  cachedBowP1Ctrl: {x: 0, y: 0.46635365, z: 7.0578413}
   cachedBowRisingLineEndT: 9.999996
-  cachedProjectedBowRisingEnd: {x: 0, y: 1.9905086, z: 10}
+  cachedProjectedBowRisingEnd: {x: 0, y: 2.1086645, z: 10}
+  cachedProjectedBowBilgeEnd: {x: 0, y: 2.5621033, z: 10}
   cachedSternRisingEnd: {x: 0, y: 2.3289495, z: -9.665415}
   cachedSternP1Ctrl: {x: 0, y: 0.46635365, z: -5.0453467}
   cachedProjectedSternRisingEnd: {x: 0, y: 2.9909785, z: -11.307542}
+  cachedProjectedSternBilgeEnd: {x: 0, y: 3.1861129, z: -11.307542}
   cachedSternRisingLineEndT: 1
-  changeVersion: 354913257
+  changeVersion: 357054157
   cachedStemTopPoint: {x: 0, y: 3.5, z: 10}
   cachedSternPostTopPoint: {x: 0, y: 2.826395, z: -9.807542}
   cachedCounterBasePoint: {x: 0, y: 2.826395, z: -9.807542}
@@ -1011,3 +1415,8 @@ SceneRoots:
   - {fileID: 287447049}
   - {fileID: 900456904}
   - {fileID: 1994714809}
+  - {fileID: 1541446021}
+  - {fileID: 1259500291}
+  - {fileID: 305155961}
+  - {fileID: 1463879056}
+  - {fileID: 888728996}

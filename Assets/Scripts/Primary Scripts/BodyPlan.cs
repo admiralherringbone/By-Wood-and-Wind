@@ -169,9 +169,12 @@ public class BodyPlan : MonoBehaviour
 
         float keelY = (sheerPlan != null) ? sheerPlan.GetKeelYAtZ(z) : 0f;
         float floorY = (sheerPlan != null) ? sheerPlan.GetRisingLineYAtZ(z) : 0.5f;
-        float floorX = (breadthPlan != null) ? breadthPlan.GetFloorLineXAtZ(z) : (hw + 1f);
+        floorY = Mathf.Max(floorY, keelY);
 
         float bilgeY = (sheerPlan != null) ? sheerPlan.GetBilgeYAtZ(z) : (floorY + 1f);
+        bilgeY = Mathf.Max(bilgeY, keelY);
+
+        float floorX = (breadthPlan != null) ? breadthPlan.GetFloorLineXAtZ(z) : (hw + 1f);
         float bilgeX = (breadthPlan != null) ? breadthPlan.GetBilgeXAtZ(z) : (floorX + 1f);
 
         float hobY = (sheerPlan != null) ? sheerPlan.GetTheoreticalHobYAtZ(z) : (bilgeY + 1f);
@@ -179,6 +182,31 @@ public class BodyPlan : MonoBehaviour
 
         float sheerY = (sheerPlan != null) ? sheerPlan.GetTopLineYAtZ(z) : (hobY + 1f);
         float sheerX = (breadthPlan != null) ? breadthPlan.GetTopTimberXAtZ(z) : hobX;
+
+        if (sheerPlan != null)
+        {
+            float bilgeBowZ = sheerPlan.GetBilgeBowZ();
+            float bilgeSternZ = sheerPlan.GetBilgeSternZ();
+
+            // Forward stem profile convergences
+            if (z >= sheerPlan.cachedKeelBowPoint.z)
+            {
+                float stemY = sheerPlan.GetStemProfileYAtZ(z);
+                keelY = stemY;
+                if (z >= sheerPlan.cachedBowRisingEnd.z) { floorY = stemY; floorX = hw; }
+                if (z >= bilgeBowZ) { bilgeY = stemY; bilgeX = hw; }
+                if (z >= sheerPlan.cachedHobBowIntersect.z) { hobY = stemY; hobX = hw; }
+            }
+            // Aft stern profile convergences
+            else if (z <= sheerPlan.cachedKeelSternPoint.z)
+            {
+                float sternY = sheerPlan.GetSternProfileYAtZ(z);
+                keelY = sternY;
+                if (z <= sheerPlan.cachedSternRisingEnd.z) { floorY = sternY; floorX = hw; }
+                if (z <= bilgeSternZ) { bilgeY = sternY; bilgeX = hw; }
+                if (z <= sheerPlan.cachedHobSternIntersect.z) { hobY = sternY; hobX = hw; }
+            }
+        }
 
         // Floor point (p1) X position directly follows the Floor line from BreadthPlan (clamped to keel half-width hw)
         floorX = Mathf.Max(floorX, hw);

@@ -78,6 +78,13 @@ public class FramingModel : MonoBehaviour
     public bool showLabels = true;
     public bool showFrames = true;
 
+    [Tooltip("Render node spheres (Keel p0, Floor p1, Bilge p2, HOB p3, Sheer p4) on all transverse frames.")]
+    public bool showFrameNodes = true;
+
+    [Tooltip("Radius of node spheres drawn on transverse frames.")]
+    [Range(0.02f, 0.3f)]
+    public float frameNodeRadius = 0.08f;
+
     public Color starboardColor = Color.cyan;
     public Color portColor = Color.magenta;
     public Color frameColor = new Color(0.2f, 0.8f, 1f, 0.7f);
@@ -269,13 +276,66 @@ public class FramingModel : MonoBehaviour
         if (bodyPlan == null) return new SectionNodes();
         SectionNodes nodes = bodyPlan.GetSectionNodesAtZ(z, side);
 
-        // For any frames aft of Stern end of Rising Line (z < cachedSternRisingEnd.z):
-        // p0 and p1 sit on the Projected Stern Rising Line, NOT climbing the Stern Profile curve!
-        if (sheerPlan != null && z < sheerPlan.cachedSternRisingEnd.z)
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        float hw = GetKeelHalfWidth();
+
+        if (sheerPlan != null)
         {
-            float projRisingY = sheerPlan.GetProjectedSternRisingYAtZ(z);
-            nodes.p0.y = projRisingY;
-            nodes.p1.y = projRisingY;
+            float bilgeBowZ = sheerPlan.GetBilgeBowZ();
+            float bilgeSternZ = sheerPlan.GetBilgeSternZ();
+
+            // 1. Forward of Keel Bow: p0 climbs the Stem profile curve
+            if (z >= sheerPlan.cachedKeelBowPoint.z)
+            {
+                float stemY = sheerPlan.GetStemProfileYAtZ(z);
+                nodes.p0.y = stemY;
+                nodes.p0.x = sideSign * hw;
+
+                // Floor line termination
+                if (z >= sheerPlan.cachedBowRisingEnd.z)
+                {
+                    nodes.p1.y = stemY;
+                    nodes.p1.x = sideSign * hw;
+                }
+                else if (nodes.p1.y < stemY)
+                {
+                    nodes.p1.y = stemY;
+                    if (Mathf.Abs(nodes.p1.x) < hw) nodes.p1.x = sideSign * hw;
+                }
+
+                // Bilge line termination (eliminates floating p2 spheres in mid-air forward of Bilge line)
+                if (z >= bilgeBowZ)
+                {
+                    nodes.p2.y = stemY;
+                    nodes.p2.x = sideSign * hw;
+                }
+                else if (nodes.p2.y < stemY)
+                {
+                    nodes.p2.y = stemY;
+                    if (Mathf.Abs(nodes.p2.x) < hw) nodes.p2.x = sideSign * hw;
+                }
+
+                // HOB line termination
+                if (z >= sheerPlan.cachedHobBowIntersect.z)
+                {
+                    nodes.p3.y = stemY;
+                    nodes.p3.x = sideSign * hw;
+                }
+            }
+            // Aft of Stern rising line / stern bilge end
+            else if (z < sheerPlan.cachedSternRisingEnd.z)
+            {
+                float projRisingY = sheerPlan.GetProjectedSternRisingYAtZ(z);
+                nodes.p0.y = projRisingY;
+                nodes.p1.y = projRisingY;
+
+                if (z <= bilgeSternZ)
+                {
+                    float sternY = sheerPlan.GetSternProfileYAtZ(z);
+                    nodes.p2.y = sternY;
+                    nodes.p2.x = sideSign * hw;
+                }
+            }
         }
 
         return nodes;
@@ -330,7 +390,7 @@ public class FramingModel : MonoBehaviour
 
         float minU = 0f;
         float maxU = 1f;
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 12; i++)
         {
             float midU = (minU + maxU) * 0.5f;
             Vector3 pt = bodyPlan.EvaluateBodySectionAtU(midU, nodes);
@@ -618,6 +678,23 @@ public class FramingModel : MonoBehaviour
                     Gizmos.DrawLine(prevPort, currPort);
                 }
                 prevPort = currPort;
+            }
+
+            if (showFrameNodes)
+            {
+                // Starboard frame nodes
+                Gizmos.color = Color.yellow; Gizmos.DrawSphere(nodesStbd.p0, frameNodeRadius);
+                Gizmos.color = new Color(1f, 0.5f, 0f); Gizmos.DrawSphere(nodesStbd.p1, frameNodeRadius);
+                Gizmos.color = new Color(0.1f, 0.9f, 0.4f); Gizmos.DrawSphere(nodesStbd.p2, frameNodeRadius);
+                Gizmos.color = Color.cyan; Gizmos.DrawSphere(nodesStbd.p3, frameNodeRadius);
+                Gizmos.color = Color.magenta; Gizmos.DrawSphere(nodesStbd.p4, frameNodeRadius);
+
+                // Port frame nodes
+                Gizmos.color = Color.yellow; Gizmos.DrawSphere(nodesPort.p0, frameNodeRadius);
+                Gizmos.color = new Color(1f, 0.5f, 0f); Gizmos.DrawSphere(nodesPort.p1, frameNodeRadius);
+                Gizmos.color = new Color(0.1f, 0.9f, 0.4f); Gizmos.DrawSphere(nodesPort.p2, frameNodeRadius);
+                Gizmos.color = Color.cyan; Gizmos.DrawSphere(nodesPort.p3, frameNodeRadius);
+                Gizmos.color = Color.magenta; Gizmos.DrawSphere(nodesPort.p4, frameNodeRadius);
             }
         }
     }

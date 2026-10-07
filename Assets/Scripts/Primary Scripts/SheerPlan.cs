@@ -25,6 +25,10 @@ public class SheerPlan : MonoBehaviour
     public bool showProjectedSternRisingLine = true;
     [Tooltip("Draw a grey dashed curve continuing the Bow Rising Line curve extending forward to the furthest forward Z coordinate.")]
     public bool showProjectedBowRisingLine = true;
+    [Tooltip("Draw a grey dashed curve continuing the Bow Bilge Line curve extending forward to the furthest forward Z coordinate.")]
+    public bool showProjectedBowBilgeLine = true;
+    [Tooltip("Draw a grey dashed curve continuing the Stern Bilge Line curve extending aft to the furthest aft Z coordinate.")]
+    public bool showProjectedSternBilgeLine = true;
     [Tooltip("Draw a grey dashed horizontal line extending from the furthest forward to furthest aft Z coordinates.")]
     public bool showProjectedTopLine = true;
 
@@ -271,9 +275,11 @@ public class SheerPlan : MonoBehaviour
     [HideInInspector] public Vector3 cachedBowP1Ctrl;
     [HideInInspector] public float cachedBowRisingLineEndT = 1f;
     [HideInInspector] public Vector3 cachedProjectedBowRisingEnd;
+    [HideInInspector] public Vector3 cachedProjectedBowBilgeEnd;
     [HideInInspector] public Vector3 cachedSternRisingEnd;
     [HideInInspector] public Vector3 cachedSternP1Ctrl;
     [HideInInspector] public Vector3 cachedProjectedSternRisingEnd;
+    [HideInInspector] public Vector3 cachedProjectedSternBilgeEnd;
     [HideInInspector] public float cachedSternRisingLineEndT = 1f;
     [HideInInspector] public int changeVersion = 0;
 
@@ -877,6 +883,41 @@ public class SheerPlan : MonoBehaviour
             cachedProjectedBowRisingEnd = cachedBowRisingEnd;
         }
 
+        // Projected Bow & Stern Bilge Lines (tangent extensions from Bilge endpoints)
+        float bilgeBowZ = GetBilgeBowZ();
+        float bilgeSternZ = GetBilgeSternZ();
+
+        Vector3 bilgeBowPt = new Vector3(0, GetBilgeYAtZ(bilgeBowZ), bilgeBowZ);
+        Vector3 bilgeBowPrev = new Vector3(0, GetBilgeYAtZ(bilgeBowZ - 0.2f), bilgeBowZ - 0.2f);
+        Vector3 bilgeBowTangent = (bilgeBowPt - bilgeBowPrev).normalized;
+
+        if (bilgeBowZ < fwdMostZ - 0.001f && Mathf.Abs(bilgeBowTangent.z) > 0.0001f)
+        {
+            float distZ = fwdMostZ - bilgeBowZ;
+            float scale = distZ / bilgeBowTangent.z;
+            cachedProjectedBowBilgeEnd = bilgeBowPt + bilgeBowTangent * scale;
+        }
+        else
+        {
+            cachedProjectedBowBilgeEnd = bilgeBowPt;
+        }
+
+        aftMostZ = GetAftMostZ();
+        Vector3 bilgeSternPt = new Vector3(0, GetBilgeYAtZ(bilgeSternZ), bilgeSternZ);
+        Vector3 bilgeSternPrev = new Vector3(0, GetBilgeYAtZ(bilgeSternZ + 0.2f), bilgeSternZ + 0.2f);
+        Vector3 bilgeSternTangent = (bilgeSternPt - bilgeSternPrev).normalized;
+
+        if (bilgeSternZ > aftMostZ + 0.001f && Mathf.Abs(bilgeSternTangent.z) > 0.0001f)
+        {
+            float distZ = aftMostZ - bilgeSternZ;
+            float scale = distZ / bilgeSternTangent.z;
+            cachedProjectedSternBilgeEnd = bilgeSternPt + bilgeSternTangent * scale;
+        }
+        else
+        {
+            cachedProjectedSternBilgeEnd = bilgeSternPt;
+        }
+
         // Projected Top Line (Spans continuously from Transom Top at Aft Perpendicular to Stem Top at Forward Perpendicular)
         cachedProjectedTopLineStart = cachedMainSheerSternIntersect;
         cachedProjectedTopLineEnd = cachedMainSheerBowIntersect;
@@ -889,6 +930,23 @@ public class SheerPlan : MonoBehaviour
     }
 
     // --- MATHEMATICAL EVALUATION METHODS ---
+
+    public virtual float GetKeelBaselineYAtZ(float z)
+    {
+        if (keelMidshipDrop == 0f) return 0f;
+        if (z >= 0)
+        {
+            float maxZ = (cachedKeelBowPoint.z != 0f) ? cachedKeelBowPoint.z : 10f;
+            float t = Mathf.Clamp01(z / maxZ);
+            return CalculateQuadraticBezierPoint(t, cachedMidshipKeel, new Vector3(0, 0, maxZ / 2f), cachedKeelBowPoint).y;
+        }
+        else
+        {
+            float minZ = (cachedKeelSternPoint.z != 0f) ? cachedKeelSternPoint.z : -10f;
+            float t = Mathf.Clamp01(z / minZ);
+            return CalculateQuadraticBezierPoint(t, cachedMidshipKeel, new Vector3(0, 0, minZ / 2f), cachedKeelSternPoint).y;
+        }
+    }
 
     public virtual float GetKeelYAtZ(float z)
     {
@@ -1486,13 +1544,17 @@ public class SheerPlan : MonoBehaviour
     }
 
     /// <summary>
-    /// Computes the 3D Main Wale height at station Z (dependent line between HOB and Main Sheer Line).
+    /// Computes the 3D Main Wale height at station Z (slaved in 100% parallel harmony to the Main Sheer Line).
+    /// At midships (Z=0), it sits at the HoB midship height (or lerped toward Main Sheer by mainWaleHeightRatio).
     /// </summary>
     public float GetMainWaleYAtZ(float z)
     {
-        float hobY = GetTheoreticalHobYAtZ(z);
-        float sheerY = GetMainSheerYAtZ(z);
-        return Mathf.Lerp(hobY, sheerY, Mathf.Clamp01(mainWaleHeightRatio));
+        float midshipHobY = cachedHobMidshipPoint.y;
+        float midshipSheerY = cachedMainSheerMidshipPoint.y;
+        float midshipWaleY = Mathf.Lerp(midshipHobY, midshipSheerY, Mathf.Clamp01(mainWaleHeightRatio));
+        float sheerOffset = midshipSheerY - midshipWaleY;
+
+        return GetMainSheerYAtZ(z) - sheerOffset;
     }
 
     /// <summary>
@@ -1588,6 +1650,30 @@ public class SheerPlan : MonoBehaviour
         if (Mathf.Abs(dz) < 0.0001f) return cachedBowRisingEnd.y;
         float t = Mathf.Clamp01((z - bowZ) / dz);
         return Mathf.Lerp(cachedBowRisingEnd.y, cachedProjectedBowRisingEnd.y, t);
+    }
+
+    public float GetProjectedBowBilgeYAtZ(float z)
+    {
+        float bilgeBowZ = GetBilgeBowZ();
+        float projZ = cachedProjectedBowBilgeEnd.z;
+        float bowY = GetBilgeYAtZ(bilgeBowZ);
+        if (z <= bilgeBowZ) return bowY;
+        float dz = projZ - bilgeBowZ;
+        if (Mathf.Abs(dz) < 0.0001f) return bowY;
+        float t = Mathf.Clamp01((z - bilgeBowZ) / dz);
+        return Mathf.Lerp(bowY, cachedProjectedBowBilgeEnd.y, t);
+    }
+
+    public float GetProjectedSternBilgeYAtZ(float z)
+    {
+        float bilgeSternZ = GetBilgeSternZ();
+        float projZ = cachedProjectedSternBilgeEnd.z;
+        float sternY = GetBilgeYAtZ(bilgeSternZ);
+        if (z >= bilgeSternZ) return sternY;
+        float dz = projZ - bilgeSternZ;
+        if (Mathf.Abs(dz) < 0.0001f) return sternY;
+        float t = Mathf.Clamp01((z - bilgeSternZ) / dz);
+        return Mathf.Lerp(sternY, cachedProjectedSternBilgeEnd.y, t);
     }
 
     public float GetRisingLineTAtZ(float z)
@@ -2069,6 +2155,18 @@ public class SheerPlan : MonoBehaviour
         if (showProjectedBowRisingLine && cachedProjectedBowRisingEnd.z > cachedBowRisingEnd.z + 0.001f)
         {
             DrawDashedLine(cachedBowRisingEnd, cachedProjectedBowRisingEnd, Color.gray, 20);
+        }
+
+        // Projected Bow & Stern Bilge Lines
+        if (showProjectedBowBilgeLine && cachedProjectedBowBilgeEnd.z > GetBilgeBowZ() + 0.001f)
+        {
+            Vector3 bEnd = new Vector3(0, GetBilgeYAtZ(GetBilgeBowZ()), GetBilgeBowZ());
+            DrawDashedLine(bEnd, cachedProjectedBowBilgeEnd, Color.gray, 20);
+        }
+        if (showProjectedSternBilgeLine && cachedProjectedSternBilgeEnd.z < GetBilgeSternZ() - 0.001f)
+        {
+            Vector3 sEnd = new Vector3(0, GetBilgeYAtZ(GetBilgeSternZ()), GetBilgeSternZ());
+            DrawDashedLine(sEnd, cachedProjectedSternBilgeEnd, Color.gray, 20);
         }
 
         // Beakhead Bulwark Control Points
