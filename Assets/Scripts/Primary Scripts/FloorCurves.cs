@@ -4,8 +4,8 @@ using UnityEditor;
 #endif
 
 /// <summary>
-/// FloorCurves implements a 3D Spatial Quadratic Bezier formulation for the Floor Plan / Floor Lines.
-/// Both forward and aft curves are quadratic and double-pointed (bow and stern terminate at X = 0 on centerline).
+/// FloorCurves implements a 3D Spatial Bezier formulation for the Floor Plan / Floor Lines.
+/// Forward span is Cubic 3D Bezier (P0..P3) and Aft span is Quadratic 3D Bezier (P0..P2), matching the exact Bezier weighting of TopLine, Breadth, Bilge, and Ribband curves.
 /// Bow point intersects the Stem Post and Stern point intersects the Stern Profile.
 /// Neither point can rise higher than its respective Stem/Stern Post Top, nor drop lower than the Midship Apex height.
 /// </summary>
@@ -36,41 +36,61 @@ public class FloorCurves : MonoBehaviour
     public bool isInitialized = false;
 
     // --- DIRECT 3D SPATIAL CONTROL POINTS ---
-    [Header("Forward Quadratic 3D Control Points (P0..P2)")]
-    [Tooltip("Bow Stem Intersect Point (P0). Double pointed at X = 0 on Stem Post profile.")]
+    [Header("Forward Cubic 3D Control Points (P0..P3)")]
+    [Tooltip("Bow Stem Intersect Point (P0). Double pointed at X = Keel Half-Width on Stem Post profile.")]
     public Vector3 fwdP0;
 
     [Tooltip("Bow Entry Tangent Handle (P1). Controls bow entrance shape.")]
     public Vector3 fwdP1;
 
-    [Tooltip("Midship Apex Point (P2/P0). Z driven by midshipApexZPercentage. X defines Max Floor Beam.")]
+    [Tooltip("Midship Forward Tangent Handle (P2). Controls forward midship sweep.")]
     public Vector3 fwdP2;
 
+    [Tooltip("Midship Apex Point (P3). Z driven by BreadthCurves midship apex Z. X defines Max Floor Beam.")]
+    public Vector3 fwdP3;
+
     [Header("Aft Quadratic 3D Control Points (P0..P2)")]
-    [Tooltip("Stern Quarter Tangent Handle (P1). Controls stern sweep shape.")]
+    [Tooltip("Midship Aft Tangent Handle (P1). Controls aft midship sweep.")]
     public Vector3 aftP1;
 
-    [Tooltip("Stern Profile Intersect Point (P2). Double pointed at X = 0 on Stern profile.")]
+    [Tooltip("Stern Profile Intersect Point (P2). Double pointed at X = Keel Half-Width on Stern profile.")]
     public Vector3 aftP2;
 
+    /// <summary>
+    /// Property fallback for aftP3 to maintain transparent backwards compatibility with scripts accessing aftP3 as Floor Stern Tip.
+    /// </summary>
+    public Vector3 aftP3
+    {
+        get => aftP2;
+        set => aftP2 = value;
+    }
+
     [Header("Floor Beam & Midship Height Settings")]
-    [Tooltip("Maximum half-width of the floor at midship (synced to fwdP2.x).")]
+    [Tooltip("Maximum half-width of the floor at midship (synced to fwdP3.x).")]
     public float maxFloorBeam = 3f;
 
     [Tooltip("Height ratio of the Floor Midship Apex point between the Keel Line (0.0) and the Breadth Curves Midship Apex height (1.0).")]
     [Range(0f, 1f)] public float midshipHeightRatio = 0.5f;
 
     [Header("Proportional Control Arm Ratios")]
-    [Tooltip("Normalized relative Z position of Bow Entry Arm (P1) along [Midship Apex Z, Bow Tip Z].")]
-    [Range(0.01f, 0.99f)] public float fwdP1Ratio = 0.50f;
+    [Tooltip("Normalized relative Z position of Midship Forward Arm (P2) along [Midship Apex Z, Bow Tip Z].")]
+    [Range(0.01f, 0.99f)] public float fwdP2Ratio = 0.50f;
 
-    [Tooltip("Normalized relative Z position of Stern Arm (P1) along [Stern Z, Midship Apex Z].")]
+    [Tooltip("Normalized relative Z position of Bow Entry Arm (P1) along [Midship Apex Z, Bow Tip Z].")]
+    [Range(0.01f, 0.99f)] public float fwdP1Ratio = 0.75f;
+
+    [Tooltip("Normalized relative Z position of Midship Aft Arm (P1) along [Stern Z, Midship Apex Z].")]
     [Range(0.01f, 0.99f)] public float aftP1Ratio = 0.50f;
+
+    [Header("Proportional Control Arm X Ratios")]
+    [Tooltip("Normalized relative X position of Bow Entry Arm (P1) relative to [Keel Half-Width, Max Floor Beam].")]
+    [Range(0.0f, 1.0f)] public float fwdP1XRatio = 0.50f;
 
     // --- CACHED BEZIER CONTROL POINTS ---
     [HideInInspector] public Vector3 cachedFwdP0;
     [HideInInspector] public Vector3 cachedFwdP1;
     [HideInInspector] public Vector3 cachedFwdP2;
+    [HideInInspector] public Vector3 cachedFwdP3;
 
     [HideInInspector] public Vector3 cachedAftP0;
     [HideInInspector] public Vector3 cachedAftP1;
@@ -112,18 +132,24 @@ public class FloorCurves : MonoBehaviour
         float sternZ = (sheerCurves != null) ? sheerCurves.sternP3.z : -15f;
         float baseY = (breadthCurves != null) ? breadthCurves.fwdP3.y : 1.5f;
         float currentMaxFloor = maxFloorBeam > 0.5f ? maxFloorBeam : 3f;
+        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
 
-        // Double Pointed (X = 0 on centerline)
-        fwdP0 = new Vector3(0f, baseY + 1f, bowZ);
-        fwdP2 = new Vector3(currentMaxFloor, baseY, 0f); // Midship Apex (Z=0)
-        fwdP1 = new Vector3(currentMaxFloor * 0.6f, baseY, bowZ * 0.5f);
+        float fwdSpan = bowZ;
 
-        aftP2 = new Vector3(0f, baseY + 1f, sternZ);
-        aftP1 = new Vector3(currentMaxFloor * 0.6f, baseY, sternZ * 0.5f);
+        // Double Pointed (X = hw on centerline)
+        fwdP0 = new Vector3(hw, baseY + 1f, bowZ);
+        fwdP3 = new Vector3(currentMaxFloor, baseY, 0f); // Midship Apex (Z=0)
+        fwdP2 = new Vector3(currentMaxFloor, baseY, fwdSpan * 0.5f);
+        fwdP1 = new Vector3(hw + (currentMaxFloor - hw) * 0.5f, baseY + 0.5f, fwdSpan * 0.75f);
+
+        aftP2 = new Vector3(hw, baseY + 1f, sternZ);
+        aftP1 = new Vector3(currentMaxFloor, baseY, sternZ * 0.5f);
 
         maxFloorBeam = currentMaxFloor;
-        fwdP1Ratio = 0.50f;
+        fwdP2Ratio = 0.50f;
+        fwdP1Ratio = 0.75f;
         aftP1Ratio = 0.50f;
+        fwdP1XRatio = 0.50f;
         isInitialized = true;
     }
 
@@ -149,16 +175,16 @@ public class FloorCurves : MonoBehaviour
         if (breadthCurves != null)
         {
             breadthCurves.UpdateCachedCurves();
-            fwdP2.z = breadthCurves.fwdP3.z;
+            fwdP3.z = breadthCurves.fwdP3.z;
         }
 
         // Calculate Midship Apex Y height between Keel Line Y and Breadth Curves Midship Apex Y
         float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
         float breadthApexY = (breadthCurves != null) ? breadthCurves.fwdP3.y : keelY + 3.0f;
-        fwdP2.y = Mathf.Lerp(keelY, breadthApexY, Mathf.Clamp01(midshipHeightRatio));
+        fwdP3.y = Mathf.Lerp(keelY, breadthApexY, Mathf.Clamp01(midshipHeightRatio));
 
         // Midship Apex Y height (minY bound for Bow and Stern points)
-        float minY = fwdP2.y;
+        float minY = fwdP3.y;
 
         // Stem Post Top Y & Stern Post Top Y upper bounds
         float maxStemY = (sheerCurves != null) ? sheerCurves.stemP3.y : minY + 10f;
@@ -184,7 +210,7 @@ public class FloorCurves : MonoBehaviour
 
         float bowZ = fwdP0.z;
         float sternZ = aftP2.z;
-        float targetApexZ = fwdP2.z;
+        float targetApexZ = fwdP3.z;
 
         float maxAllowedBeam = 20.0f;
         if (breadthCurves != null)
@@ -194,24 +220,26 @@ public class FloorCurves : MonoBehaviour
         }
         maxFloorBeam = Mathf.Clamp(maxFloorBeam, hw, maxAllowedBeam);
 
-        fwdP2.x = maxFloorBeam;
+        fwdP3.x = maxFloorBeam;
 
         // Lock Midship Apex Control Arms straight on the Z axis (X = maxFloorBeam) for smooth C1 tangent continuity
-        fwdP1.x = maxFloorBeam;
+        fwdP2.x = maxFloorBeam;
         aftP1.x = maxFloorBeam;
-        fwdP1.y = fwdP2.y;
-        aftP1.y = fwdP2.y;
+        fwdP2.y = fwdP3.y;
+        aftP1.y = fwdP3.y;
 
-        // Proportionally scale Bow Control Arm (fwdP1) Z
+        // Proportionally scale Bow Control Arm (fwdP2) Z
         float fwdSpan = bowZ - targetApexZ;
         if (fwdSpan > 0.001f)
         {
-            fwdP1.z = targetApexZ + fwdP1Ratio * fwdSpan;
+            fwdP2.z = targetApexZ + fwdP2Ratio * fwdSpan;
         }
         else
         {
-            fwdP1.z = targetApexZ;
+            fwdP2.z = targetApexZ;
         }
+        fwdP1 = fwdP2; // Move Bow Tip arm (fwdP1) to exact same position as Midship Apex arm (fwdP2)
+        fwdP1Ratio = fwdP2Ratio;
 
         // Proportionally scale Stern Control Arm (aftP1) Z
         float aftSpan = targetApexZ - sternZ;
@@ -224,13 +252,14 @@ public class FloorCurves : MonoBehaviour
             aftP1.z = sternZ;
         }
 
-        // Cache Forward Quadratic Bezier Points (P0, P1, P2)
+        // Cache Forward Cubic Bezier Points (P0, P1, P2, P3)
         cachedFwdP0 = fwdP0;
         cachedFwdP1 = fwdP1;
         cachedFwdP2 = fwdP2;
+        cachedFwdP3 = fwdP3;
 
-        // Cache Aft Quadratic Bezier Points (P0, P1, P2) where Aft P0 is Midship Apex (fwdP2)
-        cachedAftP0 = fwdP2;
+        // Cache Aft Quadratic Bezier Points (P0, P1, P2) where Aft P0 is Midship Apex (fwdP3)
+        cachedAftP0 = fwdP3;
         cachedAftP1 = aftP1;
         cachedAftP2 = aftP2;
 
@@ -251,16 +280,18 @@ public class FloorCurves : MonoBehaviour
 
     public virtual Vector3 GetFloorPointAtZ(float z)
     {
-        if (z >= cachedFwdP2.z)
+        EnsureInitialized();
+
+        if (z >= cachedFwdP3.z)
         {
             if (z >= cachedFwdP0.z) return cachedFwdP0;
-            float t = GetBezierTAtZ(cachedFwdP0, cachedFwdP1, cachedFwdP2, z, true);
-            return CalculateQuadraticBezierPoint(t, cachedFwdP0, cachedFwdP1, cachedFwdP2);
+            float t = GetBezierTAtZ(cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3, z);
+            return CalculateCubicBezierPoint(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
         }
         else
         {
             if (z <= cachedAftP2.z) return cachedAftP2;
-            float t = GetBezierTAtZ(cachedAftP0, cachedAftP1, cachedAftP2, z, false);
+            float t = GetBezierTAtZQuadratic(cachedAftP0, cachedAftP1, cachedAftP2, z);
             return CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
         }
     }
@@ -275,13 +306,23 @@ public class FloorCurves : MonoBehaviour
         return (uu * p0) + (2f * u * t * p1) + (tt * p2);
     }
 
-    public float GetBezierTAtZ(Vector3 p0, Vector3 p1, Vector3 p2, float targetZ, bool isForward)
+    public Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1f - t;
+        float tt = t * t;
+        float uu = u * u;
+        float uuu = uu * u;
+        float ttt = tt * t;
+        return (uuu * p0) + (3f * uu * t * p1) + (3f * u * tt * p2) + (ttt * p3);
+    }
+
+    public float GetBezierTAtZQuadratic(Vector3 p0, Vector3 p1, Vector3 p2, float targetZ)
     {
         float min = 0f;
         float max = 1f;
         float t = 0.5f;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 12; i++)
         {
             float u = 1f - t;
             float zVal = (u * u * p0.z) + (2f * u * t * p1.z) + (t * t * p2.z);
@@ -289,18 +330,70 @@ public class FloorCurves : MonoBehaviour
 
             if (Mathf.Abs(error) < 0.00005f) return t;
 
-            if ((isForward && zVal < targetZ) || (!isForward && zVal > targetZ))
+            if (p0.z > p2.z)
             {
-                min = t;
+                if (zVal > targetZ) min = t;
+                else max = t;
             }
             else
             {
-                max = t;
+                if (zVal < targetZ) min = t;
+                else max = t;
             }
             t = (min + max) * 0.5f;
         }
 
         return t;
+    }
+
+    public float GetBezierTAtZScalar(float z0, float z1, float z2, float z3, float targetZ)
+    {
+        float dzTotal = z3 - z0;
+        if (Mathf.Abs(dzTotal) < 0.0001f) return 0f;
+
+        float min = 0f;
+        float max = 1f;
+        float t = Mathf.Clamp01((targetZ - z0) / dzTotal);
+
+        for (int i = 0; i < 12; i++)
+        {
+            float u = 1f - t;
+            float zVal = (u * u * u * z0) + (3f * u * u * t * z1) + (3f * u * t * t * z2) + (t * t * t * z3);
+            float error = zVal - targetZ;
+
+            if (Mathf.Abs(error) < 0.00005f) return t;
+
+            if (z0 > z3)
+            {
+                if (zVal > targetZ) min = t;
+                else max = t;
+            }
+            else
+            {
+                if (zVal < targetZ) min = t;
+                else max = t;
+            }
+
+            float dzdt = 3f * u * u * (z1 - z0) + 6f * u * t * (z2 - z1) + 3f * t * t * (z3 - z2);
+            if (Mathf.Abs(dzdt) > 0.0001f)
+            {
+                float nextT = t - error / dzdt;
+                if (nextT >= min && nextT <= max)
+                {
+                    t = nextT;
+                    continue;
+                }
+            }
+
+            t = (min + max) * 0.5f;
+        }
+
+        return t;
+    }
+
+    public float GetBezierTAtZ(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float targetZ)
+    {
+        return GetBezierTAtZScalar(p0.z, p1.z, p2.z, p3.z, targetZ);
     }
 
     private Vector3 MirrorX(Vector3 point)
@@ -332,19 +425,20 @@ public class FloorCurves : MonoBehaviour
 
         UpdateCachedCurves();
 
-        // Draw Starboard 3D Floor Curve (Vibrant Orange/Coral)
-        DrawQuadraticBezierCurve(cachedFwdP0, cachedFwdP1, cachedFwdP2, floorCurveColor);
+        // Draw Starboard 3D Floor Curve (Vibrant Orange/Coral) - Cubic Forward, Quadratic Aft
+        DrawCubicBezierCurve(cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3, floorCurveColor);
         DrawQuadraticBezierCurve(cachedAftP0, cachedAftP1, cachedAftP2, floorCurveColor);
 
         // Draw Port 3D Floor Curve (Mirrored X)
         Color portColor = new Color(floorCurveColor.r, floorCurveColor.g * 0.6f, floorCurveColor.b, floorCurveColor.a);
-        DrawQuadraticBezierCurve(MirrorX(cachedFwdP0), MirrorX(cachedFwdP1), MirrorX(cachedFwdP2), portColor);
+        DrawCubicBezierCurve(MirrorX(cachedFwdP0), MirrorX(cachedFwdP1), MirrorX(cachedFwdP2), MirrorX(cachedFwdP3), portColor);
         DrawQuadraticBezierCurve(MirrorX(cachedAftP0), MirrorX(cachedAftP1), MirrorX(cachedAftP2), portColor);
 
         // Draw 3D Control Polygon Skeleton Arms
         Gizmos.color = new Color(1f, 0.6f, 0.1f, 0.6f);
         Gizmos.DrawLine(cachedFwdP0, cachedFwdP1);
         Gizmos.DrawLine(cachedFwdP1, cachedFwdP2);
+        Gizmos.DrawLine(cachedFwdP2, cachedFwdP3);
         Gizmos.DrawLine(cachedAftP0, cachedAftP1);
         Gizmos.DrawLine(cachedAftP1, cachedAftP2);
 
@@ -352,26 +446,39 @@ public class FloorCurves : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawSphere(cachedFwdP0, 0.12f);
         Gizmos.DrawSphere(cachedFwdP1, 0.09f);
-        Gizmos.DrawSphere(cachedFwdP2, 0.15f); // Midship Apex
+        Gizmos.DrawSphere(cachedFwdP2, 0.09f);
+        Gizmos.DrawSphere(cachedFwdP3, 0.15f); // Midship Apex
         Gizmos.DrawSphere(cachedAftP1, 0.09f);
-        Gizmos.DrawSphere(cachedAftP2, 0.12f);
+        Gizmos.DrawSphere(cachedAftP2, 0.12f); // Floor Stern Tip (aftP2)
 
 #if UNITY_EDITOR
         if (showLabels)
         {
             GUIStyle labelStyle = GetCachedLabelStyle();
             Handles.Label(cachedFwdP0 + Vector3.up * 0.2f, "Floor Bow Tip (Stem)", labelStyle);
-            Handles.Label(cachedFwdP2 + Vector3.up * 0.2f, $"Floor Midship Apex ({maxFloorBeam:F2}m)", labelStyle);
+            Handles.Label(cachedFwdP3 + Vector3.up * 0.2f, $"Floor Midship Apex ({maxFloorBeam:F2}m)", labelStyle);
             Handles.Label(cachedAftP2 + Vector3.up * 0.2f, "Floor Stern Tip", labelStyle);
         }
 #endif
     }
 
-    private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color)
+    private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 40)
     {
         Gizmos.color = color;
         Vector3 prev = p0;
-        int segments = 30;
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            Vector3 curr = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
+            Gizmos.DrawLine(prev, curr);
+            prev = curr;
+        }
+    }
+
+    private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 30)
+    {
+        Gizmos.color = color;
+        Vector3 prev = p0;
         for (int i = 1; i <= segments; i++)
         {
             float t = i / (float)segments;
@@ -417,27 +524,31 @@ public class FloorCurvesEditor : Editor
         Vector3 newFwdP0 = Handles.FreeMoveHandle(curves.fwdP0, 0.16f, Vector3.zero, Handles.SphereHandleCap);
         newFwdP0.x = hw;
 
-        // 2. Bow Control Arm Handle (Orange)
+        // 2. Bow Entry Control Arm Handle (Orange)
         Handles.color = new Color(1f, 0.6f, 0.1f);
         Vector3 newFwdP1 = Handles.FreeMoveHandle(curves.fwdP1, 0.12f, Vector3.zero, Handles.SphereHandleCap);
 
-        // 3. Midship Apex Handle (Green Sphere + Red X Arrow & Green Y Arrow)
+        // 3. Midship Forward Control Arm Handle (Orange)
+        Handles.color = new Color(1f, 0.6f, 0.1f);
+        Vector3 newFwdP2 = Handles.FreeMoveHandle(curves.fwdP2, 0.12f, Vector3.zero, Handles.SphereHandleCap);
+
+        // 4. Midship Apex Handle (Green Sphere + Red X Arrow & Green Y Arrow)
         Handles.color = Color.green;
-        Vector3 newFwdP2 = Handles.FreeMoveHandle(curves.fwdP2, 0.18f, Vector3.zero, Handles.SphereHandleCap);
+        Vector3 newFwdP3 = Handles.FreeMoveHandle(curves.fwdP3, 0.18f, Vector3.zero, Handles.SphereHandleCap);
 
         Handles.color = Color.red;
-        Vector3 xArrowFwdP2 = Handles.Slider(curves.fwdP2, Vector3.right, 0.8f, Handles.ArrowHandleCap, 0.05f);
-        if (Mathf.Abs(xArrowFwdP2.x - curves.fwdP2.x) > 0.001f) newFwdP2.x = xArrowFwdP2.x;
+        Vector3 xArrowFwdP3 = Handles.Slider(curves.fwdP3, Vector3.right, 0.8f, Handles.ArrowHandleCap, 0.05f);
+        if (Mathf.Abs(xArrowFwdP3.x - curves.fwdP3.x) > 0.001f) newFwdP3.x = xArrowFwdP3.x;
 
         Handles.color = Color.green;
-        Vector3 yArrowFwdP2 = Handles.Slider(curves.fwdP2, Vector3.up, 0.8f, Handles.ArrowHandleCap, 0.05f);
-        if (Mathf.Abs(yArrowFwdP2.y - curves.fwdP2.y) > 0.001f) newFwdP2.y = yArrowFwdP2.y;
+        Vector3 yArrowFwdP3 = Handles.Slider(curves.fwdP3, Vector3.up, 0.8f, Handles.ArrowHandleCap, 0.05f);
+        if (Mathf.Abs(yArrowFwdP3.y - curves.fwdP3.y) > 0.001f) newFwdP3.y = yArrowFwdP3.y;
 
-        // 4. Stern Control Arm Handle (Orange)
+        // 5. Midship Aft Control Arm Handle (Orange)
         Handles.color = new Color(1f, 0.6f, 0.1f);
         Vector3 newAftP1 = Handles.FreeMoveHandle(curves.aftP1, 0.12f, Vector3.zero, Handles.SphereHandleCap);
 
-        // 5. Stern Point Handle (Yellow) - Double-pointed on Stern Profile
+        // 6. Stern Point Handle (Yellow) - Double-pointed on Stern Profile (aftP2)
         Handles.color = Color.yellow;
         Vector3 newAftP2 = Handles.FreeMoveHandle(curves.aftP2, 0.16f, Vector3.zero, Handles.SphereHandleCap);
         newAftP2.x = hw;
@@ -448,7 +559,7 @@ public class FloorCurvesEditor : Editor
 
             float keelY = (curves.sheerCurves != null) ? curves.sheerCurves.keelY : 0f;
             float breadthApexY = (curves.breadthCurves != null) ? curves.breadthCurves.fwdP3.y : keelY + 3.0f;
-            float minY = newFwdP2.y;
+            float minY = newFwdP3.y;
             float maxStemY = (curves.sheerCurves != null) ? curves.sheerCurves.stemP3.y : minY + 10f;
             float maxSternY = (curves.sheerCurves != null) ? curves.sheerCurves.sternP3.y : minY + 10f;
 
@@ -465,24 +576,29 @@ public class FloorCurvesEditor : Editor
                 float bX = Mathf.Max(curves.breadthCurves.maxBeam, curves.breadthCurves.fwdP3.x);
                 if (bX > 0.1f) maxAllowedBeam = bX;
             }
-            curves.maxFloorBeam = Mathf.Clamp(Mathf.Abs(newFwdP2.x), hw, maxAllowedBeam);
+            curves.maxFloorBeam = Mathf.Clamp(Mathf.Abs(newFwdP3.x), hw, maxAllowedBeam);
             float apexSpan = breadthApexY - keelY;
             if (apexSpan > 0.001f)
             {
-                curves.midshipHeightRatio = Mathf.Clamp01((newFwdP2.y - keelY) / apexSpan);
+                curves.midshipHeightRatio = Mathf.Clamp01((newFwdP3.y - keelY) / apexSpan);
             }
 
             // Update Control Arm Z Ratios
             float bowZ = curves.fwdP0.z;
             float sternZ = curves.aftP2.z;
+            float targetApexZ = curves.fwdP3.z;
 
-            float fwdSpan = bowZ - curves.fwdP2.z;
+            float fwdSpan = bowZ - targetApexZ;
             if (fwdSpan > 0.001f)
             {
-                curves.fwdP1Ratio = Mathf.Clamp01((newFwdP1.z - curves.fwdP2.z) / fwdSpan);
+                if (Mathf.Abs(newFwdP1.z - curves.fwdP1.z) > 0.001f)
+                    curves.fwdP2Ratio = Mathf.Clamp01((newFwdP1.z - targetApexZ) / fwdSpan);
+                else
+                    curves.fwdP2Ratio = Mathf.Clamp01((newFwdP2.z - targetApexZ) / fwdSpan);
+                curves.fwdP1Ratio = curves.fwdP2Ratio;
             }
 
-            float aftSpan = curves.fwdP2.z - sternZ;
+            float aftSpan = targetApexZ - sternZ;
             if (aftSpan > 0.001f)
             {
                 curves.aftP1Ratio = Mathf.Clamp01((newAftP1.z - sternZ) / aftSpan);
@@ -496,6 +612,13 @@ public class FloorCurvesEditor : Editor
             {
                 bodyCurves.UpdateCachedCurves();
                 EditorUtility.SetDirty(bodyCurves);
+            }
+
+            FashionCurves fashionCurves = FindFirstObjectByType<FashionCurves>();
+            if (fashionCurves != null)
+            {
+                fashionCurves.UpdateCachedCurves();
+                EditorUtility.SetDirty(fashionCurves);
             }
 
             BilgeCurves bilgeCurves = FindFirstObjectByType<BilgeCurves>();

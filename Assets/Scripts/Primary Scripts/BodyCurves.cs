@@ -163,10 +163,10 @@ public class BodyCurves : MonoBehaviour
         // 1. Keel Point (p0): Baseline height from SheerCurves
         float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
 
-        // 2. Floor Point (p1): Bound directly to FloorCurves Midship Apex (fwdP2)
-        float floorX = (floorCurves != null) ? floorCurves.fwdP2.x : (hw + 1f);
-        float floorY = (floorCurves != null) ? floorCurves.fwdP2.y : (keelY + 0.5f);
-        if (floorCurves != null && Mathf.Abs(z - floorCurves.fwdP2.z) > 0.01f)
+        // 2. Floor Point (p1): Bound directly to FloorCurves Midship Apex (fwdP3)
+        float floorX = (floorCurves != null) ? floorCurves.fwdP3.x : (hw + 1f);
+        float floorY = (floorCurves != null) ? floorCurves.fwdP3.y : (keelY + 0.5f);
+        if (floorCurves != null && Mathf.Abs(z - floorCurves.fwdP3.z) > 0.01f)
         {
             floorX = floorCurves.GetFloorXAtZ(z);
             floorY = floorCurves.GetFloorYAtZ(z);
@@ -649,7 +649,7 @@ public class BodyCurvesEditor : Editor
                 float clampedFloorX = Mathf.Clamp(Mathf.Abs(newP1.x), minOrganicFloorX, maxAllowedBeam);
 
                 curves.floorCurves.maxFloorBeam = clampedFloorX;
-                curves.floorCurves.fwdP2.x = curves.floorCurves.maxFloorBeam;
+                curves.floorCurves.fwdP3.x = curves.floorCurves.maxFloorBeam;
 
                 float keelY = (curves.sheerCurves != null) ? curves.sheerCurves.keelY : 0f;
                 float breadthApexY = (curves.breadthCurves != null) ? curves.breadthCurves.fwdP3.y : keelY + 3.0f;

@@ -20,7 +20,8 @@ public class QuarticBezierEvaluator : ISectionCurveEvaluator
             float t = u * 4f;
             Vector3 linearPt = Vector3.Lerp(P0, P1, t);
             Vector3 bezierPt = EvaluateQuarticBezier(P0, P1, P2, P3, P4, u);
-            return Vector3.Lerp(linearPt, bezierPt, floorHollow);
+            float weight = Mathf.Lerp(floorHollow, 1.0f, t);
+            return Vector3.Lerp(linearPt, bezierPt, weight);
         }
         else
         {

@@ -139,8 +139,8 @@ public class FashionCurves : MonoBehaviour
         }
 
         // 1. Bottom Node P1: Floor Stern Tip (u = 0.25)
-        float p1X = (floorCurves != null) ? floorCurves.aftP2.x : hw;
-        float p1Y = (floorCurves != null) ? floorCurves.aftP2.y : ((sheerCurves != null) ? sheerCurves.keelY + 0.5f : 0.5f);
+        float p1X = (floorCurves != null) ? floorCurves.aftP3.x : hw;
+        float p1Y = (floorCurves != null) ? floorCurves.aftP3.y : ((sheerCurves != null) ? sheerCurves.keelY + 0.5f : 0.5f);
         float p1Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p1Y) : -10f;
 
         stbdP1 = new Vector3(Mathf.Abs(p1X), p1Y, p1Z);
@@ -152,10 +152,24 @@ public class FashionCurves : MonoBehaviour
 
         stbdP3 = new Vector3(Mathf.Abs(p3X), p3Y, p3Z);
 
-        // 3. Lower Mould Node P2: Transom Bilge Node (u = 0.50, proportionally positioned between P1 and P3)
-        float p2Y = Mathf.Lerp(stbdP1.y, stbdP3.y, Mathf.Clamp01(bilgeHeightRatio));
-        float p2X = Mathf.Lerp(stbdP1.x, stbdP3.x, Mathf.Clamp01(bilgeWidthRatio));
-        float p2Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p2Y) : Mathf.Lerp(stbdP1.z, stbdP3.z, Mathf.Clamp01(bilgeHeightRatio));
+        // 3. Lower Mould Node P2: Transom Bilge Node (u = 0.50, derived from BodyCurves master bilge node)
+        float tY = Mathf.Clamp01(bilgeHeightRatio);
+        float tX = Mathf.Clamp01(bilgeWidthRatio);
+
+        if (bodyCurves != null)
+        {
+            float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+            SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
+            float bSpanX = bodyNodes.p3.x - bodyNodes.p1.x;
+            float bSpanY = bodyNodes.p3.y - bodyNodes.p1.y;
+
+            if (Mathf.Abs(bSpanX) > 0.001f) tX = Mathf.Clamp01((Mathf.Abs(bodyNodes.p2.x) - bodyNodes.p1.x) / bSpanX);
+            if (Mathf.Abs(bSpanY) > 0.001f) tY = Mathf.Clamp01((bodyNodes.p2.y - bodyNodes.p1.y) / bSpanY);
+        }
+
+        float p2Y = Mathf.Lerp(stbdP1.y, stbdP3.y, tY);
+        float p2X = Mathf.Lerp(stbdP1.x, stbdP3.x, tX);
+        float p2Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p2Y) : Mathf.Lerp(stbdP1.z, stbdP3.z, tY);
 
         stbdP2 = new Vector3(p2X, p2Y, p2Z);
 
@@ -220,14 +234,41 @@ public class FashionCurves : MonoBehaviour
             float tLower = clampedT / (2f / 3f);
             float u = Mathf.Lerp(0.25f, 0.75f, tLower);
 
-            SectionNodes nodes = GetTransomSectionNodes(sideSign);
-            Vector3 nurbsPt = nurbsEvaluator.EvaluateSectionPoint(u, nodes, 0.5f, 1.0f);
+            if (bodyCurves != null)
+            {
+                float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+                SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
+                float hollowVal = bodyCurves.floorHollow;
+                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(u, bodyNodes, hollowVal, 1.0f);
 
-            float xLower = Mathf.Abs(nurbsPt.x);
-            float yLower = nurbsPt.y;
-            float zLower = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(yLower) : nurbsPt.z;
+                float bFloorX = bodyNodes.p1.x;
+                float bFloorY = bodyNodes.p1.y;
+                float bBreadthX = bodyNodes.p3.x;
+                float bBreadthY = bodyNodes.p3.y;
 
-            return new Vector3(sideSign * xLower, yLower, zLower);
+                float dSpanX = bBreadthX - bFloorX;
+                float dSpanY = bBreadthY - bFloorY;
+
+                float tX = (Mathf.Abs(dSpanX) > 0.0001f) ? (Mathf.Abs(bodyPt.x) - bFloorX) / dSpanX : tLower;
+                float tY = (Mathf.Abs(dSpanY) > 0.0001f) ? (bodyPt.y - bFloorY) / dSpanY : tLower;
+
+                float xLower = Mathf.Lerp(stbdP1.x, stbdP3.x, tX);
+                float yLower = Mathf.Lerp(stbdP1.y, stbdP3.y, tY);
+                float zLower = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(yLower) : stbdP1.z;
+
+                return new Vector3(sideSign * xLower, yLower, zLower);
+            }
+            else
+            {
+                SectionNodes nodes = GetTransomSectionNodes(sideSign);
+                Vector3 nurbsPt = nurbsEvaluator.EvaluateSectionPoint(u, nodes, 0.5f, 1.0f);
+
+                float xLower = Mathf.Abs(nurbsPt.x);
+                float yLower = nurbsPt.y;
+                float zLower = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(yLower) : nurbsPt.z;
+
+                return new Vector3(sideSign * xLower, yLower, zLower);
+            }
         }
         else
         {
@@ -298,6 +339,48 @@ public class FashionCurves : MonoBehaviour
             {
                 t = Mathf.Clamp01(t - error / dydt);
             }
+        }
+
+        return GetFashionPointAtT(t, side);
+    }
+
+    /// <summary>
+    /// Evaluates 3D point on Fashion Curve at target station Z for specified side (+1 Starboard, -1 Port).
+    /// </summary>
+    public Vector3 GetFashionPointAtZ(float targetZ, float side)
+    {
+        UpdateCachedCurves();
+
+        float zSpan = stbdP4.z - stbdP1.z;
+        if (Mathf.Abs(zSpan) < 0.0001f)
+        {
+            return GetFashionPointAtT(0f, side);
+        }
+
+        if (targetZ >= stbdP1.z) return GetFashionPointAtT(0f, side);
+        if (targetZ <= stbdP4.z) return GetFashionPointAtT(1f, side);
+
+        float minT = 0f;
+        float maxT = 1f;
+        float t = Mathf.Clamp01((targetZ - stbdP1.z) / zSpan);
+
+        for (int i = 0; i < 12; i++)
+        {
+            Vector3 pt = GetFashionPointAtT(t, side);
+            float error = pt.z - targetZ;
+            if (Mathf.Abs(error) < 0.0001f) return pt;
+
+            if (stbdP1.z > stbdP4.z)
+            {
+                if (pt.z > targetZ) minT = t;
+                else maxT = t;
+            }
+            else
+            {
+                if (pt.z < targetZ) minT = t;
+                else maxT = t;
+            }
+            t = (minT + maxT) * 0.5f;
         }
 
         return GetFashionPointAtT(t, side);

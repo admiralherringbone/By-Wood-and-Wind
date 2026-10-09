@@ -399,11 +399,11 @@ public class TopLineCurves : MonoBehaviour
         float dzTotal = z3 - z0;
         if (Mathf.Abs(dzTotal) < 0.0001f) return 0f;
 
-        float t = Mathf.Clamp01((targetZ - z0) / dzTotal);
         float min = 0f;
         float max = 1f;
+        float t = Mathf.Clamp01((targetZ - z0) / dzTotal);
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 12; i++)
         {
             float u = 1f - t;
             float zVal = (u * u * u * z0) + (3f * u * u * t * z1) + (3f * u * t * t * z2) + (t * t * t * z3);
@@ -411,8 +411,16 @@ public class TopLineCurves : MonoBehaviour
 
             if (Mathf.Abs(error) < 0.00005f) return t;
 
-            if (zVal < targetZ) min = Mathf.Max(min, t);
-            else max = Mathf.Min(max, t);
+            if (z0 > z3)
+            {
+                if (zVal > targetZ) min = t;
+                else max = t;
+            }
+            else
+            {
+                if (zVal < targetZ) min = t;
+                else max = t;
+            }
 
             float dzdt = 3f * u * u * (z1 - z0) + 6f * u * t * (z2 - z1) + 3f * t * t * (z3 - z2);
             if (Mathf.Abs(dzdt) > 0.0001f)
@@ -438,15 +446,23 @@ public class TopLineCurves : MonoBehaviour
             float min = 0f;
             float max = 1f;
             float t = 0.5f;
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 12; i++)
             {
                 float u = 1f - t;
                 float zVal = (u * u * p0.z) + (2f * u * t * p1.z) + (t * t * p2.z);
                 float error = zVal - targetZ;
                 if (Mathf.Abs(error) < 0.00005f) return t;
 
-                if ((isForward && zVal < targetZ) || (!isForward && zVal > targetZ)) min = t;
-                else max = t;
+                if (p0.z > p2.z)
+                {
+                    if (zVal > targetZ) min = t;
+                    else max = t;
+                }
+                else
+                {
+                    if (zVal < targetZ) min = t;
+                    else max = t;
+                }
                 t = (min + max) * 0.5f;
             }
             return t;

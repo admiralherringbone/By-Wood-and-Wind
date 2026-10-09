@@ -148,37 +148,47 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61b06e20783d54c81904b7057c9e788b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BilgeCurves
-  sheerPlan: {fileID: 0}
-  bodyPlan: {fileID: 0}
   sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
   breadthCurves: {fileID: 1799144730}
   floorCurves: {fileID: 216798052}
   bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  fashionCurves: {fileID: 2019170296}
+  bowCtrlArmGuide: {fileID: 0}
   enableInteractiveHandles: 1
   showLabels: 1
   bilgeCurveColor: {r: 0.1, g: 0.9, b: 0.4, a: 0.95}
+  showBowMouldP1Guide: 1
+  showFwdP2Guide: 1
+  bowMouldGuideColor: {r: 0.1, g: 0.95, b: 0.85, a: 0.95}
+  fwdP2GuideColor: {r: 0.95, g: 0.85, b: 0.1, a: 0.95}
+  showAftMouldA1Guide: 1
+  showSternTransomGuide: 1
+  aftMouldGuideColor: {r: 0.75, g: 0.25, b: 0.95, a: 0.95}
+  sternTransomGuideColor: {r: 0.95, g: 0.25, b: 0.55, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0, y: 2.7826602, z: 12.472677}
-  fwdP1: {x: 1.6155915, y: 2.0023153, z: 9.255311}
-  fwdP2: {x: 2.4798372, y: 2.0023153, z: 8.495112}
-  fwdP3: {x: 2.4798372, y: 2.0023153, z: -0.39931747}
-  aftP1: {x: 2.4798372, y: 2.0023153, z: -6.228485}
-  aftP2: {x: 0.6554688, y: 3.8388577, z: -11.648493}
-  bilgeWidthRatio: 0.7715465
-  bilgeHeightRatio: 0.40203032
-  fwdP2Ratio: 0.6909908
-  fwdP1Ratio: 0.7500491
-  aftP1Ratio: 0.4818138
-  fwdP1XRatio: 0.6329913
+  fwdP0: {x: 0.25, y: 2.2417428, z: 12.319279}
+  fwdP1: {x: 2.621317, y: 1.093559, z: 9.588188}
+  fwdP2: {x: 2.622119, y: 1.093559, z: 8.525151}
+  fwdP3: {x: 2.622119, y: 1.093559, z: -0.39888996}
+  aftP1: {x: 2.622119, y: 1.093559, z: -5.9979753}
+  aftP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
+  bilgeWidthRatio: 0.7724883
+  bilgeHeightRatio: 0.24219428
+  fwdP2Ratio: 0.7016766
+  fwdP1Ratio: 0.78526074
+  aftP1Ratio: 0.48876333
+  fwdP1XRatio: 0.99966186
   fwdP1YRatio: 0.42994612
-  cachedFwdP0: {x: 0, y: 2.7826602, z: 12.472677}
-  cachedFwdP1: {x: 1.6155915, y: 2.0023153, z: 9.255311}
-  cachedFwdP2: {x: 2.4798372, y: 2.0023153, z: 8.495112}
-  cachedFwdP3: {x: 2.4798372, y: 2.0023153, z: -0.39931747}
-  cachedAftP0: {x: 2.4798372, y: 2.0023153, z: -0.39931747}
-  cachedAftP1: {x: 2.4798372, y: 2.0023153, z: -6.228485}
-  cachedAftP2: {x: 0.6554688, y: 3.8388577, z: -11.648493}
-  changeVersion: 221146
+  cachedFwdP0: {x: 0.25, y: 2.2417428, z: 12.319279}
+  cachedFwdP1: {x: 2.621317, y: 1.093559, z: 9.588188}
+  cachedFwdP2: {x: 2.622119, y: 1.093559, z: 8.525151}
+  cachedFwdP3: {x: 2.622119, y: 1.093559, z: -0.39888996}
+  cachedAftP0: {x: 2.622119, y: 1.093559, z: -0.39888996}
+  cachedAftP1: {x: 2.622119, y: 1.093559, z: -5.9979753}
+  cachedAftP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
+  changeVersion: 2953647
 --- !u!4 &186442760
 Transform:
   m_ObjectHideFlags: 0
@@ -238,30 +248,709 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e71f206524fe8473a93fdeda4bc629e0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FloorCurves
-  sheerPlan: {fileID: 0}
-  bodyPlan: {fileID: 0}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
   sheerCurves: {fileID: 1818396365}
   breadthCurves: {fileID: 1799144730}
   enableInteractiveHandles: 1
   showLabels: 1
-  floorCurveColor: {r: 0.95, g: 0.45, b: 0.1, a: 0.95}
+  floorCurveColor: {r: 0, g: 0, b: 0, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0, y: 1.8800683, z: 12.173246}
-  fwdP1: {x: 0.67693955, y: 0.9025147, z: 8.323585}
-  fwdP2: {x: 0.67693955, y: 0.9025147, z: -0.39931747}
-  aftP1: {x: 0.67693955, y: 0.9025147, z: -5.937012}
-  aftP2: {x: 0, y: 3.4353447, z: -11.475216}
-  maxFloorBeam: 0.67693955
-  midshipHeightRatio: 0.248071
-  fwdP1Ratio: 0.69380456
+  fwdP0: {x: 0.25, y: 1.639806, z: 12.051445}
+  fwdP1: {x: 1.2926486, y: 0.2803154, z: 8.235941}
+  fwdP2: {x: 1.2926486, y: 0.2803154, z: 8.235941}
+  fwdP3: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
+  aftP1: {x: 1.2926486, y: 0.2803154, z: -5.7859273}
+  aftP2: {x: 0.25, y: 2.7326477, z: -11.173461}
+  maxFloorBeam: 1.2926486
+  midshipHeightRatio: 0.07704929
+  fwdP2Ratio: 0.69354206
+  fwdP1Ratio: 0.69354206
   aftP1Ratio: 0.500023
-  cachedFwdP0: {x: 0, y: 1.8800683, z: 12.173246}
-  cachedFwdP1: {x: 0.67693955, y: 0.9025147, z: 8.323585}
-  cachedFwdP2: {x: 0.67693955, y: 0.9025147, z: -0.39931747}
-  cachedAftP0: {x: 0.67693955, y: 0.9025147, z: -0.39931747}
-  cachedAftP1: {x: 0.67693955, y: 0.9025147, z: -5.937012}
-  cachedAftP2: {x: 0, y: 3.4353447, z: -11.475216}
-  changeVersion: 1137926
+  fwdP1XRatio: 0.511224
+  cachedFwdP0: {x: 0.25, y: 1.639806, z: 12.051445}
+  cachedFwdP1: {x: 1.2926486, y: 0.2803154, z: 8.235941}
+  cachedFwdP2: {x: 1.2926486, y: 0.2803154, z: 8.235941}
+  cachedFwdP3: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
+  cachedAftP0: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
+  cachedAftP1: {x: 1.2926486, y: 0.2803154, z: -5.7859273}
+  cachedAftP2: {x: 0.25, y: 2.7326477, z: -11.173461}
+  changeVersion: 78112566
+--- !u!1 &264070283
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 264070285}
+  - component: {fileID: 264070284}
+  m_Layer: 0
+  m_Name: TopLineCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &264070284
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 264070283}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cfbb6be456ae4939bc4838b38b2541b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TopLineCurves
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  sheerCurves: {fileID: 1818396365}
+  breadthCurves: {fileID: 1799144730}
+  enableInteractiveHandles: 1
+  showLabels: 1
+  topLineCurveColor: {r: 0.85, g: 0.2, b: 0.95, a: 0.95}
+  isInitialized: 1
+  fwdP0: {x: 0.25, y: 6.178974, z: 12.629255}
+  fwdP1: {x: 2.6597054, y: 6.0776367, z: 12.205609}
+  fwdP2: {x: 2.6597054, y: 5.6539702, z: 9.258327}
+  fwdP3: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
+  aftP1: {x: 2.6597054, y: 5.6539702, z: -7.382319}
+  aftP2: {x: 1.1413531, y: 7.379114, z: -14.205765}
+  aftP3: {x: 0.25, y: 8.125153, z: -14.971435}
+  transomWidth: 0.3699013
+  maxBeam: 2.6597054
+  midshipApexZPercentage: 0.51450956
+  fwdP2Ratio: 0.74125797
+  fwdP1Ratio: 0.96748227
+  aftP1Ratio: 0.49420637
+  fwdP2XRatio: 0.9
+  fwdP1XRatio: 1
+  aftP1XRatio: 0.9
+  fwdP1YRatio: 0.92297345
+  cachedFwdP0: {x: 0.25, y: 6.178974, z: 12.629255}
+  cachedFwdP1: {x: 2.6597054, y: 6.0776367, z: 12.205609}
+  cachedFwdP2: {x: 2.6597054, y: 5.6539702, z: 9.258327}
+  cachedFwdP3: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
+  cachedAftP0: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
+  cachedAftP1: {x: 2.6597054, y: 5.6539702, z: -7.382319}
+  cachedAftP2: {x: 1.1413531, y: 7.379114, z: -14.205765}
+  cachedAftP3: {x: 0.25, y: 8.125153, z: -14.971435}
+  cachedIsAftCubic: 0
+  changeVersion: 67497682
+--- !u!4 &264070285
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 264070283}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &291057394
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 291057396}
+  - component: {fileID: 291057395}
+  m_Layer: 0
+  m_Name: RibbandCurvesBG
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &291057395
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 291057394}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2be6e2c2c7e04cc9b3414d6383e3173, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RibbandCurvesBG
+  bowCtrlArmGuide: {fileID: 0}
+  sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
+  breadthCurves: {fileID: 1799144730}
+  bilgeCurves: {fileID: 186442759}
+  floorCurves: {fileID: 216798052}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  fashionCurves: {fileID: 2019170296}
+  region: 4
+  ribbandCountPerBand: 6
+  showLabels: 1
+  showControlArms: 1
+  showPolygonSkeleton: 0
+  ribbandColor:
+    r: 0.2
+    g: 0.75
+    b: 1
+    a: 0.95
+  isInitialized: 1
+  generatedRibbands:
+  - name: Upper Mould (TopLine to Breadth) 1 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 0
+    tRatio: 0.14285715
+    uSectionParam: 0.78571427
+    fwdP0: {x: 0.25, y: 4.4185557, z: 12.629255}
+    fwdP1: {x: 2.9922755, y: 3.970862, z: 10.854578}
+    fwdP2: {x: 2.9938657, y: 3.9288056, z: 8.826259}
+    fwdP3: {x: 2.9938657, y: 3.9288056, z: -0.39888996}
+    aftP0: {x: 2.9938657, y: 3.9288056, z: -0.39888996}
+    aftP1: {x: 2.9938657, y: 3.9288056, z: -6.7644367}
+    aftP2: {x: 1.6618383, y: 4.8590436, z: -12.310794}
+  - name: Upper Mould (TopLine to Breadth) 2 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 1
+    tRatio: 0.2857143
+    uSectionParam: 0.8214286
+    fwdP0: {x: 0.25, y: 4.711959, z: 12.629255}
+    fwdP1: {x: 2.9415343, y: 4.3070626, z: 11.070176}
+    fwdP2: {x: 2.9428349, y: 4.2167845, z: 8.901863}
+    fwdP3: {x: 2.9428349, y: 4.2167845, z: -0.39888996}
+    aftP0: {x: 2.9428349, y: 4.2167845, z: -0.39888996}
+    aftP1: {x: 2.9428349, y: 4.2167845, z: -6.8674173}
+    aftP2: {x: 1.5316117, y: 5.2790556, z: -12.821199}
+  - name: Upper Mould (TopLine to Breadth) 3 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 2
+    tRatio: 0.42857143
+    uSectionParam: 0.85714287
+    fwdP0: {x: 0.25, y: 5.005362, z: 12.629255}
+    fwdP1: {x: 2.872148, y: 4.6477585, z: 11.288657}
+    fwdP2: {x: 2.8731616, y: 4.5031447, z: 8.977445}
+    fwdP3: {x: 2.8731616, y: 4.5031447, z: -0.39888996}
+    aftP0: {x: 2.8731616, y: 4.5031447, z: -0.39888996}
+    aftP1: {x: 2.8731616, y: 4.5031447, z: -6.9703975}
+    aftP2: {x: 1.324383, y: 5.6990676, z: -13.580697}
+  - name: Upper Mould (TopLine to Breadth) 4 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 3
+    tRatio: 0.5714286
+    uSectionParam: 0.89285713
+    fwdP0: {x: 0.25, y: 5.298765, z: 12.629255}
+    fwdP1: {x: 2.7966917, y: 4.9940214, z: 11.510709}
+    fwdP2: {x: 2.7974298, y: 4.7889643, z: 9.053275}
+    fwdP3: {x: 2.7974298, y: 4.7889643, z: -0.39888996}
+    aftP0: {x: 2.7974298, y: 4.7889643, z: -0.39888996}
+    aftP1: {x: 2.7974298, y: 4.7889643, z: -7.073378}
+    aftP2: {x: 1.2733369, y: 6.119079, z: -13.736964}
+  - name: Upper Mould (TopLine to Breadth) 5 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 4
+    tRatio: 0.71428573
+    uSectionParam: 0.92857146
+    fwdP0: {x: 0.25, y: 5.592168, z: 12.629255}
+    fwdP1: {x: 2.7277424, y: 5.3469715, z: 11.737049}
+    fwdP2: {x: 2.7282212, y: 5.0753236, z: 9.129628}
+    fwdP3: {x: 2.7282212, y: 5.0753236, z: -0.39888996}
+    aftP0: {x: 2.7282212, y: 5.0753236, z: -0.39888996}
+    aftP1: {x: 2.7282212, y: 5.0753236, z: -7.176358}
+    aftP2: {x: 1.2197235, y: 6.539091, z: -13.89323}
+  - name: Upper Mould (TopLine to Breadth) 6 BG
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 5
+    tRatio: 0.85714287
+    uSectionParam: 0.96428573
+    fwdP0: {x: 0.25, y: 5.885571, z: 12.629255}
+    fwdP1: {x: 2.6778846, y: 5.707773, z: 11.968424}
+    fwdP2: {x: 2.6781192, y: 5.3632994, z: 9.206782}
+    fwdP3: {x: 2.6781192, y: 5.3632994, z: -0.39888996}
+    aftP0: {x: 2.6781192, y: 5.3632994, z: -0.39888996}
+    aftP1: {x: 2.6781192, y: 5.3632994, z: -7.279339}
+    aftP2: {x: 1.1740953, y: 6.959102, z: -14.049498}
+  - name: Upper (Breadth to Bilge) 1 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 6
+    tRatio: 0.14285715
+    uSectionParam: 0.53571427
+    fwdP0: {x: 0.25, y: 2.6276026, z: 12.435499}
+    fwdP1: {x: 2.7749708, y: 1.5890998, z: 9.96485}
+    fwdP2: {x: 2.7759466, y: 1.5890998, z: 8.5633135}
+    fwdP3: {x: 2.7759466, y: 1.5890998, z: -0.39888996}
+    aftP0: {x: 2.7759466, y: 1.5890998, z: -0.39888996}
+    aftP1: {x: 2.7759466, y: 1.5890998, z: -6.2862296}
+    aftP2: {x: 1.5926648, y: 3.383205, z: -11.452826}
+  - name: Upper (Breadth to Bilge) 2 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 7
+    tRatio: 0.2857143
+    uSectionParam: 0.5714286
+    fwdP0: {x: 0.25, y: 2.8771944, z: 12.492968}
+    fwdP1: {x: 2.875354, y: 1.9141728, z: 10.181124}
+    fwdP2: {x: 2.8764958, y: 1.9141728, z: 8.623125}
+    fwdP3: {x: 2.8764958, y: 1.9141728, z: -0.39888996}
+    aftP0: {x: 2.8764958, y: 1.9141728, z: -0.39888996}
+    aftP1: {x: 2.8764958, y: 1.9141728, z: -6.3487678}
+    aftP2: {x: 1.663519, y: 3.5385108, z: -11.519517}
+  - name: Upper (Breadth to Bilge) 3 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 8
+    tRatio: 0.42857143
+    uSectionParam: 0.60714287
+    fwdP0: {x: 0.25, y: 3.126786, z: 12.538656}
+    fwdP1: {x: 2.942441, y: 2.2511606, z: 10.348596}
+    fwdP2: {x: 2.943742, y: 2.2511606, z: 8.669441}
+    fwdP3: {x: 2.943742, y: 2.2511606, z: -0.39888996}
+    aftP0: {x: 2.943742, y: 2.2511606, z: -0.39888996}
+    aftP1: {x: 2.943742, y: 2.2511606, z: -6.4113054}
+    aftP2: {x: 1.7084326, y: 3.7039783, z: -11.590573}
+  - name: Upper (Breadth to Bilge) 4 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 9
+    tRatio: 0.5714286
+    uSectionParam: 0.64285713
+    fwdP0: {x: 0.25, y: 3.3763776, z: 12.5740185}
+    fwdP1: {x: 2.9829311, y: 2.5960572, z: 10.472527}
+    fwdP2: {x: 2.9843838, y: 2.5960572, z: 8.703714}
+    fwdP3: {x: 2.9843838, y: 2.5960572, z: -0.39888996}
+    aftP0: {x: 2.9843838, y: 2.5960572, z: -0.39888996}
+    aftP1: {x: 2.9843838, y: 2.5960572, z: -6.473843}
+    aftP2: {x: 1.7332295, y: 3.8781867, z: -11.665382}
+  - name: Upper (Breadth to Bilge) 5 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 10
+    tRatio: 0.71428573
+    uSectionParam: 0.67857146
+    fwdP0: {x: 0.25, y: 3.6259694, z: 12.600256}
+    fwdP1: {x: 3.003524, y: 2.9448562, z: 10.559029}
+    fwdP2: {x: 3.0051208, y: 2.9448562, z: 8.727637}
+    fwdP3: {x: 3.0051208, y: 2.9448562, z: -0.39888996}
+    aftP0: {x: 3.0051208, y: 2.9448562, z: -0.39888996}
+    aftP1: {x: 3.0051208, y: 2.9448562, z: -6.536381}
+    aftP2: {x: 1.743732, y: 4.0597134, z: -11.743334}
+  - name: Upper (Breadth to Bilge) 6 BG
+    subRegionName: Upper (Breadth to Bilge)
+    index: 11
+    tRatio: 0.85714287
+    uSectionParam: 0.71428573
+    fwdP0: {x: 0.25, y: 3.875561, z: 12.6183815}
+    fwdP1: {x: 3.0109162, y: 3.2935495, z: 10.613501}
+    fwdP2: {x: 3.0126507, y: 3.2935495, z: 8.7427025}
+    fwdP3: {x: 3.0126507, y: 3.2935495, z: -0.39888996}
+    aftP0: {x: 3.0126507, y: 3.2935495, z: -0.39888996}
+    aftP1: {x: 3.0126507, y: 3.2935495, z: -6.598919}
+    aftP2: {x: 1.7457635, y: 4.247136, z: -11.843965}
+  - name: Middle (Bilge to Floor) 1 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 12
+    tRatio: 0.14285715
+    uSectionParam: 0.2857143
+    fwdP0: {x: 0.25, y: 1.7452639, z: 12.10765}
+    fwdP1: {x: 1.4199525, y: 0.3988183, z: 8.325181}
+    fwdP2: {x: 1.420009, y: 0.3988183, z: 8.109853}
+    fwdP3: {x: 1.420009, y: 0.3988183, z: -0.39888996}
+    aftP0: {x: 1.420009, y: 0.3988183, z: -0.39888996}
+    aftP1: {x: 1.420009, y: 0.3988183, z: -5.848465}
+    aftP2: {x: 0.35474968, y: 2.8766434, z: -11.235296}
+  - name: Middle (Bilge to Floor) 2 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 13
+    tRatio: 0.2857143
+    uSectionParam: 0.32142857
+    fwdP0: {x: 0.25, y: 1.8507217, z: 12.159531}
+    fwdP1: {x: 1.6549116, y: 0.5120991, z: 8.578922}
+    fwdP2: {x: 1.6550474, y: 0.5120991, z: 8.180026}
+    fwdP3: {x: 1.6550474, y: 0.5120991, z: -0.39888996}
+    aftP0: {x: 1.6550474, y: 0.5120991, z: -0.39888996}
+    aftP1: {x: 1.6550474, y: 0.5120991, z: -5.911003}
+    aftP2: {x: 0.5172129, y: 2.9613633, z: -11.271677}
+  - name: Middle (Bilge to Floor) 3 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 14
+    tRatio: 0.42857143
+    uSectionParam: 0.35714287
+    fwdP0: {x: 0.25, y: 1.9561796, z: 12.207422}
+    fwdP1: {x: 1.8886148, y: 0.63000983, z: 8.810155}
+    fwdP2: {x: 1.8888522, y: 0.63000983, z: 8.243976}
+    fwdP3: {x: 1.8888522, y: 0.63000983, z: -0.39888996}
+    aftP0: {x: 1.8888522, y: 0.63000983, z: -0.39888996}
+    aftP1: {x: 1.8888522, y: 0.63000983, z: -5.973541}
+    aftP2: {x: 0.71724176, y: 3.0080545, z: -11.291727}
+  - name: Middle (Bilge to Floor) 4 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 15
+    tRatio: 0.5714286
+    uSectionParam: 0.39285713
+    fwdP0: {x: 0.25, y: 2.0616374, z: 12.251616}
+    fwdP1: {x: 2.1122465, y: 0.75915027, z: 9.032083}
+    fwdP2: {x: 2.1126063, y: 0.75915027, z: 8.305351}
+    fwdP3: {x: 2.1126063, y: 0.75915027, z: -0.39888996}
+    aftP0: {x: 2.1126063, y: 0.75915027, z: -0.39888996}
+    aftP1: {x: 2.1126063, y: 0.75915027, z: -6.0360785}
+    aftP2: {x: 0.9346876, y: 3.0379643, z: -11.304571}
+  - name: Middle (Bilge to Floor) 5 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 16
+    tRatio: 0.71428573
+    uSectionParam: 0.42857143
+    fwdP0: {x: 0.25, y: 2.1670952, z: 12.292376}
+    fwdP1: {x: 2.316994, y: 0.90612054, z: 9.253377}
+    fwdP2: {x: 2.3174932, y: 0.90612054, z: 8.366551}
+    fwdP3: {x: 2.3174932, y: 0.90612054, z: -0.39888996}
+    aftP0: {x: 2.3174932, y: 0.90612054, z: -0.39888996}
+    aftP1: {x: 2.3174932, y: 0.90612054, z: -6.098616}
+    aftP2: {x: 1.1494029, y: 3.072341, z: -11.319333}
+  - name: Middle (Bilge to Floor) 6 BG
+    subRegionName: Middle (Bilge to Floor)
+    index: 17
+    tRatio: 0.85714287
+    uSectionParam: 0.46428573
+    fwdP0: {x: 0.25, y: 2.2725532, z: 12.329935}
+    fwdP1: {x: 2.4940453, y: 1.0775206, z: 9.474492}
+    fwdP2: {x: 2.4946957, y: 1.0775206, z: 8.427702}
+    fwdP3: {x: 2.4946957, y: 1.0775206, z: -0.39888996}
+    aftP0: {x: 2.4946957, y: 1.0775206, z: -0.39888996}
+    aftP1: {x: 2.4946957, y: 1.0775206, z: -6.1611543}
+    aftP2: {x: 1.3412392, y: 3.1324315, z: -11.345138}
+  - name: Lower (Floor to Keel) 1 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 18
+    tRatio: 0.14285715
+    uSectionParam: 0.035714287
+    fwdP0: {x: 0.25, y: 0.23425801, z: 10.557581}
+    fwdP1: {x: 0.3853086, y: 0.038919415, z: 7.7998533}
+    fwdP2: {x: 0.3853086, y: 0.038919415, z: 7.7998533}
+    fwdP3: {x: 0.3853086, y: 0.038919415, z: -0.39888996}
+    aftP0: {x: 0.3853086, y: 0.038919415, z: -0.39888996}
+    aftP1: {x: 0.3853086, y: 0.038919415, z: -4.5240417}
+    aftP2: {x: 0.25, y: 0.39037827, z: -10.167637}
+  - name: Lower (Floor to Keel) 2 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 19
+    tRatio: 0.2857143
+    uSectionParam: 0.071428575
+    fwdP0: {x: 0.25, y: 0.46851602, z: 10.964374}
+    fwdP1: {x: 0.5214946, y: 0.075718544, z: 7.8401737}
+    fwdP2: {x: 0.5214946, y: 0.075718544, z: 7.8401737}
+    fwdP3: {x: 0.5214946, y: 0.075718544, z: -0.39888996}
+    aftP0: {x: 0.5214946, y: 0.075718544, z: -0.39888996}
+    aftP1: {x: 0.5214946, y: 0.075718544, z: -4.734356}
+    aftP2: {x: 0.25, y: 0.78075653, z: -10.335275}
+  - name: Lower (Floor to Keel) 3 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 20
+    tRatio: 0.42857143
+    uSectionParam: 0.10714286
+    fwdP0: {x: 0.25, y: 0.70277405, z: 11.27963}
+    fwdP1: {x: 0.65789986, y: 0.11198759, z: 7.8776336}
+    fwdP2: {x: 0.65789986, y: 0.11198759, z: 7.8776336}
+    fwdP3: {x: 0.65789986, y: 0.11198759, z: -0.39888996}
+    aftP0: {x: 0.65789986, y: 0.11198759, z: -0.39888996}
+    aftP1: {x: 0.65789986, y: 0.11198759, z: -4.94467}
+    aftP2: {x: 0.25, y: 1.1711347, z: -10.502912}
+  - name: Lower (Floor to Keel) 4 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 21
+    tRatio: 0.5714286
+    uSectionParam: 0.14285715
+    fwdP0: {x: 0.25, y: 0.93703204, z: 11.532133}
+    fwdP1: {x: 0.79386663, y: 0.14931679, z: 7.9137483}
+    fwdP2: {x: 0.79386663, y: 0.14931679, z: 7.9137483}
+    fwdP3: {x: 0.79386663, y: 0.14931679, z: -0.39888996}
+    aftP0: {x: 0.79386663, y: 0.14931679, z: -0.39888996}
+    aftP1: {x: 0.79386663, y: 0.14931679, z: -5.1549845}
+    aftP2: {x: 0.25, y: 1.5615131, z: -10.670549}
+  - name: Lower (Floor to Keel) 5 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 22
+    tRatio: 0.71428573
+    uSectionParam: 0.17857143
+    fwdP0: {x: 0.25, y: 1.17129, z: 11.7384615}
+    fwdP1: {x: 0.92873645, y: 0.18929633, z: 7.9498963}
+    fwdP2: {x: 0.92873645, y: 0.18929633, z: 7.9498963}
+    fwdP3: {x: 0.92873645, y: 0.18929633, z: -0.39888996}
+    aftP0: {x: 0.92873645, y: 0.18929633, z: -0.39888996}
+    aftP1: {x: 0.92873645, y: 0.18929633, z: -5.3652987}
+    aftP2: {x: 0.25, y: 1.9518912, z: -10.838186}
+  - name: Lower (Floor to Keel) 6 BG
+    subRegionName: Lower (Floor to Keel)
+    index: 23
+    tRatio: 0.85714287
+    uSectionParam: 0.21428572
+    fwdP0: {x: 0.25, y: 1.4055481, z: 11.909165}
+    fwdP1: {x: 1.0618515, y: 0.23351648, z: 7.987755}
+    fwdP2: {x: 1.0618515, y: 0.23351648, z: 7.987755}
+    fwdP3: {x: 1.0618515, y: 0.23351648, z: -0.39888996}
+    aftP0: {x: 1.0618515, y: 0.23351648, z: -0.39888996}
+    aftP1: {x: 1.0618515, y: 0.23351648, z: -5.575613}
+    aftP2: {x: 0.25, y: 2.3422694, z: -11.005824}
+  changeVersion: 29352
+--- !u!4 &291057396
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 291057394}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &747401015
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 747401017}
+  - component: {fileID: 747401016}
+  m_Layer: 0
+  m_Name: BackBoneCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &747401016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 747401015}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1db8f845a12347cd991cb7a7f8a8955, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackboneCurves
+  sheerCurves: {fileID: 1818396365}
+  bodyCurves: {fileID: 2032973263}
+  keelBreadth: {fileID: 882306903}
+  keelWidth: 0.5
+  showLabels: 1
+  backboneColor: {r: 0.95, g: 0.6, b: 0.1, a: 0.95}
+  isInitialized: 1
+  stbdStemP0: {x: 0.25, y: 0, z: 10}
+  stbdStemP1: {x: 0.25, y: 0.6361033, z: 11.8196125}
+  stbdStemP2: {x: 0.25, y: 2.0037498, z: 12.565482}
+  stbdStemP3: {x: 0.25, y: 4.1251526, z: 12.629255}
+  stbdUpperStemTop: {x: 0.25, y: 6.178974, z: 12.629255}
+  stbdKeelStart: {x: 0.25, y: 0, z: 10}
+  stbdKeelEnd: {x: 0.25, y: 0, z: -10}
+  stbdSternP0: {x: 0.25, y: 0, z: -10}
+  stbdSternP3: {x: 0.25, y: 4.1251526, z: -11.771435}
+  portStemP0: {x: -0.25, y: 0, z: 10}
+  portStemP1: {x: -0.25, y: 0.6361033, z: 11.8196125}
+  portStemP2: {x: -0.25, y: 2.0037498, z: 12.565482}
+  portStemP3: {x: -0.25, y: 4.1251526, z: 12.629255}
+  portUpperStemTop: {x: -0.25, y: 6.178974, z: 12.629255}
+  portKeelStart: {x: -0.25, y: 0, z: 10}
+  portKeelEnd: {x: -0.25, y: 0, z: -10}
+  portSternP0: {x: -0.25, y: 0, z: -10}
+  portSternP3: {x: -0.25, y: 4.1251526, z: -11.771435}
+  changeVersion: 1222889
+--- !u!4 &747401017
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 747401015}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &882306902
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 882306904}
+  - component: {fileID: 882306903}
+  m_Layer: 0
+  m_Name: KeelBreadth
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &882306903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 882306902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d3ec4accc98d4c888c4afbbcaf0fca3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeelBreadth
+  sheerCurves: {fileID: 1818396365}
+  bodyCurves: {fileID: 2032973263}
+  keelWidth: 0.5
+  showLabels: 1
+  keelColor: {r: 1, g: 0.85, b: 0.1, a: 0.95}
+  isInitialized: 1
+  stbdKeelStart: {x: 0.25, y: 0, z: 10}
+  stbdKeelEnd: {x: 0.25, y: 0, z: -10}
+  portKeelStart: {x: -0.25, y: 0, z: 10}
+  portKeelEnd: {x: -0.25, y: 0, z: -10}
+  changeVersion: 1225594
+--- !u!4 &882306904
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 882306902}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1349209203
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1349209205}
+  - component: {fileID: 1349209204}
+  m_Layer: 0
+  m_Name: RibbandCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1349209204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1349209203}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0798d9a86ce242c1bb192b021fa6d5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RibbandCurves
+  sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
+  breadthCurves: {fileID: 1799144730}
+  bilgeCurves: {fileID: 186442759}
+  floorCurves: {fileID: 216798052}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  fashionCurves: {fileID: 2019170296}
+  region: 4
+  ribbandCountPerBand: 1
+  showLabels: 0
+  showControlArms: 1
+  showPolygonSkeleton: 0
+  ribbandColor: {r: 0, g: 0.014314713, b: 0.46226418, a: 1}
+  showBowMouldP1Guide: 1
+  showFwdP2Guide: 1
+  bowMouldGuideColor: {r: 0.1, g: 0.95, b: 0.85, a: 0.95}
+  fwdP2GuideColor: {r: 0.95, g: 0.85, b: 0.1, a: 0.95}
+  showAftMouldA1Guide: 1
+  showSternTransomGuide: 1
+  aftMouldGuideColor: {r: 0.75, g: 0.25, b: 0.95, a: 0.95}
+  sternTransomGuideColor: {r: 0.95, g: 0.25, b: 0.55, a: 0.95}
+  isInitialized: 1
+  generatedRibbands:
+  - name: Upper Mould (TopLine to Breadth) 1
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 0
+    tRatio: 0.5
+    uSectionParam: 0.875
+    fwdP0: {x: 0.25, y: 5.1520634, z: 12.629255}
+    fwdP1: {x: 2.8337064, y: 4.8201294, z: 11.399196}
+    fwdP2: {x: 2.8345802, y: 4.646059, z: 9.004347}
+    fwdP3: {x: 2.8345802, y: 4.646059, z: -0.39888996}
+    aftP0: {x: 2.8345802, y: 4.646059, z: -0.39888996}
+    aftP1: {x: 2.8345802, y: 4.646059, z: -6.86895}
+    aftP2: {x: 1.3011625, y: 5.909073, z: -13.65883}
+  - name: Upper (Breadth to Bilge) 1
+    subRegionName: Upper (Breadth to Bilge)
+    index: 1
+    tRatio: 0.5
+    uSectionParam: 0.625
+    fwdP0: {x: 0.25, y: 3.1834478, z: 12.547543}
+    fwdP1: {x: 2.9633055, y: 2.3304188, z: 10.4024515}
+    fwdP2: {x: 2.964682, y: 2.3304188, z: 8.699301}
+    fwdP3: {x: 2.964682, y: 2.3304188, z: -0.39888996}
+    aftP0: {x: 2.964682, y: 2.3304188, z: -0.39888996}
+    aftP1: {x: 2.964682, y: 2.3304188, z: -6.320479}
+    aftP2: {x: 1.6895705, y: 3.7390432, z: -11.605631}
+  - name: Middle (Bilge to Floor) 1
+    subRegionName: Middle (Bilge to Floor)
+    index: 2
+    tRatio: 0.5
+    uSectionParam: 0.375
+    fwdP0: {x: 0.25, y: 1.9407744, z: 12.200664}
+    fwdP1: {x: 2.0451386, y: 0.5951313, z: 8.901873}
+    fwdP2: {x: 2.045442, y: 0.5951313, z: 8.378366}
+    fwdP3: {x: 2.045442, y: 0.5951313, z: -0.39888996}
+    aftP0: {x: 2.045442, y: 0.5951313, z: -0.39888996}
+    aftP1: {x: 2.045442, y: 0.5951313, z: -5.8680134}
+    aftP2: {x: 0.7844586, y: 2.9745553, z: -11.277342}
+  - name: Lower (Floor to Keel) 1
+    subRegionName: Lower (Floor to Keel)
+    index: 3
+    tRatio: 0.5
+    uSectionParam: 0.125
+    fwdP0: {x: 0.25, y: 0.819903, z: 11.412504}
+    fwdP1: {x: 0.7771509, y: 0.124060914, z: 7.785949}
+    fwdP2: {x: 0.7771509, y: 0.124060914, z: 8.139699}
+    fwdP3: {x: 0.7771509, y: 0.124060914, z: -0.39888996}
+    aftP0: {x: 0.7771509, y: 0.124060914, z: -0.39888996}
+    aftP1: {x: 0.7771509, y: 0.124060914, z: -5.745185}
+    aftP2: {x: 0.25, y: 1.3663238, z: -10.586731}
+  changeVersion: 1208342
+--- !u!4 &1349209205
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1349209203}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1420301563
 GameObject:
   m_ObjectHideFlags: 0
@@ -354,6 +1043,71 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1591367781
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1591367782}
+  - component: {fileID: 1591367783}
+  m_Layer: 0
+  m_Name: SectionModelCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1591367782
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1591367781}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1591367783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1591367781}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26800daf973024c8a9d9950b5021424c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SectionModelCurves
+  sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
+  breadthCurves: {fileID: 1799144730}
+  bilgeCurves: {fileID: 186442759}
+  floorCurves: {fileID: 216798052}
+  bodyCurves: {fileID: 2032973263}
+  ribbandCurves: {fileID: 1349209204}
+  fashionCurves: {fileID: 2019170296}
+  backboneCurves: {fileID: 747401016}
+  sectionCount: 15
+  includePrimaryBoundaryNodes: 1
+  showTransverseSections: 1
+  showSectionNodes: 0
+  showPolygonSkeleton: 0
+  showLabels: 1
+  nodeRadius: 0.06
+  sectionColor: {r: 0.2, g: 0.85, b: 0.45, a: 0.95}
+  starboardColor: {r: 0.2, g: 0.95, b: 0.4, a: 0.95}
+  portColor: {r: 0.95, g: 0.25, b: 0.4, a: 0.95}
+  isInitialized: 1
+  changeVersion: 81082
 --- !u!1 &1799144729
 GameObject:
   m_ObjectHideFlags: 0
@@ -383,40 +1137,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d359a49de2efd4f6d8a716f34e833f47, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BreadthCurves
-  sheerPlan: {fileID: 0}
-  bodyPlan: {fileID: 0}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
   sheerCurves: {fileID: 1818396365}
   enableInteractiveHandles: 1
   showLabels: 1
-  breadthCurveColor: {r: 0.1, g: 0.95, b: 0.4, a: 0.95}
+  showAftProjectionLine: 1
+  breadthCurveColor: {r: 0.9428512, g: 0.9490196, b: 0.10196079, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0.125, y: 4.1251526, z: 12.629255}
-  fwdP1: {x: 3.0117188, y: 3.6381307, z: 10.641136}
-  fwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750237}
-  fwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39931747}
-  aftP1: {x: 3.0136719, y: 3.6381307, z: -6.6620145}
-  aftP2: {x: 1.6303965, y: 4.4390326, z: -11.969445}
+  fwdP0: {x: 0.25, y: 4.1251526, z: 12.629255}
+  fwdP1: {x: 3.0118032, y: 3.6381307, z: 10.641204}
+  fwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750363}
+  fwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
+  aftP1: {x: 3.0136719, y: 3.6381307, z: -6.6614566}
+  aftP2: {x: 1.7451465, y: 4.4390326, z: -11.968783}
   aftP3: {x: 0.125, y: 4.1251526, z: -10.216921}
   transomWidth: 0.541
   maxBeam: 3.0136719
-  midshipApexZPercentage: 0.47035524
-  fwdP2Ratio: 0.70226836
-  fwdP1Ratio: 0.8474031
-  aftP1Ratio: 0.45871842
+  midshipApexZPercentage: 0.47035837
+  fwdP2Ratio: 0.7022683
+  fwdP1Ratio: 0.84740335
+  aftP1Ratio: 0.45871872
   fwdP2XRatio: 0.9
   fwdP1XRatio: 0.99932384
   aftP1XRatio: 0.9
   fwdP1YRatio: 0
-  cachedFwdP0: {x: 0.125, y: 4.1251526, z: 12.629255}
-  cachedFwdP1: {x: 3.0117188, y: 3.6381307, z: 10.641136}
-  cachedFwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750237}
-  cachedFwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39931747}
-  cachedAftP0: {x: 3.0136719, y: 3.6381307, z: -0.39931747}
-  cachedAftP1: {x: 3.0136719, y: 3.6381307, z: -6.6620145}
-  cachedAftP2: {x: 1.6303965, y: 4.4390326, z: -11.969445}
+  cachedFwdP0: {x: 0.25, y: 4.1251526, z: 12.629255}
+  cachedFwdP1: {x: 3.0118032, y: 3.6381307, z: 10.641204}
+  cachedFwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750363}
+  cachedFwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
+  cachedAftP0: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
+  cachedAftP1: {x: 3.0136719, y: 3.6381307, z: -6.6614566}
+  cachedAftP2: {x: 1.7451465, y: 4.4390326, z: -11.968783}
   cachedAftP3: {x: 0.125, y: 4.1251526, z: -10.216921}
   cachedIsAftCubic: 0
-  changeVersion: 2394001
+  changeVersion: 311217291
 --- !u!4 &1799144731
 Transform:
   m_ObjectHideFlags: 0
@@ -476,15 +1231,15 @@ MonoBehaviour:
   sternPostHeight: 4.1251526
   sternPostRake: 1.7714348
   enableCounter: 1
-  counterLength: 2
-  counterHeight: 1.5
-  counterBottomControlZ: 0.2304864
-  counterBottomControlY: 0.5333869
-  counterTopControlZ: 0.4728427
-  counterTopControlY: 0.778636
-  transomRakeAft: 1.1999998
-  transomRakeHeight: 2.5
-  upperStemRatio: 0.5
+  counterLength: 1.8036747
+  counterHeight: 1.5588975
+  counterBottomControlZ: 0.25557423
+  counterBottomControlY: 0.51323473
+  counterTopControlZ: 0.5243104
+  counterTopControlY: 0.7492179
+  transomRakeAft: 0.6306553
+  transomRakeHeight: 1.6950641
+  upperStemRatio: 0.63117576
   stemP0: {x: 0, y: 0, z: 10}
   stemP1: {x: 0, y: 0.6361033, z: 11.8196125}
   stemP2: {x: 0, y: 2.0037498, z: 12.565482}
@@ -496,12 +1251,12 @@ MonoBehaviour:
   counterP0: {x: 0, y: 4.1251526, z: -11.771435}
   counterP1: {x: 0, y: 4.925233, z: -12.232408}
   counterP2: {x: 0, y: 5.2931066, z: -12.71712}
-  counterP3: {x: 0, y: 5.6251526, z: -13.771435}
-  transomP0: {x: 0, y: 5.6251526, z: -13.771435}
-  transomP1: {x: 0, y: 8.125153, z: -14.971435}
-  upperStemTop: {x: 0, y: 6.1251526, z: 12.629255}
+  counterP3: {x: 0, y: 5.68405, z: -13.5751095}
+  transomP0: {x: 0, y: 5.68405, z: -13.5751095}
+  transomP1: {x: 0, y: 7.379114, z: -14.205765}
+  upperStemTop: {x: 0, y: 6.178974, z: 12.629255}
   isInitialized: 1
-  changeVersion: 8386580
+  changeVersion: 1341237357
 --- !u!4 &1818396366
 Transform:
   m_ObjectHideFlags: 0
@@ -644,6 +1399,70 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &2019170295
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2019170297}
+  - component: {fileID: 2019170296}
+  m_Layer: 0
+  m_Name: FashionCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2019170296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019170295}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4481f12a85dd84cc789572d7e17008dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FashionCurves
+  sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
+  breadthCurves: {fileID: 1799144730}
+  floorCurves: {fileID: 216798052}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  bilgeHeightRatio: 0.24219428
+  bilgeWidthRatio: 0.7724883
+  showLabels: 1
+  fashionCurveColor: {r: 0.95, g: 0.25, b: 0.85, a: 0.95}
+  isInitialized: 1
+  stbdP1: {x: 0.25, y: 2.7326477, z: -11.173461}
+  stbdP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
+  stbdP3: {x: 1.7451465, y: 4.4390326, z: -11.968783}
+  stbdP4: {x: 1.1413531, y: 7.379114, z: -14.205765}
+  portP1: {x: -0.25, y: 2.7326477, z: -11.173461}
+  portP2: {x: -1.4049832, y: 3.1459243, z: -11.350932}
+  portP3: {x: -1.7451465, y: 4.4390326, z: -11.968783}
+  portP4: {x: -1.1413531, y: 7.379114, z: -14.205765}
+  changeVersion: 71453653
+--- !u!4 &2019170297
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019170295}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2032973262
 GameObject:
   m_ObjectHideFlags: 0
@@ -673,16 +1492,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b3cbbb73888a47aa84a31ef88893f76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BodyCurves
-  sheerPlan: {fileID: 0}
-  bodyPlan: {fileID: 0}
+  keelThickness: 0.4
   sheerCurves: {fileID: 1818396365}
   breadthCurves: {fileID: 1799144730}
   floorCurves: {fileID: 216798052}
   bilgeCurves: {fileID: 186442759}
+  topLineCurves: {fileID: 264070284}
   keelWidth: 0.5
   floorHollow: 0.5
-  bilgeHeightRatio: 0.40203032
-  bilgeWidthRatio: 0.7715465
+  bilgeHeightRatio: 0.24219428
+  bilgeWidthRatio: 0.7724883
   minConvexArcFactor: 0.2
   showLabels: 1
   showPolygonSkeleton: 1
@@ -690,12 +1509,12 @@ MonoBehaviour:
   controlArmLengthScale: 0.6
   starboardColor: {r: 0, g: 1, b: 0, a: 1}
   portColor: {r: 1, g: 0, b: 0, a: 1}
-  cachedP0: {x: 0.125, y: 0, z: -0.39931747}
-  cachedP1: {x: 0.67693955, y: 0.9025147, z: -0.39931747}
-  cachedP2: {x: 2.4798372, y: 2.0023153, z: -0.39931747}
-  cachedP3: {x: 3.0136719, y: 3.6381307, z: -0.39931747}
-  cachedP4: {x: 3.0136719, y: 4.1251526, z: -0.39931747}
-  changeVersion: 519715
+  cachedP0: {x: 0.25, y: 0, z: -0.39888996}
+  cachedP1: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
+  cachedP2: {x: 2.622119, y: 1.093559, z: -0.39888996}
+  cachedP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
+  cachedP4: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
+  changeVersion: 1246059
 --- !u!4 &2032973264
 Transform:
   m_ObjectHideFlags: 0
@@ -722,3 +1541,10 @@ SceneRoots:
   - {fileID: 216798051}
   - {fileID: 2032973264}
   - {fileID: 186442760}
+  - {fileID: 1349209205}
+  - {fileID: 882306904}
+  - {fileID: 747401017}
+  - {fileID: 2019170297}
+  - {fileID: 264070285}
+  - {fileID: 1591367782}
+  - {fileID: 291057396}

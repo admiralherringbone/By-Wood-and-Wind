@@ -17,6 +17,7 @@ public class RibbandCurves : MonoBehaviour
 {
     public enum RibbandRegion
     {
+        TopLineToBreadth,
         BreadthToBilge,
         BilgeToFloor,
         FloorToKeel,
@@ -48,6 +49,9 @@ public class RibbandCurves : MonoBehaviour
     [Tooltip("Reference to SheerCurves for profile lines (Stem, Stern, Keel).")]
     public SheerCurves sheerCurves;
 
+    [Tooltip("Reference to TopLineCurves for Top Line (u=1.00) 3D points.")]
+    public TopLineCurves topLineCurves;
+
     [Tooltip("Reference to BreadthCurves for Max Breadth (p3) 3D points.")]
     public BreadthCurves breadthCurves;
 
@@ -75,8 +79,29 @@ public class RibbandCurves : MonoBehaviour
 
     [Header("Gizmo Visualization Settings")]
     public bool showLabels = true;
+    public bool showControlArms = true;
     public bool showPolygonSkeleton = false;
     public Color ribbandColor = new Color(0.2f, 0.75f, 1.0f, 0.95f);
+
+    [Header("Forward Control Arm Guides (Dashed Lines)")]
+    [Tooltip("Show the dashed 3D Bow Mould P1 section guide line (TopLine down to Floor).")]
+    public bool showBowMouldP1Guide = true;
+
+    [Tooltip("Show the dashed 3D Forward Midship P2 section guide line (TopLine down to Keel).")]
+    public bool showFwdP2Guide = true;
+
+    public Color bowMouldGuideColor = new Color(0.1f, 0.95f, 0.85f, 0.95f); // Vibrant Cyan
+    public Color fwdP2GuideColor = new Color(0.95f, 0.85f, 0.1f, 0.95f);    // Vibrant Gold
+
+    [Header("Aft Control Arm Guides (Dashed Lines)")]
+    [Tooltip("Show the dashed 3D Aft Mould A1 section guide line (TopLine down to Floor).")]
+    public bool showAftMouldA1Guide = true;
+
+    [Tooltip("Show the dashed 3D Stern Transom Boundary A2 guide line (TopLine down to Keel).")]
+    public bool showSternTransomGuide = true;
+
+    public Color aftMouldGuideColor = new Color(0.75f, 0.25f, 0.95f, 0.95f);   // Vibrant Purple
+    public Color sternTransomGuideColor = new Color(0.95f, 0.25f, 0.55f, 0.95f); // Vibrant Rose / Pink
 
     [Header("Initialization State")]
     public bool isInitialized = false;
@@ -106,6 +131,9 @@ public class RibbandCurves : MonoBehaviour
     {
         if (sheerCurves == null) sheerCurves = GetComponentInParent<SheerCurves>();
         if (sheerCurves == null) sheerCurves = FindFirstObjectByType<SheerCurves>();
+
+        if (topLineCurves == null) topLineCurves = GetComponentInParent<TopLineCurves>();
+        if (topLineCurves == null) topLineCurves = FindFirstObjectByType<TopLineCurves>();
 
         if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
         if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
@@ -144,6 +172,7 @@ public class RibbandCurves : MonoBehaviour
         FindReferences();
 
         if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
+        if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
         if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
         if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
         if (bilgeCurves != null) bilgeCurves.UpdateCachedCurves();
@@ -151,21 +180,26 @@ public class RibbandCurves : MonoBehaviour
 
         generatedRibbands.Clear();
 
-        if (region == RibbandRegion.BreadthToBilge)
+        if (region == RibbandRegion.TopLineToBreadth)
         {
-            GenerateSubRegion(RibbandRegion.BreadthToBilge, "Upper", ribbandCountPerBand, 0.50f, 0.75f);
+            GenerateSubRegion(RibbandRegion.TopLineToBreadth, "Upper Mould (TopLine to Breadth)", ribbandCountPerBand, 0.75f, 1.00f);
+        }
+        else if (region == RibbandRegion.BreadthToBilge)
+        {
+            GenerateSubRegion(RibbandRegion.BreadthToBilge, "Upper (Breadth to Bilge)", ribbandCountPerBand, 0.50f, 0.75f);
         }
         else if (region == RibbandRegion.BilgeToFloor)
         {
-            GenerateSubRegion(RibbandRegion.BilgeToFloor, "Middle", ribbandCountPerBand, 0.25f, 0.50f);
+            GenerateSubRegion(RibbandRegion.BilgeToFloor, "Middle (Bilge to Floor)", ribbandCountPerBand, 0.25f, 0.50f);
         }
         else if (region == RibbandRegion.FloorToKeel)
         {
-            GenerateSubRegion(RibbandRegion.FloorToKeel, "Lower", ribbandCountPerBand, 0.00f, 0.25f);
+            GenerateSubRegion(RibbandRegion.FloorToKeel, "Lower (Floor to Keel)", ribbandCountPerBand, 0.00f, 0.25f);
         }
         else if (region == RibbandRegion.FullHullSpan)
         {
-            // Generate all 3 distinct bands simultaneously in order from top to bottom
+            // Generate all 4 distinct bands simultaneously in order from top to bottom
+            GenerateSubRegion(RibbandRegion.TopLineToBreadth, "Upper Mould (TopLine to Breadth)", ribbandCountPerBand, 0.75f, 1.00f);
             GenerateSubRegion(RibbandRegion.BreadthToBilge, "Upper (Breadth to Bilge)", ribbandCountPerBand, 0.50f, 0.75f);
             GenerateSubRegion(RibbandRegion.BilgeToFloor, "Middle (Bilge to Floor)", ribbandCountPerBand, 0.25f, 0.50f);
             GenerateSubRegion(RibbandRegion.FloorToKeel, "Lower (Floor to Keel)", ribbandCountPerBand, 0.00f, 0.25f);
@@ -228,40 +262,23 @@ public class RibbandCurves : MonoBehaviour
                 rib.fwdP0.z = Mathf.Lerp(lowerFwdP0.z, upperFwdP0.z, t);
             }
 
-            // 3. Stern Corner Point (aftP2): Bound directly to FashionCurves if uRib >= 0.25f
-            if (fashionCurves != null && uRib >= 0.25f)
-            {
-                float tFashion = Mathf.Clamp01((uRib - 0.25f) / 0.75f);
-                rib.aftP2 = fashionCurves.GetFashionPointAtT(tFashion, 1f);
-            }
-            else
-            {
-                rib.aftP2.x = Mathf.Lerp(lowerAftP2.x, upperAftP2.x, t);
-                rib.aftP2.y = Mathf.Lerp(lowerAftP2.y, upperAftP2.y, t);
-                if (sheerCurves != null)
-                {
-                    rib.aftP2.z = sheerCurves.GetSternProfileZAtY(rib.aftP2.y);
-                }
-                else
-                {
-                    rib.aftP2.z = Mathf.Lerp(lowerAftP2.z, upperAftP2.z, t);
-                }
-            }
+            // 3. Bow Entry Arm (fwdP1): Evaluated natively from Bow Mould P1 Guide
+            rib.fwdP1 = EvaluateBowMouldP1AtU(uRib);
 
-            // 4. Bow Entry Arm (fwdP1): 3D lerp between lower and upper bow entry handles
-            rib.fwdP1.x = Mathf.Lerp(lowerFwdP1.x, upperFwdP1.x, t);
-            rib.fwdP1.y = Mathf.Lerp(lowerFwdP1.y, upperFwdP1.y, t);
-            rib.fwdP1.z = Mathf.Lerp(lowerFwdP1.z, upperFwdP1.z, t);
-
-            // 5. Midship Forward Arm (fwdP2): Z lerped, X and Y locked to midship apex for C1 continuity
-            rib.fwdP2.z = Mathf.Lerp(lowerFwdP2.z, upperFwdP2.z, t);
+            // 4. Midship Forward Arm (fwdP2): Z from Forward P2 Guide, X and Y locked to midship apex for C1 continuity
+            Vector3 guideFwdP2 = EvaluateFwdP2AtU(uRib);
+            rib.fwdP2.z = guideFwdP2.z;
             rib.fwdP2.x = rib.fwdP3.x;
             rib.fwdP2.y = rib.fwdP3.y;
 
-            // 6. Stern Arm (aftP1): Z lerped, X and Y locked to midship apex for C1 continuity
-            rib.aftP1.z = Mathf.Lerp(lowerAftP1.z, upperAftP1.z, t);
+            // 5. Stern Arm (aftP1): Z from Aft Mould A1 Guide, X and Y locked to midship apex for C1 continuity
+            Vector3 guideAftA1 = EvaluateAftMouldA1AtU(uRib);
+            rib.aftP1.z = guideAftA1.z;
             rib.aftP1.x = rib.fwdP3.x;
             rib.aftP1.y = rib.fwdP3.y;
+
+            // 6. Stern Transom Corner (aftP2): Evaluated natively from Stern Transom A2 Guide / FashionCurves
+            rib.aftP2 = EvaluateAftTransomA2AtU(uRib);
 
             rib.aftP0 = rib.fwdP3;
 
@@ -293,7 +310,23 @@ public class RibbandCurves : MonoBehaviour
         Vector3 keelBowArm = keelMidPt + Vector3.forward * (bowZ - midZ) * 0.5f;
         Vector3 keelSternArm = keelSternPt + Vector3.forward * (midZ - sternZ) * 0.5f;
 
-        if (subReg == RibbandRegion.BreadthToBilge)
+        if (subReg == RibbandRegion.TopLineToBreadth)
+        {
+            uF0 = (topLineCurves != null) ? topLineCurves.fwdP0 : defaultBow * 1.2f;
+            uF1 = (topLineCurves != null) ? topLineCurves.fwdP1 : defaultBow * 1.1f;
+            uF2 = (topLineCurves != null) ? topLineCurves.fwdP2 : defaultApex * 1.2f + Vector3.forward * 5f;
+            uF3 = (topLineCurves != null) ? topLineCurves.fwdP3 : defaultApex * 1.2f;
+            uA1 = (topLineCurves != null) ? topLineCurves.aftP1 : defaultApex * 1.2f - Vector3.forward * 5f;
+            uA2 = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.aftP3 : topLineCurves.aftP2) : defaultStern * 1.2f;
+
+            lF0 = (breadthCurves != null) ? breadthCurves.fwdP0 : defaultBow;
+            lF1 = (breadthCurves != null) ? breadthCurves.fwdP1 : defaultBow * 0.75f;
+            lF2 = (breadthCurves != null) ? breadthCurves.fwdP2 : defaultApex + Vector3.forward * 5f;
+            lF3 = (breadthCurves != null) ? breadthCurves.fwdP3 : defaultApex;
+            lA1 = (breadthCurves != null) ? breadthCurves.aftP1 : defaultApex - Vector3.forward * 5f;
+            lA2 = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3 : breadthCurves.aftP2) : defaultStern;
+        }
+        else if (subReg == RibbandRegion.BreadthToBilge)
         {
             uF0 = (breadthCurves != null) ? breadthCurves.fwdP0 : defaultBow;
             uF1 = (breadthCurves != null) ? breadthCurves.fwdP1 : defaultBow * 0.75f;
@@ -318,21 +351,45 @@ public class RibbandCurves : MonoBehaviour
             uA1 = (bilgeCurves != null) ? bilgeCurves.aftP1 : defaultApex * 0.5f - Vector3.forward * 4f;
             uA2 = (bilgeCurves != null) ? bilgeCurves.aftP2 : defaultStern * 0.5f;
 
-            lF0 = (floorCurves != null) ? floorCurves.fwdP0 : keelBowPt;
-            lF1 = (floorCurves != null) ? floorCurves.fwdP1 : keelBowArm;
-            lF2 = (floorCurves != null) ? floorCurves.fwdP1 : keelBowArm;
-            lF3 = (floorCurves != null) ? floorCurves.fwdP2 : keelMidPt;
-            lA1 = (floorCurves != null) ? floorCurves.aftP1 : keelSternArm;
-            lA2 = (floorCurves != null) ? floorCurves.aftP2 : keelSternPt;
+            if (floorCurves != null)
+            {
+                lF0 = floorCurves.fwdP0;
+                lF1 = floorCurves.fwdP1;
+                lF2 = floorCurves.fwdP2;
+                lF3 = floorCurves.fwdP3;
+                lA1 = floorCurves.aftP1;
+                lA2 = floorCurves.aftP3;
+            }
+            else
+            {
+                lF0 = keelBowPt;
+                lF1 = keelBowArm;
+                lF2 = keelBowArm;
+                lF3 = keelMidPt;
+                lA1 = keelSternArm;
+                lA2 = keelSternPt;
+            }
         }
         else // FloorToKeel
         {
-            uF0 = (floorCurves != null) ? floorCurves.fwdP0 : defaultBow * 0.5f;
-            uF1 = (floorCurves != null) ? floorCurves.fwdP1 : defaultBow * 0.4f;
-            uF2 = (floorCurves != null) ? floorCurves.fwdP1 : defaultApex * 0.5f + Vector3.forward * 4f;
-            uF3 = (floorCurves != null) ? floorCurves.fwdP2 : defaultApex * 0.5f;
-            uA1 = (floorCurves != null) ? floorCurves.aftP1 : defaultApex * 0.5f - Vector3.forward * 4f;
-            uA2 = (floorCurves != null) ? floorCurves.aftP2 : defaultStern * 0.5f;
+            if (floorCurves != null)
+            {
+                uF0 = floorCurves.fwdP0;
+                uF1 = floorCurves.fwdP1;
+                uF2 = floorCurves.fwdP2;
+                uF3 = floorCurves.fwdP3;
+                uA1 = floorCurves.aftP1;
+                uA2 = floorCurves.aftP3;
+            }
+            else
+            {
+                uF0 = defaultBow * 0.5f;
+                uF1 = defaultBow * 0.4f;
+                uF2 = defaultApex * 0.5f + Vector3.forward * 4f;
+                uF3 = defaultApex * 0.5f;
+                uA1 = defaultApex * 0.5f - Vector3.forward * 4f;
+                uA2 = defaultStern * 0.5f;
+            }
 
             lF0 = keelBowPt;
             lF1 = keelBowArm;
@@ -341,6 +398,406 @@ public class RibbandCurves : MonoBehaviour
             lA1 = keelSternArm;
             lA2 = keelSternPt;
         }
+    }
+
+    /// <summary>
+    /// Mathematically evaluates the 3D Bow Mould entry control handle (fwdP1) at parameter u
+    /// by scaling the master BodyCurves section through the Key Shape Bow Tip arms
+    /// (TopLineCurves.fwdP1, BreadthCurves.fwdP1, FloorCurves.fwdP1) and locking Z to the Stem Post profile.
+    /// </summary>
+    public Vector3 EvaluateBowMouldP1AtU(float u)
+    {
+        float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        float fwdSpan = bowZ - midZ;
+
+        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+        Vector3 floorP1 = (floorCurves != null) ? floorCurves.fwdP1 : new Vector3(hw + 1f, keelY + 0.5f, midZ + fwdSpan * 0.5f);
+        Vector3 breadthP1 = (breadthCurves != null) ? breadthCurves.fwdP1 : new Vector3(hw + 3f, keelY + 2.5f, midZ + fwdSpan * 0.75f);
+        Vector3 topLineP1 = (topLineCurves != null) ? topLineCurves.fwdP1 : new Vector3(hw + 3.5f, keelY + 3.5f, midZ + fwdSpan * 0.85f);
+
+        SectionNodes midNodes = (bodyCurves != null) ? bodyCurves.GetSectionNodesAtZ(midZ, 1f) : new SectionNodes();
+
+        Vector3 secFloor = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(0.25f, midNodes) : new Vector3(hw + 1f, keelY + 0.5f, midZ);
+        Vector3 secBreadth = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(0.75f, midNodes) : new Vector3(hw + 3f, keelY + 2.5f, midZ);
+        Vector3 secTop = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(1.00f, midNodes) : new Vector3(hw + 3.5f, keelY + 3.5f, midZ);
+
+        float floorMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secFloor.x));
+        float floorMidY = Mathf.Max(keelY + 0.001f, secFloor.y);
+        float sX_floor = (floorP1.x - hw) / (floorMidX - hw);
+        float sY_floor = (floorP1.y - keelY) / (floorMidY - keelY);
+
+        float bMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secBreadth.x));
+        float bMidY = Mathf.Max(keelY + 0.001f, secBreadth.y);
+        float sX_breadth = (breadthP1.x - hw) / (bMidX - hw);
+        float sY_breadth = (breadthP1.y - keelY) / (bMidY - keelY);
+
+        float topMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secTop.x));
+        float topMidY = Mathf.Max(keelY + 0.001f, secTop.y);
+        float sX_top = (topLineP1.x - hw) / (topMidX - hw);
+        float sY_top = (topLineP1.y - keelY) / (topMidY - keelY);
+
+        float sX, sY;
+        if (u >= 0.75f)
+        {
+            float tUpper = (u - 0.75f) / 0.25f;
+            sX = Mathf.Lerp(sX_breadth, sX_top, tUpper);
+            sY = Mathf.Lerp(sY_breadth, sY_top, tUpper);
+        }
+        else if (u >= 0.25f)
+        {
+            float tMidBand = (u - 0.25f) / 0.50f;
+            sX = Mathf.Lerp(sX_floor, sX_breadth, tMidBand);
+            sY = Mathf.Lerp(sY_floor, sY_breadth, tMidBand);
+        }
+        else
+        {
+            float tLower = u / 0.25f;
+            sX = Mathf.Lerp(1.0f, sX_floor, tLower);
+            sY = Mathf.Lerp(1.0f, sY_floor, tLower);
+        }
+
+        Vector3 secPt = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(u, midNodes) : new Vector3(hw + u * 3f, keelY + u * 2.5f, midZ);
+
+        float xVal = hw + (Mathf.Abs(secPt.x) - hw) * sX;
+        float yVal = keelY + (secPt.y - keelY) * sY;
+
+        Vector3 pt = new Vector3(xVal, yVal, 0f);
+        pt.z = EvaluateCenterlineStemProfileZAtY(pt.y);
+        return pt;
+    }
+
+    /// <summary>
+    /// Mathematically evaluates the 3D Forward Midship control handle (fwdP2) at parameter u.
+    /// Range for P2 guide is Keel (u=0.00) up to TopLine (u=1.00).
+    /// </summary>
+    public Vector3 EvaluateFwdP2AtU(float u)
+    {
+        float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : 0.25f;
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+        SectionNodes midNodes = (bodyCurves != null) ? bodyCurves.GetSectionNodesAtZ(midZ, 1f) : new SectionNodes();
+        Vector3 secPtP3 = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(u, midNodes) : new Vector3(hw + u * 4f, keelY + u * 3f, midZ);
+        Vector3 p3 = new Vector3(Mathf.Abs(secPtP3.x), secPtP3.y, midZ);
+
+        Vector3 pt2 = new Vector3(p3.x, p3.y, 0f);
+        pt2.z = EvaluateCenterlineFwdP2ProfileZAtY(pt2.y);
+        return pt2;
+    }
+
+    /// <summary>
+    /// Mathematically evaluates the 3D Aft Mould tangent control handle (aftP1) at parameter u
+    /// by scaling the master BodyCurves section through the Key Shape Aft arms
+    /// (TopLineCurves.aftP1, BreadthCurves.aftP1, FloorCurves.aftP1) and locking Z to the Stern Profile.
+    /// Range for A1 guide is Keel (u=0.00) to TopLine (u=1.00).
+    /// </summary>
+    public Vector3 EvaluateAftMouldA1AtU(float u)
+    {
+        float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+        Vector3 floorA1 = (floorCurves != null) ? floorCurves.aftP1 : new Vector3(hw + 1f, keelY + 0.5f, midZ - 5f);
+        Vector3 breadthA1 = (breadthCurves != null) ? breadthCurves.aftP1 : new Vector3(hw + 3f, keelY + 2.5f, midZ - 7f);
+        Vector3 topLineA1 = (topLineCurves != null) ? topLineCurves.aftP1 : new Vector3(hw + 3.5f, keelY + 3.5f, midZ - 8f);
+
+        SectionNodes midNodes = (bodyCurves != null) ? bodyCurves.GetSectionNodesAtZ(midZ, 1f) : new SectionNodes();
+
+        Vector3 secFloor = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(0.25f, midNodes) : new Vector3(hw + 1f, keelY + 0.5f, midZ);
+        Vector3 secBreadth = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(0.75f, midNodes) : new Vector3(hw + 3f, keelY + 2.5f, midZ);
+        Vector3 secTop = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(1.00f, midNodes) : new Vector3(hw + 3.5f, keelY + 3.5f, midZ);
+
+        float floorMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secFloor.x));
+        float floorMidY = Mathf.Max(keelY + 0.001f, secFloor.y);
+        float sX_floor = (floorA1.x - hw) / (floorMidX - hw);
+        float sY_floor = (floorA1.y - keelY) / (floorMidY - keelY);
+
+        float bMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secBreadth.x));
+        float bMidY = Mathf.Max(keelY + 0.001f, secBreadth.y);
+        float sX_breadth = (breadthA1.x - hw) / (bMidX - hw);
+        float sY_breadth = (breadthA1.y - keelY) / (bMidY - keelY);
+
+        float topMidX = Mathf.Max(hw + 0.001f, Mathf.Abs(secTop.x));
+        float topMidY = Mathf.Max(keelY + 0.001f, secTop.y);
+        float sX_top = (topLineA1.x - hw) / (topMidX - hw);
+        float sY_top = (topLineA1.y - keelY) / (topMidY - keelY);
+
+        float sX, sY;
+        if (u >= 0.75f)
+        {
+            float tUpper = (u - 0.75f) / 0.25f;
+            sX = Mathf.Lerp(sX_breadth, sX_top, tUpper);
+            sY = Mathf.Lerp(sY_breadth, sY_top, tUpper);
+        }
+        else if (u >= 0.25f)
+        {
+            float tMidBand = (u - 0.25f) / 0.50f;
+            sX = Mathf.Lerp(sX_floor, sX_breadth, tMidBand);
+            sY = Mathf.Lerp(sY_floor, sY_breadth, tMidBand);
+        }
+        else
+        {
+            float tLower = u / 0.25f;
+            sX = Mathf.Lerp(1.0f, sX_floor, tLower);
+            sY = Mathf.Lerp(1.0f, sY_floor, tLower);
+        }
+
+        Vector3 secPt = (bodyCurves != null) ? bodyCurves.EvaluateBodySectionAtU(u, midNodes) : new Vector3(hw + u * 3f, keelY + u * 2.5f, midZ);
+
+        float xVal = hw + (Mathf.Abs(secPt.x) - hw) * sX;
+        float yVal = keelY + (secPt.y - keelY) * sY;
+
+        Vector3 pt = new Vector3(xVal, yVal, 0f);
+
+        pt.z = EvaluateCenterlineSternProfileZAtY(pt.y);
+
+        return pt;
+    }
+
+    /// <summary>
+    /// Mathematically evaluates the 3D Stern Transom Corner / Boundary node (aftP2) at parameter u.
+    /// Range for A2 guide is Keel (u=0.00) up to TopLine (u=1.00).
+    /// </summary>
+    public Vector3 EvaluateAftTransomA2AtU(float u)
+    {
+        if (fashionCurves != null)
+        {
+            if (u >= 0.25f)
+            {
+                float tFashion = (u - 0.25f) / 0.75f;
+                return fashionCurves.GetFashionPointAtT(tFashion, 1f);
+            }
+            else
+            {
+                float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+                float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : 0.25f;
+                float keelZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(keelY) : -15f;
+                Vector3 keelPt = new Vector3(hw, keelY, keelZ);
+                Vector3 floorPt = fashionCurves.stbdP1;
+                float tLower = u / 0.25f;
+                return Vector3.Lerp(keelPt, floorPt, tLower);
+            }
+        }
+        else
+        {
+            float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+            float sternZ = (sheerCurves != null) ? sheerCurves.sternP3.z : -15f;
+            float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : 0.25f;
+            float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+            Vector3 floorA2 = (floorCurves != null) ? floorCurves.aftP3 : new Vector3(hw, keelY + 0.5f, sternZ + 2f);
+            Vector3 breadthA2 = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3 : breadthCurves.aftP2) : new Vector3(hw + 3f, keelY + 2.5f, sternZ);
+            Vector3 topLineA2 = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.aftP3 : topLineCurves.aftP2) : new Vector3(hw + 3.5f, keelY + 3.5f, sternZ);
+
+            if (u >= 0.75f)
+            {
+                float tUpper = (u - 0.75f) / 0.25f;
+                return Vector3.Lerp(breadthA2, topLineA2, tUpper);
+            }
+            else if (u >= 0.25f)
+            {
+                float tMidBand = (u - 0.25f) / 0.50f;
+                return Vector3.Lerp(floorA2, breadthA2, tMidBand);
+            }
+            else
+            {
+                float keelZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(keelY) : sternZ;
+                Vector3 keelPt = new Vector3(hw, keelY, keelZ);
+                float tLower = u / 0.25f;
+                return Vector3.Lerp(keelPt, floorA2, tLower);
+            }
+        }
+    }
+
+    public float EvaluateCenterlineSternProfileZAtY(float targetY)
+    {
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+        Vector3 floorA1 = (floorCurves != null) ? floorCurves.aftP1 : new Vector3(1f, keelY + 0.5f, -10f);
+        Vector3 breadthA1 = (breadthCurves != null) ? breadthCurves.aftP1 : new Vector3(3f, keelY + 2.5f, -12f);
+        Vector3 topLineA1 = (topLineCurves != null) ? topLineCurves.aftP1 : new Vector3(3.5f, keelY + 3.5f, -13f);
+        float keelZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(keelY) : floorA1.z;
+
+        // 1. Upper Band: Between Breadth (u=0.75) and TopLine (u=1.00)
+        if (targetY >= breadthA1.y)
+        {
+            float dyUpper = topLineA1.y - breadthA1.y;
+            if (Mathf.Abs(dyUpper) < 0.0001f) return breadthA1.z;
+
+            if (sheerCurves != null)
+            {
+                float sternZ_breadth = sheerCurves.GetSternProfileZAtY(breadthA1.y);
+                float sternZ_topLine = sheerCurves.GetSternProfileZAtY(topLineA1.y);
+                float sternZ_target = sheerCurves.GetSternProfileZAtY(targetY);
+
+                float dSternSpan = sternZ_topLine - sternZ_breadth;
+                if (Mathf.Abs(dSternSpan) > 0.0001f)
+                {
+                    float tSternShape = Mathf.Clamp01((sternZ_target - sternZ_breadth) / dSternSpan);
+                    return Mathf.Lerp(breadthA1.z, topLineA1.z, tSternShape);
+                }
+            }
+
+            float tUpper = Mathf.Clamp01((targetY - breadthA1.y) / dyUpper);
+            return Mathf.Lerp(breadthA1.z, topLineA1.z, tUpper);
+        }
+
+        // 2. Middle Band: Between Floor (u=0.25) and Breadth (u=0.75)
+        if (targetY >= floorA1.y)
+        {
+            float dyMid = breadthA1.y - floorA1.y;
+            if (Mathf.Abs(dyMid) < 0.0001f) return floorA1.z;
+
+            if (sheerCurves != null)
+            {
+                float sternZ_floor = sheerCurves.GetSternProfileZAtY(floorA1.y);
+                float sternZ_breadth = sheerCurves.GetSternProfileZAtY(breadthA1.y);
+                float sternZ_target = sheerCurves.GetSternProfileZAtY(targetY);
+
+                float dSternSpan = sternZ_breadth - sternZ_floor;
+                if (Mathf.Abs(dSternSpan) > 0.0001f)
+                {
+                    float tSternShape = Mathf.Clamp01((sternZ_target - sternZ_floor) / dSternSpan);
+                    return Mathf.Lerp(floorA1.z, breadthA1.z, tSternShape);
+                }
+            }
+
+            float tMid = Mathf.Clamp01((targetY - floorA1.y) / dyMid);
+            return Mathf.Lerp(floorA1.z, breadthA1.z, tMid);
+        }
+
+        // 3. Lower Band (Below Floor down to Keel):
+        // Follow the scaled/stretched Stern Profile continuation from Floor down to Keel
+        float sternZ_floorLower = sheerCurves.GetSternProfileZAtY(floorA1.y);
+        float sternZ_breadthLower = sheerCurves.GetSternProfileZAtY(breadthA1.y);
+        float sternZ_targetLower = sheerCurves.GetSternProfileZAtY(targetY);
+
+        float dSternMidSpan = sternZ_breadthLower - sternZ_floorLower;
+        float scaleZ = 1.0f;
+        if (Mathf.Abs(dSternMidSpan) > 0.0001f)
+        {
+            scaleZ = (breadthA1.z - floorA1.z) / dSternMidSpan;
+        }
+
+        return floorA1.z + (sternZ_targetLower - sternZ_floorLower) * scaleZ;
+    }
+
+    public float EvaluateCenterlineStemProfileZAtY(float targetY)
+    {
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+
+        Vector3 floorP1 = (floorCurves != null) ? floorCurves.fwdP1 : new Vector3(1f, keelY + 0.5f, 10f);
+        Vector3 breadthP1 = (breadthCurves != null) ? breadthCurves.fwdP1 : new Vector3(3f, keelY + 2.5f, 12f);
+        Vector3 topLineP1 = (topLineCurves != null) ? topLineCurves.fwdP1 : new Vector3(3.5f, keelY + 3.5f, 13f);
+
+        float stemBottomZRatio = (sheerCurves != null) ? sheerCurves.stemBottomControlZ : 0.5f;
+        float stemBottomYRatio = (sheerCurves != null) ? sheerCurves.stemBottomControlY : 0.1f;
+        float stemTopZRatio = (sheerCurves != null) ? sheerCurves.stemTopControlZ : 1.0f;
+        float stemTopYRatio = (sheerCurves != null) ? sheerCurves.stemTopControlY : 0.6f;
+
+        float y0 = keelY;
+        float y3 = breadthP1.y;
+        float z3 = breadthP1.z;
+
+        if (targetY >= y3)
+        {
+            float dyUpper = topLineP1.y - y3;
+            if (Mathf.Abs(dyUpper) < 0.0001f) return z3;
+            float tUpper = Mathf.Clamp01((targetY - y3) / dyUpper);
+            return Mathf.Lerp(z3, topLineP1.z, tUpper);
+        }
+
+        float y1C = y0 + (y3 - y0) * stemBottomYRatio;
+        float y2C = y0 + (y3 - y0) * stemTopYRatio;
+
+        float targetFloorY = Mathf.Clamp(floorP1.y, y0 + 0.001f, y3 - 0.001f);
+        float tFloor = SolveBezierTAtY(y0, y1C, y2C, y3, targetFloorY);
+        float uFloor = 1f - tFloor;
+        float c0Keel = (uFloor * uFloor * uFloor) + 3f * uFloor * uFloor * tFloor * (1f - stemBottomZRatio) + 3f * uFloor * tFloor * tFloor * (1f - stemTopZRatio);
+        c0Keel = Mathf.Clamp(c0Keel, 0.0001f, 0.9999f);
+        float z0 = (floorP1.z - (1f - c0Keel) * z3) / c0Keel;
+
+        if (targetY <= y0) return z0;
+
+        float tParam = SolveBezierTAtY(y0, y1C, y2C, y3, targetY);
+
+        float dzStem = z3 - z0;
+        float z1C = z0 + dzStem * stemBottomZRatio;
+        float z2C = z0 + dzStem * stemTopZRatio;
+
+        float uP = 1f - tParam;
+        return (uP * uP * uP * z0) + (3f * uP * uP * tParam * z1C) + (3f * uP * tParam * tParam * z2C) + (tParam * tParam * tParam * z3);
+    }
+
+    public float EvaluateCenterlineFwdP2ProfileZAtY(float targetY)
+    {
+        float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
+        float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        float fwdSpan = bowZ - midZ;
+
+        Vector3 floorP2 = (floorCurves != null) ? floorCurves.fwdP1 : new Vector3(1f, keelY + 0.5f, midZ + fwdSpan * 0.5f);
+        Vector3 breadthP2 = (breadthCurves != null) ? breadthCurves.fwdP2 : new Vector3(3f, keelY + 2.5f, midZ + fwdSpan * 0.35f);
+        Vector3 topLineP2 = (topLineCurves != null) ? topLineCurves.fwdP2 : new Vector3(3.5f, keelY + 3.5f, midZ + fwdSpan * 0.45f);
+
+        float stemBottomZRatio = (sheerCurves != null) ? sheerCurves.stemBottomControlZ : 0.5f;
+        float stemBottomYRatio = (sheerCurves != null) ? sheerCurves.stemBottomControlY : 0.1f;
+        float stemTopZRatio = (sheerCurves != null) ? sheerCurves.stemTopControlZ : 1.0f;
+        float stemTopYRatio = (sheerCurves != null) ? sheerCurves.stemTopControlY : 0.6f;
+
+        float y0 = keelY;
+        float y3 = breadthP2.y;
+        float z3 = breadthP2.z;
+
+        if (targetY >= y3)
+        {
+            float dyUpper = topLineP2.y - y3;
+            if (Mathf.Abs(dyUpper) < 0.0001f) return z3;
+            float tUpper = Mathf.Clamp01((targetY - y3) / dyUpper);
+            return Mathf.Lerp(z3, topLineP2.z, tUpper);
+        }
+
+        float y1C = y0 + (y3 - y0) * stemBottomYRatio;
+        float y2C = y0 + (y3 - y0) * stemTopYRatio;
+
+        float targetFloorY = Mathf.Clamp(floorP2.y, y0 + 0.001f, y3 - 0.001f);
+        float tFloor = SolveBezierTAtY(y0, y1C, y2C, y3, targetFloorY);
+        float uFloor = 1f - tFloor;
+        float c0Keel = (uFloor * uFloor * uFloor) + 3f * uFloor * uFloor * tFloor * (1f - stemBottomZRatio) + 3f * uFloor * tFloor * tFloor * (1f - stemTopZRatio);
+        c0Keel = Mathf.Clamp(c0Keel, 0.0001f, 0.9999f);
+        float z0 = (floorP2.z - (1f - c0Keel) * z3) / c0Keel;
+
+        if (targetY <= y0) return z0;
+
+        float tParam = SolveBezierTAtY(y0, y1C, y2C, y3, targetY);
+
+        float dzStem = z3 - z0;
+        float z1C = z0 + dzStem * stemBottomZRatio;
+        float z2C = z0 + dzStem * stemTopZRatio;
+
+        float uP = 1f - tParam;
+        return (uP * uP * uP * z0) + (3f * uP * uP * tParam * z1C) + (3f * uP * tParam * tParam * z2C) + (tParam * tParam * tParam * z3);
+    }
+
+    private float SolveBezierTAtY(float y0, float y1, float y2, float y3, float targetY)
+    {
+        float t = 0.5f;
+        float minT = 0f;
+        float maxT = 1f;
+
+        for (int k = 0; k < 12; k++)
+        {
+            float u = 1f - t;
+            float yVal = (u * u * u * y0) + (3f * u * u * t * y1) + (3f * u * t * t * y2) + (t * t * t * y3);
+            if (yVal < targetY) minT = t;
+            else maxT = t;
+            t = (minT + maxT) * 0.5f;
+        }
+        return t;
     }
 
     // --- 3D SPATIAL EVALUATION METHODS ---
@@ -411,16 +868,24 @@ public class RibbandCurves : MonoBehaviour
         float max = 1f;
         float t = 0.5f;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 24; i++)
         {
             float u = 1f - t;
             float zVal = (u * u * p0.z) + (2f * u * t * p1.z) + (t * t * p2.z);
             float error = zVal - targetZ;
 
-            if (Mathf.Abs(error) < 0.00005f) return t;
+            if (Mathf.Abs(error) < 0.000001f) return t;
 
-            if ((isForward && zVal < targetZ) || (!isForward && zVal > targetZ)) min = t;
-            else max = t;
+            if (p0.z > p2.z)
+            {
+                if (zVal > targetZ) min = t;
+                else max = t;
+            }
+            else
+            {
+                if (zVal < targetZ) min = t;
+                else max = t;
+            }
             t = (min + max) * 0.5f;
         }
 
@@ -433,16 +898,24 @@ public class RibbandCurves : MonoBehaviour
         float max = 1f;
         float t = 0.5f;
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 24; i++)
         {
             float u = 1f - t;
             float zVal = (u * u * u * p0.z) + (3f * u * u * t * p1.z) + (3f * u * t * t * p2.z) + (t * t * t * p3.z);
             float error = zVal - targetZ;
 
-            if (Mathf.Abs(error) < 0.00005f) return t;
+            if (Mathf.Abs(error) < 0.000001f) return t;
 
-            if ((isForward && zVal < targetZ) || (!isForward && zVal > targetZ)) min = t;
-            else max = t;
+            if (p0.z > p3.z)
+            {
+                if (zVal > targetZ) min = t;
+                else max = t;
+            }
+            else
+            {
+                if (zVal < targetZ) min = t;
+                else max = t;
+            }
             t = (min + max) * 0.5f;
         }
 
@@ -496,30 +969,207 @@ public class RibbandCurves : MonoBehaviour
             Gizmos.color = c;
             Gizmos.DrawLine(rib.aftP2, MirrorX(rib.aftP2));
 
-            if (showPolygonSkeleton)
+            // Draw 3D Control Polygon Skeleton Arms (Forward & Aft)
+            if (showControlArms || showPolygonSkeleton)
             {
-                Gizmos.color = new Color(c.r, c.g, c.b, 0.4f);
+                Gizmos.color = new Color(c.r, c.g, c.b, 0.65f);
+                // Forward Control Arms
                 Gizmos.DrawLine(rib.fwdP0, rib.fwdP1);
-                Gizmos.DrawLine(rib.fwdP3, rib.fwdP2);
-                Gizmos.DrawLine(rib.aftP0, rib.aftP1);
+                Gizmos.DrawLine(rib.fwdP1, rib.fwdP2);
+                Gizmos.DrawLine(rib.fwdP2, rib.fwdP3);
+                // Aft Control Arms
+                Gizmos.DrawLine(rib.fwdP3, rib.aftP1);
                 Gizmos.DrawLine(rib.aftP1, rib.aftP2);
-            }
 
-            // Draw Control Point Spheres
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawSphere(rib.fwdP0, 0.08f);
-            Gizmos.DrawSphere(rib.fwdP3, 0.11f); // Midship Apex
-            Gizmos.DrawSphere(rib.aftP2, 0.08f);
+                // Port Control Arms
+                Gizmos.DrawLine(MirrorX(rib.fwdP0), MirrorX(rib.fwdP1));
+                Gizmos.DrawLine(MirrorX(rib.fwdP1), MirrorX(rib.fwdP2));
+                Gizmos.DrawLine(MirrorX(rib.fwdP2), MirrorX(rib.fwdP3));
+                Gizmos.DrawLine(MirrorX(rib.fwdP3), MirrorX(rib.aftP1));
+                Gizmos.DrawLine(MirrorX(rib.aftP1), MirrorX(rib.aftP2));
+
+                // Draw Control Point Spheres for ALL 6 nodes (P0, P1, P2, P3, A1, A2)
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(rib.fwdP0, 0.10f); // Bow Tip (P0)
+
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawSphere(rib.fwdP1, 0.08f); // Bow Entry Arm (P1)
+
+                Gizmos.color = Color.green;
+                Gizmos.DrawSphere(rib.fwdP2, 0.08f); // Midship Forward Arm (P2)
+
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(rib.fwdP3, 0.12f); // Midship Apex (P3)
+
+                Gizmos.color = new Color(1f, 0.5f, 0f);
+                Gizmos.DrawSphere(rib.aftP1, 0.08f); // Midship Aft Arm (A1)
+
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawSphere(rib.aftP2, 0.10f); // Stern Transom Corner (A2)
+
+                // Mirrored Port Spheres
+                Gizmos.color = Color.yellow; Gizmos.DrawSphere(MirrorX(rib.fwdP0), 0.10f);
+                Gizmos.color = Color.cyan; Gizmos.DrawSphere(MirrorX(rib.fwdP1), 0.08f);
+                Gizmos.color = Color.green; Gizmos.DrawSphere(MirrorX(rib.fwdP2), 0.08f);
+                Gizmos.color = Color.yellow; Gizmos.DrawSphere(MirrorX(rib.fwdP3), 0.12f);
+                Gizmos.color = new Color(1f, 0.5f, 0f); Gizmos.DrawSphere(MirrorX(rib.aftP1), 0.08f);
+                Gizmos.color = Color.magenta; Gizmos.DrawSphere(MirrorX(rib.aftP2), 0.10f);
+            }
 
 #if UNITY_EDITOR
             if (showLabels)
             {
                 GUIStyle labelStyle = GetCachedLabelStyle();
-                Handles.Label(rib.fwdP3 + Vector3.up * 0.15f, $"{rib.name} ({rib.fwdP3.x:F2}m)", labelStyle);
+                Handles.Label(rib.fwdP3 + Vector3.up * 0.15f, $"{rib.name} (u={rib.uSectionParam:F2})", labelStyle);
+                if (showControlArms)
+                {
+                    Handles.Label(rib.fwdP1 + Vector3.up * 0.10f, $"P1 (Bow)", labelStyle);
+                    Handles.Label(rib.fwdP2 + Vector3.up * 0.10f, $"P2 (FwdArm)", labelStyle);
+                }
             }
 #endif
         }
+
+#if UNITY_EDITOR
+        // --- DASHED FORWARD CONTROL ARM GUIDES ---
+        if (showBowMouldP1Guide) DrawBowMouldP1GuideDashed(bowMouldGuideColor);
+        if (showFwdP2Guide) DrawFwdP2GuideDashed(fwdP2GuideColor);
+
+        // --- DASHED AFT CONTROL ARM GUIDES ---
+        if (showAftMouldA1Guide) DrawAftMouldA1GuideDashed(aftMouldGuideColor);
+        if (showSternTransomGuide) DrawSternTransomGuideDashed(sternTransomGuideColor);
+#endif
     }
+
+#if UNITY_EDITOR
+    private void DrawBowMouldP1GuideDashed(Color color, int steps = 30)
+    {
+        Handles.color = color;
+        Vector3 prev = EvaluateBowMouldP1AtU(0.25f);
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = Mathf.Lerp(0.25f, 1.00f, (float)i / steps);
+            Vector3 curr = EvaluateBowMouldP1AtU(u);
+            Handles.DrawDottedLine(prev, curr, 4f);
+            Handles.DrawDottedLine(MirrorX(prev), MirrorX(curr), 4f);
+            prev = curr;
+        }
+
+        float[] sampleUs = new float[] { 0.25f, 0.50f, 0.75f, 1.00f };
+        string[] labels = new string[] { "Floor P1 (u=0.25)", "Ribband P1 (u=0.50)", "Breadth P1 (u=0.75)", "TopLine P1 (u=1.00)" };
+
+        for (int k = 0; k < sampleUs.Length; k++)
+        {
+            Vector3 pt = EvaluateBowMouldP1AtU(sampleUs[k]);
+            Gizmos.color = color;
+            Gizmos.DrawSphere(pt, 0.07f);
+            Gizmos.DrawSphere(MirrorX(pt), 0.07f);
+
+            if (showLabels)
+            {
+                GUIStyle labelStyle = GetCachedLabelStyle();
+                labelStyle.normal.textColor = color;
+                Handles.Label(pt + Vector3.up * 0.12f, labels[k], labelStyle);
+            }
+        }
+    }
+
+    private void DrawFwdP2GuideDashed(Color color, int steps = 40)
+    {
+        Handles.color = color;
+        Vector3 prev = EvaluateFwdP2AtU(0.00f);
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = (float)i / steps;
+            Vector3 curr = EvaluateFwdP2AtU(u);
+            Handles.DrawDottedLine(prev, curr, 4f);
+            Handles.DrawDottedLine(MirrorX(prev), MirrorX(curr), 4f);
+            prev = curr;
+        }
+
+        float[] sampleUs = new float[] { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
+        string[] labels = new string[] { "Keel P2 (u=0.00)", "Floor P2 (u=0.25)", "Ribband P2 (u=0.50)", "Breadth P2 (u=0.75)", "TopLine P2 (u=1.00)" };
+
+        for (int k = 0; k < sampleUs.Length; k++)
+        {
+            Vector3 pt = EvaluateFwdP2AtU(sampleUs[k]);
+            Gizmos.color = color;
+            Gizmos.DrawSphere(pt, 0.07f);
+            Gizmos.DrawSphere(MirrorX(pt), 0.07f);
+
+            if (showLabels)
+            {
+                GUIStyle labelStyle = GetCachedLabelStyle();
+                labelStyle.normal.textColor = color;
+                Handles.Label(pt + Vector3.up * 0.12f, labels[k], labelStyle);
+            }
+        }
+    }
+
+    private void DrawAftMouldA1GuideDashed(Color color, int steps = 40)
+    {
+        Handles.color = color;
+        Vector3 prev = EvaluateAftMouldA1AtU(0.00f);
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = (float)i / steps;
+            Vector3 curr = EvaluateAftMouldA1AtU(u);
+            Handles.DrawDottedLine(prev, curr, 4f);
+            Handles.DrawDottedLine(MirrorX(prev), MirrorX(curr), 4f);
+            prev = curr;
+        }
+
+        float[] sampleUs = new float[] { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
+        string[] labels = new string[] { "Keel A1 (u=0.00)", "Floor A1 (u=0.25)", "Ribband A1 (u=0.50)", "Breadth A1 (u=0.75)", "TopLine A1 (u=1.00)" };
+
+        for (int k = 0; k < sampleUs.Length; k++)
+        {
+            Vector3 pt = EvaluateAftMouldA1AtU(sampleUs[k]);
+            Gizmos.color = color;
+            Gizmos.DrawSphere(pt, 0.07f);
+            Gizmos.DrawSphere(MirrorX(pt), 0.07f);
+
+            if (showLabels)
+            {
+                GUIStyle labelStyle = GetCachedLabelStyle();
+                labelStyle.normal.textColor = color;
+                Handles.Label(pt + Vector3.up * 0.12f, labels[k], labelStyle);
+            }
+        }
+    }
+
+    private void DrawSternTransomGuideDashed(Color color, int steps = 40)
+    {
+        Handles.color = color;
+        Vector3 prev = EvaluateAftTransomA2AtU(0.00f);
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = (float)i / steps;
+            Vector3 curr = EvaluateAftTransomA2AtU(u);
+            Handles.DrawDottedLine(prev, curr, 4f);
+            Handles.DrawDottedLine(MirrorX(prev), MirrorX(curr), 4f);
+            prev = curr;
+        }
+
+        float[] sampleUs = new float[] { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
+        string[] labels = new string[] { "Keel A2 (u=0.00)", "Floor A2 (u=0.25)", "Ribband A2 (u=0.50)", "Breadth A2 (u=0.75)", "TopLine A2 (u=1.00)" };
+
+        for (int k = 0; k < sampleUs.Length; k++)
+        {
+            Vector3 pt = EvaluateAftTransomA2AtU(sampleUs[k]);
+            Gizmos.color = color;
+            Gizmos.DrawSphere(pt, 0.07f);
+            Gizmos.DrawSphere(MirrorX(pt), 0.07f);
+
+            if (showLabels)
+            {
+                GUIStyle labelStyle = GetCachedLabelStyle();
+                labelStyle.normal.textColor = color;
+                Handles.Label(pt + Vector3.up * 0.12f, labels[k], labelStyle);
+            }
+        }
+    }
+#endif
 
     private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 30)
     {

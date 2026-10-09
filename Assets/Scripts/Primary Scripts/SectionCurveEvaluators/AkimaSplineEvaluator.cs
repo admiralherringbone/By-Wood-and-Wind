@@ -26,7 +26,8 @@ public class AkimaSplineEvaluator : ISectionCurveEvaluator
             float t = u * 4f;
             Vector3 linearPt = Vector3.Lerp(P0, P1, t);
             Vector3 akimaPt = EvaluateHermiteSegment(P0, T0, P1, T1, t, tension);
-            return Vector3.Lerp(linearPt, akimaPt, floorHollow);
+            float weight = Mathf.Lerp(floorHollow, 1.0f, t);
+            return Vector3.Lerp(linearPt, akimaPt, weight);
         }
         else if (u <= 0.50f)
         {

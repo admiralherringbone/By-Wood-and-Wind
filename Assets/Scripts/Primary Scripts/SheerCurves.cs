@@ -292,6 +292,66 @@ public class SheerCurves : MonoBehaviour
         return CalculateCubicBezierPoint(t, stemP0, stemP1, stemP2, stemP3).z;
     }
 
+    /// <summary>
+    /// Evaluates the exact Y height on the 3D Stem Profile for a given Z station.
+    /// </summary>
+    public float GetStemProfileYAtZ(float targetZ)
+    {
+        UpdateCachedProfile();
+
+        if (targetZ >= stemP3.z) return stemP3.y;
+        if (targetZ <= stemP0.z) return stemP0.y;
+
+        float t = GetBezierTAtZ(stemP0, stemP1, stemP2, stemP3, targetZ);
+        return CalculateCubicBezierPoint(t, stemP0, stemP1, stemP2, stemP3).y;
+    }
+
+    /// <summary>
+    /// Evaluates the exact Y height on the 3D Stern Profile for a given Z station.
+    /// </summary>
+    public float GetSternProfileYAtZ(float targetZ)
+    {
+        UpdateCachedProfile();
+
+        if (targetZ <= sternP3.z) return sternP3.y;
+        if (targetZ >= sternP0.z) return sternP0.y;
+
+        float sternDz = sternP3.z - sternP0.z;
+        if (Mathf.Abs(sternDz) < 0.0001f) return sternP3.y;
+        float sternT = Mathf.Clamp01((targetZ - sternP0.z) / sternDz);
+        return Mathf.Lerp(sternP0.y, sternP3.y, sternT);
+    }
+
+    private float GetBezierTAtZ(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float targetZ)
+    {
+        float min = 0f;
+        float max = 1f;
+        float t = 0.5f;
+
+        for (int i = 0; i < 8; i++)
+        {
+            float u = 1f - t;
+            float zVal = (u * u * u * p0.z) + (3f * u * u * t * p1.z) + (3f * u * t * t * p2.z) + (t * t * t * p3.z);
+            float error = zVal - targetZ;
+
+            if (Mathf.Abs(error) < 0.00005f) return t;
+
+            if (p0.z > p3.z)
+            {
+                if (zVal < targetZ) max = t;
+                else min = t;
+            }
+            else
+            {
+                if (zVal < targetZ) min = t;
+                else max = t;
+            }
+            t = (min + max) * 0.5f;
+        }
+
+        return t;
+    }
+
     public float GetBezierTAtYScalar(float y0, float y1, float y2, float y3, float targetY)
     {
         float dyTotal = y3 - y0;
