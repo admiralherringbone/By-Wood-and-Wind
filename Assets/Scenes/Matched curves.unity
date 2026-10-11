@@ -193,7 +193,7 @@ MonoBehaviour:
   cachedAftP2: {x: 1.3470587, y: 3.4075868, z: -11.603903}
   cachedInnerMidshipPt: {x: 2.5495858, y: 1.8309219, z: -0.47306794}
   cachedOffsetVector: {x: -0.21909142, y: 0.0789026, z: 0}
-  changeVersion: 6118037
+  changeVersion: 6189341
 --- !u!4 &186442760
 Transform:
   m_ObjectHideFlags: 0
@@ -285,7 +285,7 @@ MonoBehaviour:
   cachedAftP2: {x: 0.125, y: 2.7326477, z: -11.286219}
   cachedInnerMidshipPt: {x: 1.7351725, y: 0.75134945, z: -0.47306794}
   cachedOffsetVector: {x: -0.15476525, y: 0.23353016, z: 0}
-  changeVersion: 128647553
+  changeVersion: 128832701
 --- !u!1 &264070283
 GameObject:
   m_ObjectHideFlags: 0
@@ -354,7 +354,7 @@ MonoBehaviour:
   cachedIsAftCubic: 0
   cachedInnerMidshipPt: {x: 2.5597548, y: 5.21949, z: -0.47306794}
   cachedOffsetVector: {x: -0.09995055, y: 0, z: 0}
-  changeVersion: 117999016
+  changeVersion: 118184564
 --- !u!4 &264070285
 Transform:
   m_ObjectHideFlags: 0
@@ -424,7 +424,7 @@ MonoBehaviour:
   portKeelEnd: {x: -0.125, y: 0, z: -10}
   portSternP0: {x: -0.125, y: 0, z: -10}
   portSternP3: {x: -0.125, y: 4.1251526, z: -11.94165}
-  changeVersion: 2031517
+  changeVersion: 2045697
 --- !u!4 &747401017
 Transform:
   m_ObjectHideFlags: 0
@@ -479,7 +479,7 @@ MonoBehaviour:
   stbdKeelEnd: {x: 0.125, y: 0, z: -10}
   portKeelStart: {x: -0.125, y: 0, z: 10}
   portKeelEnd: {x: -0.125, y: 0, z: -10}
-  changeVersion: 2001712
+  changeVersion: 2001716
 --- !u!4 &882306904
 Transform:
   m_ObjectHideFlags: 0
@@ -4344,7 +4344,7 @@ MonoBehaviour:
     - {x: -0.22716795, y: 2.3287888, z: -10.155977}
     - {x: -0.13319157, y: 2.4512265, z: -10.570611}
     - {x: -0.035912946, y: 2.5779598, z: -10.9900055}
-  changeVersion: 1874850
+  changeVersion: 1889032
 --- !u!4 &1349209205
 Transform:
   m_ObjectHideFlags: 0
@@ -4520,7 +4520,7 @@ MonoBehaviour:
   portColor: {r: 0.95, g: 0.25, b: 0.4, a: 0.95}
   useKeyCurvesOnlyForSections: 1
   isInitialized: 1
-  changeVersion: 219182
+  changeVersion: 233360
 --- !u!1 &1799144729
 GameObject:
   m_ObjectHideFlags: 0
@@ -4589,7 +4589,7 @@ MonoBehaviour:
   cachedIsAftCubic: 0
   cachedInnerMidshipPt: {x: 2.8530774, y: 3.6381307, z: -0.47306794}
   cachedOffsetVector: {x: -0.16059446, y: 0, z: 0}
-  changeVersion: 550673086
+  changeVersion: 559785958
 --- !u!4 &1799144731
 Transform:
   m_ObjectHideFlags: 0
@@ -4675,7 +4675,7 @@ MonoBehaviour:
   transomP1: {x: 0, y: 6.3251524, z: -13.401649}
   upperStemTop: {x: 0, y: 5.566162, z: 12.629255}
   isInitialized: 1
-  changeVersion: -2012783050
+  changeVersion: -2003271122
 --- !u!4 &1818396366
 Transform:
   m_ObjectHideFlags: 0
@@ -4683,6 +4683,138 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1818396364}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1859298325
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1859298327}
+  - component: {fileID: 1859298326}
+  m_Layer: 0
+  m_Name: LowerDeckCurves
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1859298326
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1859298325}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 588e2abbf7373455485fb00a81522d01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LowerDeckCurves
+  mainDeckCurves: {fileID: 2078491385}
+  sheerCurves: {fileID: 1818396365}
+  topLineCurves: {fileID: 264070284}
+  breadthCurves: {fileID: 1799144730}
+  bilgeCurves: {fileID: 186442759}
+  floorCurves: {fileID: 216798052}
+  fashionCurves: {fileID: 2019170296}
+  bodyCurves: {fileID: 2032973263}
+  backboneCurves: {fileID: 747401016}
+  enableInteractiveHandles: 1
+  nodeSphereRadius: 0.1
+  showLabels: 1
+  tiers:
+  - tierName: Lower Deck 1
+    isEnabled: 1
+    headroom: 1.7495663
+    forwardZ: 11.391122
+    aftZ: -10.189211
+    stemClearance: 0.35
+    sternClearance: 0.35
+    sheerScale: 0.5
+    midshipCamber: 0.2
+    proportionalCamberToBeam: 1
+    showBottomDeck: 1
+    deckThickness: 0.18
+    showThicknessEdgeCaps: 1
+    showCenterline: 1
+    showEdges: 1
+    showBeams: 1
+    showEndMargins: 1
+    showNodeSpheres: 1
+    deckBeamCount: 12
+    centerlineColor: {r: 0.2, g: 0.85, b: 0.95, a: 0.95}
+    deckEdgeColor: {r: 0.15, g: 0.7, b: 0.85, a: 0.95}
+    beamColor: {r: 0.7, g: 0.85, b: 0.95, a: 0.6}
+    bottomColor: {r: 0.12, g: 0.55, b: 0.7, a: 0.75}
+    edgeCapColor: {r: 0.3, g: 0.9, b: 0.8, a: 0.7}
+    midshipCenter: {x: 0, y: 2.321108, z: -0.47306794}
+    stbdMidshipEdge: {x: 2.5983179, y: 2.121108, z: -0.47306794}
+    portMidshipEdge: {x: -2.5983179, y: 2.121108, z: -0.47306794}
+    fwdCenterTip: {x: 0, y: 2.6159093, z: 11.391122}
+    aftCenterTip: {x: 0, y: 2.7010942, z: -10.189211}
+    midshipBottomCenter: {x: 0, y: 2.141108, z: -0.47306794}
+    stbdMidshipBottomEdge: {x: 2.5680897, y: 1.941108, z: -0.47306794}
+    portMidshipBottomEdge: {x: -2.5680897, y: 1.941108, z: -0.47306794}
+    fwdBottomCenterTip: {x: 0, y: 2.4359093, z: 11.391122}
+    aftBottomCenterTip: {x: 0, y: 2.521094, z: -10.189211}
+    actualHeadroom: 1.7495663
+    holdClearanceToBottom: 2.0211082
+    midshipBeamWidth: 5.1966357
+  - tierName: Lower Deck 2
+    isEnabled: 1
+    headroom: 0.9142262
+    forwardZ: 11.456576
+    aftZ: -10.227475
+    stemClearance: 0.35
+    sternClearance: 0.35
+    sheerScale: 0.3
+    midshipCamber: 0.14
+    proportionalCamberToBeam: 1
+    showBottomDeck: 1
+    deckThickness: 0.16
+    showThicknessEdgeCaps: 1
+    showCenterline: 1
+    showEdges: 1
+    showBeams: 1
+    showEndMargins: 1
+    showNodeSpheres: 1
+    deckBeamCount: 12
+    centerlineColor: {r: 0.35, g: 0.95, b: 0.65, a: 0.95}
+    deckEdgeColor: {r: 0.2975, g: 0.8075, b: 0.5525, a: 0.95}
+    beamColor: {r: 0.35, g: 0.95, b: 0.65, a: 0.6}
+    bottomColor: {r: 0.21000001, g: 0.57, b: 0.39000002, a: 0.75}
+    edgeCapColor: {r: 0.3, g: 0.9, b: 0.8, a: 0.7}
+    midshipCenter: {x: 0, y: 1.2268819, z: -0.47306794}
+    stbdMidshipEdge: {x: 1.9882932, y: 1.0868819, z: -0.47306794}
+    portMidshipEdge: {x: -1.9882932, y: 1.0868819, z: -0.47306794}
+    fwdCenterTip: {x: 0, y: 1.4057198, z: 11.456576}
+    aftCenterTip: {x: 0, y: 1.4566728, z: -10.227475}
+    midshipBottomCenter: {x: 0, y: 1.0668819, z: -0.47306794}
+    stbdMidshipBottomEdge: {x: 1.8675916, y: 0.9268819, z: -0.47306794}
+    portMidshipBottomEdge: {x: -1.8675916, y: 0.9268819, z: -0.47306794}
+    fwdBottomCenterTip: {x: 0, y: 1.2457198, z: 11.456576}
+    aftBottomCenterTip: {x: 0, y: 1.2966728, z: -10.227475}
+    actualHeadroom: 0.9142262
+    holdClearanceToBottom: 0.92688185
+    midshipBeamWidth: 3.9765863
+  changeVersion: 22971
+--- !u!4 &1859298327
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1859298325}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -4883,7 +5015,7 @@ MonoBehaviour:
   innerPortCounterTop: {x: -1.3555971, y: 5.1251526, z: -12.7956505}
   innerPortP3: {x: -1.5619857, y: 4.420794, z: -11.948687}
   innerPortP4: {x: -1.2170932, y: 6.311378, z: -13.301699}
-  changeVersion: 117066685
+  changeVersion: 117137989
 --- !u!4 &2019170297
 Transform:
   m_ObjectHideFlags: 0
@@ -4955,7 +5087,7 @@ MonoBehaviour:
   cachedP2: {x: 2.7686772, y: 1.7520193, z: -0.47306794}
   cachedP3: {x: 3.0136719, y: 3.6381307, z: -0.47306794}
   cachedP4: {x: 2.6597054, y: 5.21949, z: -0.47306794}
-  changeVersion: 1734067
+  changeVersion: 1734069
 --- !u!4 &2032973264
 Transform:
   m_ObjectHideFlags: 0
@@ -5015,7 +5147,7 @@ MonoBehaviour:
   stbdTransomCorner: {x: 1.3195065, y: 5.4381256, z: -12.9301195}
   midshipCamber: 0.25
   proportionalCamberToBeam: 1
-  midshipApexZPercentage: 0.5
+  midshipApexZPercentage: 0.626
   sheerCurvePower: 2
   showBottomDeck: 1
   deckThickness: 0.2
@@ -5047,7 +5179,7 @@ MonoBehaviour:
   sternBottomCenter: {x: 0, y: 5.352714, z: -13.012674}
   stbdTransomBottomCorner: {x: 1.3426065, y: 5.238126, z: -12.84427}
   portTransomBottomCorner: {x: -1.3426065, y: 5.238126, z: -12.84427}
-  changeVersion: 5
+  changeVersion: 157
 --- !u!4 &2078491386
 Transform:
   m_ObjectHideFlags: 0
@@ -5081,3 +5213,4 @@ SceneRoots:
   - {fileID: 264070285}
   - {fileID: 1591367782}
   - {fileID: 2078491386}
+  - {fileID: 1859298327}
