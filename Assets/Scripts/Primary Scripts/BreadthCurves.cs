@@ -26,6 +26,7 @@ public class BreadthCurves : MonoBehaviour
 
     [Header("Gizmo Settings")]
     public bool showLabels = true;
+    [Tooltip("Draw dashed projection lines extending aft from the Transom Corner continuing curvature all the way to the Transom Rake Top (furthest aft point).")]
     public bool showAftProjectionLine = true;
     public Color breadthCurveColor = new Color(0.1f, 0.95f, 0.4f, 0.95f);
 
@@ -472,7 +473,11 @@ public class BreadthCurves : MonoBehaviour
         }
 
         float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
-        if (z <= sternTipZ)
+        if (z < sternTipZ - 0.001f)
+        {
+            return GetInnerAftProjectionPointAtZ(z, starboard);
+        }
+        else if (z <= sternTipZ + 0.001f)
         {
             if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
             {
@@ -580,18 +585,12 @@ public class BreadthCurves : MonoBehaviour
 
     public virtual float GetTheoreticalBreadthXAtZ(float z)
     {
-        if (z >= 0) return GetBreadthXAtZ(z);
-
-        if (cachedIsAftCubic)
+        float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (z >= sternTipZ)
         {
-            if (z > cachedAftP3.z) return GetBreadthXAtZ(z);
-            return GetAftProjectionPointAtZ(z).x;
+            return GetBreadthXAtZ(z);
         }
-        else
-        {
-            if (z > cachedAftP2.z) return GetBreadthXAtZ(z);
-            return GetAftProjectionPointAtZ(z).x;
-        }
+        return GetAftProjectionPointAtZ(z).x;
     }
 
     /// <summary>
@@ -632,6 +631,58 @@ public class BreadthCurves : MonoBehaviour
         float t = GetAftBezierTAtExtrapolatedZ(z);
         return cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                 : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+    }
+
+    /// <summary>
+    /// Evaluates 3D parallel inner point on the extrapolated aft curve at parameter t.
+    /// </summary>
+    public virtual Vector3 EvaluateInnerPointAtT(float t, bool starboard = true)
+    {
+        EnsureInitialized();
+        Vector3 pOuter = cachedFwdP3;
+        Vector3 pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            pInner = bodyCurves.GetInnerNodePosition(3, cachedFwdP3.z, 1f);
+        }
+
+        float deltaX = pInner.x - pOuter.x;
+        float deltaY = pInner.y - pOuter.y;
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        Vector3 pt = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                      : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+        Vector3 deriv = cachedIsAftCubic ? CalculateCubicBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                         : CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
+
+        float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+        Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+        Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+        if (innerPt.x < 0f) innerPt.x = 0f;
+
+        return starboard ? innerPt : MirrorX(innerPt);
+    }
+
+    /// <summary>
+    /// Evaluates 3D spatial point on the Breadth Curves Inner Aft Curves Projection Line at station Z (extrapolated behind Transom Corner).
+    /// </summary>
+    public virtual Vector3 GetInnerAftProjectionPointAtZ(float z, bool starboard = true)
+    {
+        UpdateCachedCurves();
+        float t = GetAftBezierTAtExtrapolatedZ(z);
+        return EvaluateInnerPointAtT(t, starboard);
+    }
+
+    public virtual float GetTheoreticalInnerBreadthXAtZ(float z)
+    {
+        float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (z >= sternTipZ)
+        {
+            return GetInnerBreadthXAtZ(z, true);
+        }
+        return GetInnerAftProjectionPointAtZ(z, true).x;
     }
 
     // --- BEZIER MATH UTILITIES ---
@@ -768,6 +819,9 @@ public class BreadthCurves : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        EnsureInitialized();
+        if (sheerCurves == null) sheerCurves = GetComponentInParent<SheerCurves>();
+        if (sheerCurves == null) sheerCurves = FindFirstObjectByType<SheerCurves>();
         if (sheerCurves == null) return;
 
         UpdateCachedCurves();
@@ -842,6 +896,30 @@ public class BreadthCurves : MonoBehaviour
         if (cachedIsAftCubic) Gizmos.DrawSphere(cachedAftP3, 0.14f);
 
 #if UNITY_EDITOR
+        // 1. Render Inner Boundary Chord Lines (Cyan Dotted)
+        Handles.color = new Color(0.2f, 0.9f, 1f, 0.6f);
+        Handles.DrawDottedLine(cachedFwdP0, cachedFwdP2, 3f); // fwdP0 -> fwdP2 (Inner bound for fwdP1)
+        Handles.DrawDottedLine(cachedFwdP3, cachedAftP2, 3f); // fwdP3 -> aftP2 (Inner bound for aftP1)
+
+        Handles.DrawDottedLine(MirrorX(cachedFwdP0), MirrorX(cachedFwdP2), 3f);
+        Handles.DrawDottedLine(MirrorX(cachedFwdP3), MirrorX(cachedAftP2), 3f);
+
+        // 2. Render Outer Rectangular Bounding Box (Vibrant Orange Dotted Box)
+        float bowZ = cachedFwdP0.z;
+        float sternZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        float yHeight = cachedFwdP3.y;
+
+        Vector3 bStbdBow = new Vector3(maxBeam, yHeight, bowZ);
+        Vector3 bPortBow = new Vector3(-maxBeam, yHeight, bowZ);
+        Vector3 bPortStern = new Vector3(-maxBeam, yHeight, sternZ);
+        Vector3 bStbdStern = new Vector3(maxBeam, yHeight, sternZ);
+
+        Handles.color = new Color(1f, 0.65f, 0.1f, 0.75f);
+        Handles.DrawDottedLine(bStbdBow, bPortBow, 4f);
+        Handles.DrawDottedLine(bPortBow, bPortStern, 4f);
+        Handles.DrawDottedLine(bPortStern, bStbdStern, 4f);
+        Handles.DrawDottedLine(bStbdStern, bStbdBow, 4f);
+
         if (showLabels)
         {
             GUIStyle style = GetCachedLabelStyle();
@@ -854,57 +932,47 @@ public class BreadthCurves : MonoBehaviour
             {
                 Handles.Label(cachedInnerMidshipPt + new Vector3(0, 0.25f, 0), $"Inner Midship ({cachedInnerMidshipPt.x:F2}m)", style);
             }
-
-            // 1. Render Inner Boundary Chord Lines (Cyan Dotted)
-            Handles.color = new Color(0.2f, 0.9f, 1f, 0.6f);
-            Handles.DrawDottedLine(cachedFwdP0, cachedFwdP2, 3f); // fwdP0 -> fwdP2 (Inner bound for fwdP1)
-            Handles.DrawDottedLine(cachedFwdP3, cachedAftP2, 3f); // fwdP3 -> aftP2 (Inner bound for aftP1)
-
-            Handles.DrawDottedLine(MirrorX(cachedFwdP0), MirrorX(cachedFwdP2), 3f);
-            Handles.DrawDottedLine(MirrorX(cachedFwdP3), MirrorX(cachedAftP2), 3f);
-
-            // 2. Render Outer Rectangular Bounding Box (Vibrant Orange Dotted Box)
-            float bowZ = cachedFwdP0.z;
-            float sternZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
-            float yHeight = cachedFwdP3.y;
-
-            Vector3 bStbdBow = new Vector3(maxBeam, yHeight, bowZ);
-            Vector3 bPortBow = new Vector3(-maxBeam, yHeight, bowZ);
-            Vector3 bPortStern = new Vector3(-maxBeam, yHeight, sternZ);
-            Vector3 bStbdStern = new Vector3(maxBeam, yHeight, sternZ);
-
-            Handles.color = new Color(1f, 0.65f, 0.1f, 0.75f);
-            Handles.DrawDottedLine(bStbdBow, bPortBow, 4f);
-            Handles.DrawDottedLine(bPortBow, bPortStern, 4f);
-            Handles.DrawDottedLine(bPortStern, bStbdStern, 4f);
-            Handles.DrawDottedLine(bStbdStern, bStbdBow, 4f);
-
-            // 3. Render Breadth Curves Aft Curves Projection Line (Dashed continuation behind Transom Corner to Transom Top Z)
-            if (showAftProjectionLine)
-            {
-                DrawAftCurvesProjectionLine();
-            }
         }
 #endif
+
+        // 3. Render Breadth Curves Aft Curves Projection Line (Dashed continuation behind Transom Corner to Transom Top Z)
+        if (showAftProjectionLine)
+        {
+            DrawAftCurvesProjectionLine();
+        }
     }
 
-#if UNITY_EDITOR
     private void DrawAftCurvesProjectionLine()
     {
-        if (sheerCurves == null) return;
+        if (sheerCurves == null)
+        {
+            sheerCurves = GetComponentInParent<SheerCurves>();
+            if (sheerCurves == null) sheerCurves = FindFirstObjectByType<SheerCurves>();
+            if (sheerCurves == null) return;
+        }
         sheerCurves.UpdateCachedProfile();
-        float targetZ = sheerCurves.transomP1.z;
+
+        // Furthest aft point: Transom Rake Top or furthest aft point on stern profile
+        float targetZ = Mathf.Min(sheerCurves.transomP1.z, sheerCurves.counterP3.z, sheerCurves.sternP3.z);
         float cornerZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
         if (targetZ >= cornerZ - 0.001f) return;
 
         float tTarget = GetAftBezierTAtExtrapolatedZ(targetZ);
         if (tTarget <= 1.0001f) return;
 
-        Handles.color = new Color(breadthCurveColor.r, breadthCurveColor.g, breadthCurveColor.b, 0.75f);
+        Color projColor = new Color(breadthCurveColor.r, breadthCurveColor.g, breadthCurveColor.b, 0.85f);
+        Gizmos.color = projColor;
+#if UNITY_EDITOR
+        Handles.color = projColor;
+#endif
 
-        int steps = 20;
+        // Render authentic dashed continuation lines (alternating segments)
+        int steps = 24;
         Vector3 prevStbd = cachedIsAftCubic ? cachedAftP3 : cachedAftP2;
         Vector3 prevPort = MirrorX(prevStbd);
+
+        Vector3 lastStbd = prevStbd;
+        Vector3 lastPort = prevPort;
 
         for (int i = 1; i <= steps; i++)
         {
@@ -913,23 +981,80 @@ public class BreadthCurves : MonoBehaviour
                                                : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
             Vector3 currPort = MirrorX(currStbd);
 
-            Handles.DrawDottedLine(prevStbd, currStbd, 4f);
-            Handles.DrawDottedLine(prevPort, currPort, 4f);
+            if (i % 2 != 0)
+            {
+                Gizmos.DrawLine(prevStbd, currStbd);
+                Gizmos.DrawLine(prevPort, currPort);
+            }
 
             prevStbd = currStbd;
             prevPort = currPort;
+            lastStbd = currStbd;
+            lastPort = currPort;
         }
 
-        // Transverse Dotted Line connecting Starboard and Port at Transom Top Z station
-        Handles.DrawDottedLine(prevStbd, prevPort, 4f);
+        // Transverse Dashed Line connecting Starboard and Port at Transom Top Z station
+        int transverseSteps = 20;
+        for (int i = 0; i < transverseSteps; i += 2)
+        {
+            Vector3 pA = Vector3.Lerp(lastStbd, lastPort, (float)i / transverseSteps);
+            Vector3 pB = Vector3.Lerp(lastStbd, lastPort, (float)(i + 1) / transverseSteps);
+            Gizmos.DrawLine(pA, pB);
+        }
 
+        // Render Inner Dashed Projection Line
+        Vector3 innerLastStbd = Vector3.zero;
+        if (showInnerLine)
+        {
+            Color portInnerColor = new Color(innerLineColor.r, innerLineColor.g * 0.6f, innerLineColor.b, innerLineColor.a);
+            Vector3 innerPrevStbd = GetInnerBreadthSternTip(true);
+            Vector3 innerPrevPort = GetInnerBreadthSternTip(false);
+
+            innerLastStbd = innerPrevStbd;
+            Vector3 innerLastPort = innerPrevPort;
+
+            for (int i = 1; i <= steps; i++)
+            {
+                float t = Mathf.Lerp(1.0f, tTarget, i / (float)steps);
+                Vector3 currInnerStbd = EvaluateInnerPointAtT(t, true);
+                Vector3 currInnerPort = MirrorX(currInnerStbd);
+
+                if (i % 2 != 0)
+                {
+                    Gizmos.color = innerLineColor;
+                    Gizmos.DrawLine(innerPrevStbd, currInnerStbd);
+                    Gizmos.color = portInnerColor;
+                    Gizmos.DrawLine(innerPrevPort, currInnerPort);
+                }
+
+                innerPrevStbd = currInnerStbd;
+                innerPrevPort = currInnerPort;
+                innerLastStbd = currInnerStbd;
+                innerLastPort = currInnerPort;
+            }
+
+            // Inner Transverse Dashed Line connecting Starboard and Port at Transom Top Z station
+            Gizmos.color = innerLineColor;
+            for (int i = 0; i < transverseSteps; i += 2)
+            {
+                Vector3 pA = Vector3.Lerp(innerLastStbd, innerLastPort, (float)i / transverseSteps);
+                Vector3 pB = Vector3.Lerp(innerLastStbd, innerLastPort, (float)(i + 1) / transverseSteps);
+                Gizmos.DrawLine(pA, pB);
+            }
+        }
+
+#if UNITY_EDITOR
         if (showLabels)
         {
             GUIStyle style = GetCachedLabelStyle();
-            Handles.Label(prevStbd + new Vector3(0, 0.2f, 0), "Breadth Curves Aft Curves Projection Line", style);
+            Handles.Label(lastStbd + new Vector3(0, 0.2f, 0), "Breadth Curves Aft Curves Projection Line", style);
+            if (showInnerLine)
+            {
+                Handles.Label(innerLastStbd + new Vector3(0, 0.15f, 0), "Inner Breadth Projection Line", style);
+            }
         }
-    }
 #endif
+    }
 
     private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 40)
     {

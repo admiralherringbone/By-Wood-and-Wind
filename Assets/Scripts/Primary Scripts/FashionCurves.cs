@@ -81,6 +81,8 @@ public class FashionCurves : MonoBehaviour
     [HideInInspector] public Vector3 innerPortP3;
     [HideInInspector] public Vector3 innerPortP4;
 
+    private Vector3[] cachedStbdOuterPts;
+    private Vector3[] cachedPortOuterPts;
     private Vector3[] cachedStbdInnerPts;
     private Vector3[] cachedPortInnerPts;
     private bool isUpdatingCurves = false;
@@ -99,7 +101,7 @@ public class FashionCurves : MonoBehaviour
 
     public void EnsureInitialized()
     {
-        if (!isInitialized)
+        if (!isInitialized || cachedStbdOuterPts == null || cachedStbdOuterPts.Length == 0)
         {
             InitializeFashionCurves();
         }
@@ -206,9 +208,9 @@ public class FashionCurves : MonoBehaviour
 
             // 4. Upper Mould Top Node P4: Fashion TopLine Point (u = 1.00)
             // MUST ALWAYS BE 100% COMPLETELY ALIGNED WITH TRANSOM RAKE TOP CORNER (topLineCurves.aftP2 / sheerCurves.transomP1)
-            float p4X = (topLineCurves != null) ? topLineCurves.aftP2.x : ((breadthCurves != null) ? breadthCurves.GetAftProjectionPointAtZ(stbdP3.z).x : p3X);
             float p4Y = (topLineCurves != null) ? topLineCurves.aftP2.y : ((sheerCurves != null) ? sheerCurves.transomP1.y : p3Y + 1.5f);
             float p4Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p4Y) : ((topLineCurves != null) ? topLineCurves.aftP2.z : -10f);
+            float p4X = (topLineCurves != null) ? topLineCurves.aftP2.x : ((breadthCurves != null) ? breadthCurves.GetAftProjectionPointAtZ(p4Z).x : p3X);
 
             stbdP4 = new Vector3(Mathf.Abs(p4X), p4Y, p4Z);
 
@@ -224,6 +226,7 @@ public class FashionCurves : MonoBehaviour
                 bilgeCurves.UpdateCachedCurves();
             }
 
+            UpdateOuterFashionCurve();
             UpdateInnerFashionCurve();
 
             changeVersion++;
@@ -258,182 +261,201 @@ public class FashionCurves : MonoBehaviour
     // --- SPATIAL EVALUATION METHODS ---
 
     /// <summary>
-    /// Evaluates 3D point on Fashion Curve using synthesis across Lower and Upper Moulds:
-    /// - Lower Mould (t in [0, 2/3], u in [0.25, 0.75]): Evaluates Floor Stern Tip P1 -> Transom Bilge P2 -> Fashion Breadth P3.
-    /// - Upper Mould (t in [2/3, 1.0], u_upper in [0, 1]): Synthesizes X from Breadth Curves Aft Projection Line X_proj(Z)
-    ///   scaled by Body Curves Upper Mould Curvature Ratio ratioBody(u_upper), strictly clamped so X <= X_proj(Z) at all points.
-    /// - Z is locked 100% to SheerCurves raked stern profile.
-    /// - At t = 1.0 (u_upper = 1.0), Fashion TopLine (P4) is ALWAYS 100% COMPLETELY ALIGNED WITH TRANSOM RAKE TOP CORNER (topLineCurves.aftP2).
+    /// Evaluates 3D point on Fashion Curve using continuous C1 Hermite spline across the 4 transom nodes:
+    /// - P1 (Floor Stern Tip at t = 0.00)
+    /// - P2 (Transom Bilge Node at t = 0.33)
+    /// - P3 (Fashion Breadth Node at t = 0.67)
+    /// - P4 (Transom Rake Top Corner at t = 1.00)
+    /// Half-breadth is strictly restricted under the Breadth Curves Aft Curves Projection Line.
+    /// Z is locked 100% to SheerCurves raked stern profile.
     /// </summary>
     public Vector3 GetFashionPointAtT(float t, float side)
     {
-        UpdateCachedCurves();
+        EnsureInitialized();
+        return EvaluateFashionPointRaw(t, side);
+    }
 
+    private Vector3 EvaluateFashionPointRaw(float t, float side)
+    {
         float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3 p1 = (sideSign > 0f) ? stbdP1 : portP1;
+        Vector3 p2 = (sideSign > 0f) ? stbdP2 : portP2;
+        Vector3 p3 = (sideSign > 0f) ? stbdP3 : portP3;
+        Vector3 p4 = (sideSign > 0f) ? stbdP4 : portP4;
+
         float clampedT = Mathf.Clamp01(t);
 
-        if (clampedT <= (2f / 3f))
+        // 1. Evaluate 2D (X, Y) curve through the 4 structural transom nodes
+        Vector2 p1XY = new Vector2(p1.x, p1.y);
+        Vector2 p2XY = new Vector2(p2.x, p2.y);
+        Vector2 p3XY = new Vector2(p3.x, p3.y);
+        Vector2 p4XY = new Vector2(p4.x, p4.y);
+
+        Vector2 t2XY = (p3XY - p1XY).sqrMagnitude > 0.0001f ? (p3XY - p1XY).normalized : Vector2.up;
+        Vector2 t3XY = (p4XY - p2XY).sqrMagnitude > 0.0001f ? (p4XY - p2XY).normalized : Vector2.up;
+
+        Vector2 d12XY = (p2XY - p1XY).sqrMagnitude > 0.0001f ? (p2XY - p1XY).normalized : Vector2.up;
+        Vector2 v1XY = 2f * d12XY - t2XY;
+        Vector2 t1XY = v1XY.sqrMagnitude > 0.001f ? v1XY.normalized : d12XY;
+
+        Vector2 d34XY = (p4XY - p3XY).sqrMagnitude > 0.0001f ? (p4XY - p3XY).normalized : Vector2.up;
+        Vector2 v4XY = 2f * d34XY - t3XY;
+        Vector2 t4XY = v4XY.sqrMagnitude > 0.001f ? v4XY.normalized : d34XY;
+
+        Vector2 ptXY;
+        if (clampedT <= (1f / 3f))
         {
-            // --- LOWER MOULD EVALUATION (t in [0, 2/3] -> u in [0.25, 0.75]) ---
-            float tLower = clampedT / (2f / 3f);
-            float u = Mathf.Lerp(0.25f, 0.75f, tLower);
-
-            if (bodyCurves != null)
-            {
-                float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
-                SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
-                float hollowVal = bodyCurves.floorHollow;
-                float keelInf = bodyCurves.keelEntryInfluence;
-                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(u, bodyNodes, hollowVal, 1.0f, keelInf);
-
-                float bFloorX = bodyNodes.p1.x;
-                float bFloorY = bodyNodes.p1.y;
-                float bBreadthX = bodyNodes.p3.x;
-                float bBreadthY = bodyNodes.p3.y;
-
-                float dSpanX = bBreadthX - bFloorX;
-                float dSpanY = bBreadthY - bFloorY;
-
-                float tX = (Mathf.Abs(dSpanX) > 0.0001f) ? (Mathf.Abs(bodyPt.x) - bFloorX) / dSpanX : tLower;
-                float tY = (Mathf.Abs(dSpanY) > 0.0001f) ? (bodyPt.y - bFloorY) / dSpanY : tLower;
-
-                float xLower = Mathf.Lerp(stbdP1.x, stbdP3.x, tX);
-                float yLower = Mathf.Lerp(stbdP1.y, stbdP3.y, tY);
-                float zLower = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(yLower) : stbdP1.z;
-
-                return new Vector3(sideSign * xLower, yLower, zLower);
-            }
-            else
-            {
-                SectionNodes nodes = GetTransomSectionNodes(sideSign);
-                Vector3 nurbsPt = nurbsEvaluator.EvaluateSectionPoint(u, nodes, 0.5f, 1.0f);
-
-                float xLower = Mathf.Abs(nurbsPt.x);
-                float yLower = nurbsPt.y;
-                float zLower = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(yLower) : nurbsPt.z;
-
-                return new Vector3(sideSign * xLower, yLower, zLower);
-            }
+            float s = clampedT * 3f;
+            ptXY = EvaluateHermiteSegment2D(p1XY, t1XY, p2XY, t2XY, s);
+        }
+        else if (clampedT <= (2f / 3f))
+        {
+            float s = (clampedT - (1f / 3f)) * 3f;
+            ptXY = EvaluateHermiteSegment2D(p2XY, t2XY, p3XY, t3XY, s);
         }
         else
         {
-            // --- UPPER MOULD EVALUATION (t in [2/3, 1.0] -> u_upper in [0, 1.0]) ---
-            float uUpper = Mathf.Clamp01((clampedT - (2f / 3f)) / (1f / 3f));
-
-            float y = Mathf.Lerp(stbdP3.y, stbdP4.y, uUpper);
-            float z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(y) : Mathf.Lerp(stbdP3.z, stbdP4.z, uUpper);
-
-            // 1. Base half-breadth along Breadth Curves Aft Curves Projection Line at station Z (Outer Boundary Ceiling)
-            float xProj = (breadthCurves != null) ? breadthCurves.GetAftProjectionPointAtZ(z).x : Mathf.Lerp(stbdP3.x, stbdP4.x, uUpper);
-            float xChord = Mathf.Lerp(stbdP3.x, stbdP4.x, uUpper);
-
-            // 2. Tumblehome / Curvature Ratio from Body Curves Upper Mould
-            float ratioBody = 1.0f;
-            if (bodyCurves != null)
-            {
-                float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
-                SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
-                float uNurbs = 0.75f + 0.25f * uUpper;
-                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(uNurbs, bodyNodes, bodyCurves.floorHollow, 1.0f, bodyCurves.keelEntryInfluence);
-                float bChord = Mathf.Lerp(bodyNodes.p3.x, bodyNodes.p4.x, uUpper);
-                if (bChord > 0.001f)
-                {
-                    ratioBody = Mathf.Abs(bodyPt.x) / bChord;
-                }
-            }
-
-            // 3. Synthesize X: Blend towards xChord at endpoints, shaped by xProj, scaled by body ratio, clamped <= xProj
-            float xShape = Mathf.Min(xProj, xChord);
-            float xUpper = Mathf.Min(xShape * ratioBody, xProj);
-
-            // Force 100% exact alignment at P4 (uUpper = 1.0) to stbdP4 (Transom Rake Top Corner)
-            if (uUpper >= 0.999f)
-            {
-                xUpper = stbdP4.x;
-            }
-
-            return new Vector3(sideSign * xUpper, y, z);
+            float s = (clampedT - (2f / 3f)) * 3f;
+            ptXY = EvaluateHermiteSegment2D(p3XY, t3XY, p4XY, t4XY, s);
         }
+
+        // 2. Lock Z to the Stern Profile at evaluated height Y
+        float z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(ptXY.y) : Mathf.Lerp(p1.z, p4.z, clampedT);
+
+        // 3. Restriction: Fashion Curve half-breadth must remain under the restriction of Breadth Curves and its Aft Projection Line
+        if (breadthCurves != null)
+        {
+            float maxBreadthX = (z <= stbdP3.z)
+                ? breadthCurves.GetAftProjectionPointAtZ(z).x
+                : breadthCurves.GetBreadthXAtZ(z);
+
+            if (Mathf.Abs(ptXY.x) > maxBreadthX)
+            {
+                ptXY.x = sideSign * maxBreadthX;
+            }
+        }
+
+        return new Vector3(ptXY.x, ptXY.y, z);
     }
 
     /// <summary>
     /// Evaluates 3D point on Fashion Curve at target height Y for specified side (+1 Starboard, -1 Port).
+    /// Uses precomputed curve samples with fast binary search for high performance.
     /// </summary>
     public Vector3 GetFashionPointAtY(float targetY, float side)
     {
-        UpdateCachedCurves();
+        EnsureInitialized();
+
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3[] pts = (sideSign > 0f) ? cachedStbdOuterPts : cachedPortOuterPts;
+
+        if (pts != null && pts.Length >= 2)
+        {
+            if (targetY <= pts[0].y) return pts[0];
+            if (targetY >= pts[pts.Length - 1].y) return pts[pts.Length - 1];
+
+            int low = 0;
+            int high = pts.Length - 1;
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                if (pts[mid].y < targetY)
+                {
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            int i0 = Mathf.Clamp(high, 0, pts.Length - 2);
+            int i1 = i0 + 1;
+            float dy = pts[i1].y - pts[i0].y;
+            float frac = (Mathf.Abs(dy) > 0.0001f) ? Mathf.Clamp01((targetY - pts[i0].y) / dy) : 0f;
+            return Vector3.Lerp(pts[i0], pts[i1], frac);
+        }
 
         float ySpan = stbdP4.y - stbdP1.y;
-        if (ySpan < 0.0001f)
-        {
-            return GetFashionPointAtT(0f, side);
-        }
-
-        // Iterative parameter solve for target Y height across the NURBS curve
+        if (ySpan < 0.0001f) return GetFashionPointAtT(0f, side);
         float t = Mathf.Clamp01((targetY - stbdP1.y) / ySpan);
-        for (int i = 0; i < 6; i++)
-        {
-            Vector3 pt = GetFashionPointAtT(t, side);
-            float error = pt.y - targetY;
-            if (Mathf.Abs(error) < 0.0001f) break;
-
-            float delta = 0.001f;
-            Vector3 ptPlus = GetFashionPointAtT(Mathf.Clamp01(t + delta), side);
-            float dydt = (ptPlus.y - pt.y) / delta;
-            if (Mathf.Abs(dydt) > 0.0001f)
-            {
-                t = Mathf.Clamp01(t - error / dydt);
-            }
-        }
-
-        return GetFashionPointAtT(t, side);
+        return EvaluateFashionPointRaw(t, side);
     }
 
     /// <summary>
     /// Evaluates 3D point on Fashion Curve at target station Z for specified side (+1 Starboard, -1 Port).
+    /// Uses precomputed curve samples with fast O(log N) binary search for instant, zero-allocation evaluation.
     /// </summary>
     public Vector3 GetFashionPointAtZ(float targetZ, float side)
     {
-        UpdateCachedCurves();
+        EnsureInitialized();
 
-        float zSpan = stbdP4.z - stbdP1.z;
-        if (Mathf.Abs(zSpan) < 0.0001f)
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3[] pts = (sideSign > 0f) ? cachedStbdOuterPts : cachedPortOuterPts;
+
+        if (pts != null && pts.Length >= 2)
         {
-            return GetFashionPointAtT(0f, side);
+            // Stern profile rakes aft: pts[0].z >= targetZ >= pts[last].z
+            if (targetZ >= pts[0].z) return pts[0];
+            if (targetZ <= pts[pts.Length - 1].z) return pts[pts.Length - 1];
+
+            int low = 0;
+            int high = pts.Length - 1;
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                if (pts[mid].z > targetZ)
+                {
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            int i0 = Mathf.Clamp(high, 0, pts.Length - 2);
+            int i1 = i0 + 1;
+            float dz = pts[i1].z - pts[i0].z;
+            float frac = (Mathf.Abs(dz) > 0.0001f) ? Mathf.Clamp01((targetZ - pts[i0].z) / dz) : 0f;
+            return Vector3.Lerp(pts[i0], pts[i1], frac);
         }
 
-        if (targetZ >= stbdP1.z) return GetFashionPointAtT(0f, side);
-        if (targetZ <= stbdP4.z) return GetFashionPointAtT(1f, side);
+        return (sideSign > 0f) ? stbdP1 : portP1;
+    }
 
-        float minT = 0f;
-        float maxT = 1f;
-        float t = Mathf.Clamp01((targetZ - stbdP1.z) / zSpan);
-
-        for (int i = 0; i < 12; i++)
-        {
-            Vector3 pt = GetFashionPointAtT(t, side);
-            float error = pt.z - targetZ;
-            if (Mathf.Abs(error) < 0.0001f) return pt;
-
-            if (stbdP1.z > stbdP4.z)
-            {
-                if (pt.z > targetZ) minT = t;
-                else maxT = t;
-            }
-            else
-            {
-                if (pt.z < targetZ) minT = t;
-                else maxT = t;
-            }
-            t = (minT + maxT) * 0.5f;
-        }
-
-        return GetFashionPointAtT(t, side);
+    /// <summary>
+    /// Returns precomputed points along the Outer Fashion Curve with 0 GC heap allocations.
+    /// </summary>
+    public virtual Vector3[] GetFashionPoints(bool starboard = true)
+    {
+        EnsureInitialized();
+        return starboard ? cachedStbdOuterPts : cachedPortOuterPts;
     }
 
     private Vector3 MirrorX(Vector3 pt)
     {
         return new Vector3(-pt.x, pt.y, pt.z);
+    }
+
+    // --- CURVE PRECOMPUTATION & CACHING ---
+
+    private void UpdateOuterFashionCurve()
+    {
+        const int totalSteps = 60;
+        int totalPts = totalSteps + 1;
+        if (cachedStbdOuterPts == null || cachedStbdOuterPts.Length != totalPts)
+        {
+            cachedStbdOuterPts = new Vector3[totalPts];
+            cachedPortOuterPts = new Vector3[totalPts];
+        }
+
+        for (int i = 0; i <= totalSteps; i++)
+        {
+            float t = (float)i / totalSteps;
+            cachedStbdOuterPts[i] = EvaluateFashionPointRaw(t, 1f);
+            cachedPortOuterPts[i] = MirrorX(cachedStbdOuterPts[i]);
+        }
     }
 
     // --- INNER FASHION TIMBER CURVE IMPLEMENTATION ---
@@ -445,6 +467,20 @@ public class FashionCurves : MonoBehaviour
         innerStbdP2 = (bilgeCurves != null) ? bilgeCurves.GetInnerBilgeSternTip(true) : stbdP2;
         innerStbdP3 = (breadthCurves != null) ? breadthCurves.GetInnerBreadthSternTip(true) : stbdP3;
         innerStbdP4 = (topLineCurves != null) ? topLineCurves.GetInnerTopLineSternTip(true) : stbdP4;
+
+        // Restrict innerStbdP4 under Inner Breadth Projection Line and outer stbdP4
+        if (breadthCurves != null)
+        {
+            float maxInnerP4X = breadthCurves.GetInnerAftProjectionPointAtZ(innerStbdP4.z, true).x;
+            if (innerStbdP4.x > maxInnerP4X)
+            {
+                innerStbdP4.x = maxInnerP4X;
+            }
+        }
+        if (innerStbdP4.x > stbdP4.x)
+        {
+            innerStbdP4.x = stbdP4.x;
+        }
 
         innerPortP1 = MirrorX(innerStbdP1);
         innerPortP2 = MirrorX(innerStbdP2);
@@ -462,8 +498,8 @@ public class FashionCurves : MonoBehaviour
         for (int i = 0; i <= totalSteps; i++)
         {
             float t = (float)i / totalSteps;
-            cachedStbdInnerPts[i] = GetInnerFashionPointAtT(t, 1f);
-            cachedPortInnerPts[i] = GetInnerFashionPointAtT(t, -1f);
+            cachedStbdInnerPts[i] = EvaluateInnerFashionPointRaw(t, 1f);
+            cachedPortInnerPts[i] = MirrorX(cachedStbdInnerPts[i]);
         }
     }
 
@@ -504,11 +540,16 @@ public class FashionCurves : MonoBehaviour
     /// - Bilge Inner Transom Corner at t = 0.33 (innerStbdP2)
     /// - Breadth Inner Transom Corner at t = 0.67 (innerStbdP3)
     /// - TopLine Inner Transom Corner at t = 1.00 (innerStbdP4)
+    /// Half-breadth is strictly restricted under the Inner Breadth Curves Projection Line and Outer Fashion Curve.
     /// </summary>
     public virtual Vector3 GetInnerFashionPointAtT(float t, float side = 1f)
     {
         EnsureInitialized();
+        return EvaluateInnerFashionPointRaw(t, side);
+    }
 
+    private Vector3 EvaluateInnerFashionPointRaw(float t, float side = 1f)
+    {
         float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
         Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
         Vector3 p2 = (sideSign > 0f) ? innerStbdP2 : innerPortP2;
@@ -576,85 +617,112 @@ public class FashionCurves : MonoBehaviour
         float zStern = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(ptXY.y) : Mathf.Lerp(p1.z, p4.z, clampedT);
         float finalZ = zStern + deltaZ;
 
+        // 4. Restriction: Inner Fashion Curve half-breadth must remain under the restriction of the Inner Breadth Curves Projection Line
+        if (breadthCurves != null)
+        {
+            float maxInnerBreadthX = (finalZ <= innerStbdP3.z)
+                ? breadthCurves.GetInnerAftProjectionPointAtZ(finalZ, true).x
+                : breadthCurves.GetInnerBreadthXAtZ(finalZ, true);
+
+            if (Mathf.Abs(ptXY.x) > maxInnerBreadthX)
+            {
+                ptXY.x = sideSign * maxInnerBreadthX;
+            }
+        }
+
+        // 5. Restriction: Inner Fashion Curve must remain inside the Outer Fashion Curve
+        Vector3 outerPt = EvaluateFashionPointRaw(clampedT, sideSign);
+        if (Mathf.Abs(ptXY.x) > Mathf.Abs(outerPt.x))
+        {
+            ptXY.x = sideSign * Mathf.Abs(outerPt.x);
+        }
+
         return new Vector3(ptXY.x, ptXY.y, finalZ);
     }
 
     /// <summary>
     /// Evaluates 3D point on the Inner Fashion Timber curve at target height Y for specified side (+1 Starboard, -1 Port).
+    /// Uses precomputed inner curve samples with fast binary search for high performance.
     /// </summary>
     public virtual Vector3 GetInnerFashionPointAtY(float targetY, float side = 1f)
     {
+        EnsureInitialized();
+
         float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
-        Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
-        Vector3 p4 = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
+        Vector3[] pts = (sideSign > 0f) ? cachedStbdInnerPts : cachedPortInnerPts;
 
-        float ySpan = p4.y - p1.y;
-        if (ySpan < 0.0001f)
+        if (pts != null && pts.Length >= 2)
         {
-            return GetInnerFashionPointAtT(0f, sideSign);
-        }
+            if (targetY <= pts[0].y) return pts[0];
+            if (targetY >= pts[pts.Length - 1].y) return pts[pts.Length - 1];
 
-        float t = Mathf.Clamp01((targetY - p1.y) / ySpan);
-        for (int i = 0; i < 6; i++)
-        {
-            Vector3 pt = GetInnerFashionPointAtT(t, sideSign);
-            float error = pt.y - targetY;
-            if (Mathf.Abs(error) < 0.0001f) break;
-
-            float delta = 0.001f;
-            Vector3 ptPlus = GetInnerFashionPointAtT(Mathf.Clamp01(t + delta), sideSign);
-            float dydt = (ptPlus.y - pt.y) / delta;
-            if (Mathf.Abs(dydt) > 0.0001f)
+            int low = 0;
+            int high = pts.Length - 1;
+            while (low <= high)
             {
-                t = Mathf.Clamp01(t - error / dydt);
+                int mid = (low + high) / 2;
+                if (pts[mid].y < targetY)
+                {
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
             }
+
+            int i0 = Mathf.Clamp(high, 0, pts.Length - 2);
+            int i1 = i0 + 1;
+            float dy = pts[i1].y - pts[i0].y;
+            float frac = (Mathf.Abs(dy) > 0.0001f) ? Mathf.Clamp01((targetY - pts[i0].y) / dy) : 0f;
+            return Vector3.Lerp(pts[i0], pts[i1], frac);
         }
 
-        return GetInnerFashionPointAtT(t, sideSign);
+        float ySpan = innerStbdP4.y - innerStbdP1.y;
+        if (ySpan < 0.0001f) return GetInnerFashionPointAtT(0f, sideSign);
+        float t = Mathf.Clamp01((targetY - innerStbdP1.y) / ySpan);
+        return EvaluateInnerFashionPointRaw(t, sideSign);
     }
 
     /// <summary>
     /// Evaluates 3D point on the Inner Fashion Timber curve at target station Z for specified side (+1 Starboard, -1 Port).
+    /// Uses precomputed curve samples with fast O(log N) binary search for instant, zero-allocation evaluation.
     /// </summary>
     public virtual Vector3 GetInnerFashionPointAtZ(float targetZ, float side = 1f)
     {
+        EnsureInitialized();
+
         float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
-        Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
-        Vector3 p4 = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
+        Vector3[] pts = (sideSign > 0f) ? cachedStbdInnerPts : cachedPortInnerPts;
 
-        float zSpan = p4.z - p1.z;
-        if (Mathf.Abs(zSpan) < 0.0001f)
+        if (pts != null && pts.Length >= 2)
         {
-            return GetInnerFashionPointAtT(0f, sideSign);
+            if (targetZ >= pts[0].z) return pts[0];
+            if (targetZ <= pts[pts.Length - 1].z) return pts[pts.Length - 1];
+
+            int low = 0;
+            int high = pts.Length - 1;
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                if (pts[mid].z > targetZ)
+                {
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            int i0 = Mathf.Clamp(high, 0, pts.Length - 2);
+            int i1 = i0 + 1;
+            float dz = pts[i1].z - pts[i0].z;
+            float frac = (Mathf.Abs(dz) > 0.0001f) ? Mathf.Clamp01((targetZ - pts[i0].z) / dz) : 0f;
+            return Vector3.Lerp(pts[i0], pts[i1], frac);
         }
 
-        if (targetZ >= p1.z) return GetInnerFashionPointAtT(0f, sideSign);
-        if (targetZ <= p4.z) return GetInnerFashionPointAtT(1f, sideSign);
-
-        float minT = 0f;
-        float maxT = 1f;
-        float t = Mathf.Clamp01((targetZ - p1.z) / zSpan);
-
-        for (int i = 0; i < 12; i++)
-        {
-            Vector3 pt = GetInnerFashionPointAtT(t, sideSign);
-            float error = pt.z - targetZ;
-            if (Mathf.Abs(error) < 0.0001f) return pt;
-
-            if (p1.z > p4.z)
-            {
-                if (pt.z > targetZ) minT = t;
-                else maxT = t;
-            }
-            else
-            {
-                if (pt.z < targetZ) minT = t;
-                else maxT = t;
-            }
-            t = (minT + maxT) * 0.5f;
-        }
-
-        return GetInnerFashionPointAtT(t, sideSign);
+        return (sideSign > 0f) ? innerStbdP1 : innerPortP1;
     }
 
     /// <summary>
@@ -662,10 +730,7 @@ public class FashionCurves : MonoBehaviour
     /// </summary>
     public virtual Vector3[] GetInnerFashionPoints(bool starboard = true)
     {
-        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length == 0)
-        {
-            UpdateCachedCurves();
-        }
+        EnsureInitialized();
         return starboard ? cachedStbdInnerPts : cachedPortInnerPts;
     }
 
@@ -705,7 +770,7 @@ public class FashionCurves : MonoBehaviour
     {
         if (sheerCurves == null) return;
 
-        UpdateCachedCurves();
+        EnsureInitialized();
 
         // 1. Draw Starboard 3D Fashion NURBS Curve (Vibrant Rose / Magenta)
         DrawFashionNurbsCurve(1f, fashionCurveColor);
@@ -804,14 +869,14 @@ public class FashionCurves : MonoBehaviour
 
     private void DrawFashionNurbsCurve(float side, Color color, int steps = 50)
     {
-        Gizmos.color = color;
-        Vector3 prev = GetFashionPointAtT(0f, side);
-        for (int i = 1; i <= steps; i++)
+        Vector3[] pts = (side > 0f) ? cachedStbdOuterPts : cachedPortOuterPts;
+        if (pts != null && pts.Length > 1)
         {
-            float t = i / (float)steps;
-            Vector3 curr = GetFashionPointAtT(t, side);
-            Gizmos.DrawLine(prev, curr);
-            prev = curr;
+            Gizmos.color = color;
+            for (int i = 0; i < pts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(pts[i], pts[i + 1]);
+            }
         }
     }
 }

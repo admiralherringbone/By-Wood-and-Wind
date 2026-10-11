@@ -409,13 +409,13 @@ public class SheerCurves : MonoBehaviour
         float max = 1f;
         float t = 0.5f;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 16; i++)
         {
             float u = 1f - t;
             float zVal = (u * u * u * p0.z) + (3f * u * u * t * p1.z) + (3f * u * t * t * p2.z) + (t * t * t * p3.z);
             float error = zVal - targetZ;
 
-            if (Mathf.Abs(error) < 0.00005f) return t;
+            if (Mathf.Abs(error) < 0.00001f) return t;
 
             if (p0.z > p3.z)
             {
@@ -442,13 +442,13 @@ public class SheerCurves : MonoBehaviour
         float min = 0f;
         float max = 1f;
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 16; i++)
         {
             float u = 1f - t;
             float yVal = (u * u * u * y0) + (3f * u * u * t * y1) + (3f * u * t * t * y2) + (t * t * t * y3);
             float error = yVal - targetY;
 
-            if (Mathf.Abs(error) < 0.00005f) return t;
+            if (Mathf.Abs(error) < 0.00001f) return t;
 
             if (yVal < targetY) min = Mathf.Max(min, t);
             else max = Mathf.Min(max, t);

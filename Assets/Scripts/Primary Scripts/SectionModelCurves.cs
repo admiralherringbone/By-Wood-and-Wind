@@ -193,7 +193,7 @@ public class SectionModelCurves : MonoBehaviour
     /// </summary>
     public List<SectionPointNode> GetTransverseSectionNodesAtZ(float z, float sideSign)
     {
-        FindReferences();
+        EnsureInitialized();
 
         List<SectionPointNode> nodes = new List<SectionPointNode>();
         float sSign = Mathf.Approximately(sideSign, 0f) ? 1f : Mathf.Sign(sideSign);
@@ -205,6 +205,7 @@ public class SectionModelCurves : MonoBehaviour
         if (isTransomRegion)
         {
             Vector3 fashionPt = fashionCurves.GetFashionPointAtZ(z, sSign);
+            fashionPt = new Vector3(sSign * Mathf.Abs(fashionPt.x), fashionPt.y, z);
             minTransomY = fashionPt.y;
 
             float uTransom = 0.25f;
@@ -254,23 +255,29 @@ public class SectionModelCurves : MonoBehaviour
             if (floorCurves != null && IsStationWithinCurveSpan(z, floorCurves.fwdP0, floorCurves.aftP3))
             {
                 Vector3 fPt = floorCurves.GetFloorPointAtZ(z);
-                nodes.Add(new SectionPointNode
+                if (!isTransomRegion || fPt.y > minTransomY + 0.01f)
                 {
-                    name = "Floor Curve",
-                    uParam = 0.25f,
-                    point = new Vector3(sSign * Mathf.Abs(fPt.x), fPt.y, z)
-                });
+                    nodes.Add(new SectionPointNode
+                    {
+                        name = "Floor Curve",
+                        uParam = 0.25f,
+                        point = new Vector3(sSign * Mathf.Abs(fPt.x), fPt.y, z)
+                    });
+                }
             }
 
             if (bilgeCurves != null && IsStationWithinCurveSpan(z, bilgeCurves.fwdP0, bilgeCurves.aftP2))
             {
                 Vector3 bPt = bilgeCurves.GetBilgePointAtZ(z);
-                nodes.Add(new SectionPointNode
+                if (!isTransomRegion || bPt.y > minTransomY + 0.01f)
                 {
-                    name = "Bilge Curve",
-                    uParam = 0.50f,
-                    point = new Vector3(sSign * Mathf.Abs(bPt.x), bPt.y, z)
-                });
+                    nodes.Add(new SectionPointNode
+                    {
+                        name = "Bilge Curve",
+                        uParam = 0.50f,
+                        point = new Vector3(sSign * Mathf.Abs(bPt.x), bPt.y, z)
+                    });
+                }
             }
 
             if (breadthCurves != null)
@@ -279,12 +286,15 @@ public class SectionModelCurves : MonoBehaviour
                 if (IsStationWithinCurveSpan(z, breadthCurves.fwdP0, bAft))
                 {
                     Vector3 brPt = breadthCurves.GetBreadthPointAtZ(z);
-                    nodes.Add(new SectionPointNode
+                    if (!isTransomRegion || brPt.y > minTransomY + 0.01f)
                     {
-                        name = "Breadth Curve",
-                        uParam = 0.75f,
-                        point = new Vector3(sSign * Mathf.Abs(brPt.x), brPt.y, z)
-                    });
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Breadth Curve",
+                            uParam = 0.75f,
+                            point = new Vector3(sSign * Mathf.Abs(brPt.x), brPt.y, z)
+                        });
+                    }
                 }
             }
 
@@ -294,12 +304,15 @@ public class SectionModelCurves : MonoBehaviour
                 if (IsStationWithinCurveSpan(z, topLineCurves.fwdP0, tlAft))
                 {
                     Vector3 tlPt = topLineCurves.GetTopLinePointAtZ(z);
-                    nodes.Add(new SectionPointNode
+                    if (!isTransomRegion || tlPt.y > minTransomY + 0.01f)
                     {
-                        name = "TopLine Curve",
-                        uParam = 1.00f,
-                        point = new Vector3(sSign * Mathf.Abs(tlPt.x), tlPt.y, z)
-                    });
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "TopLine Curve",
+                            uParam = 1.00f,
+                            point = new Vector3(sSign * Mathf.Abs(tlPt.x), tlPt.y, z)
+                        });
+                    }
                 }
             }
         }
@@ -313,13 +326,15 @@ public class SectionModelCurves : MonoBehaviour
                 if (IsStationWithinCurveSpan(z, rib.fwdP0, rib.aftP2))
                 {
                     Vector3 ribPt = ribbandCurves.GetRibbandPointAtZ(i, z);
-
-                    nodes.Add(new SectionPointNode
+                    if (!isTransomRegion || ribPt.y > minTransomY + 0.01f)
                     {
-                        name = rib.name,
-                        uParam = rib.uSectionParam,
-                        point = new Vector3(sSign * Mathf.Abs(ribPt.x), ribPt.y, z)
-                    });
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = rib.name,
+                            uParam = rib.uSectionParam,
+                            point = new Vector3(sSign * Mathf.Abs(ribPt.x), ribPt.y, z)
+                        });
+                    }
                 }
             }
         }
@@ -328,6 +343,221 @@ public class SectionModelCurves : MonoBehaviour
         nodes.Sort((a, b) => a.uParam.CompareTo(b.uParam));
 
         // 5. Remove any duplicate nodes positioned at almost identical locations
+        List<SectionPointNode> uniqueNodes = new List<SectionPointNode>();
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (uniqueNodes.Count == 0)
+            {
+                uniqueNodes.Add(nodes[i]);
+            }
+            else
+            {
+                Vector3 prev = uniqueNodes[uniqueNodes.Count - 1].point;
+                if (Vector3.Distance(prev, nodes[i].point) > 0.005f)
+                {
+                    uniqueNodes.Add(nodes[i]);
+                }
+            }
+        }
+
+        return uniqueNodes;
+    }
+
+    /// <summary>
+    /// Gets the ordered transverse inner section nodes (from Inner Fashion Base or Inner Keel up to Inner TopLine)
+    /// at station Z for specified side (+1 Starboard, -1 Port).
+    /// Guarantees that cut frames lock 100% to the Inner Fashion Curve and longitudinal inner lines.
+    /// </summary>
+    public List<SectionPointNode> GetTransverseInnerSectionNodesAtZ(float z, float sideSign)
+    {
+        EnsureInitialized();
+
+        List<SectionPointNode> nodes = new List<SectionPointNode>();
+        float sSign = Mathf.Approximately(sideSign, 0f) ? 1f : Mathf.Sign(sideSign);
+        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
+        float bottomSpacing = (bodyCurves != null) ? bodyCurves.innerLineSpacing : 0.2f;
+
+        bool isTransomRegion = (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f);
+        float minInnerTransomY = -999f;
+
+        if (isTransomRegion)
+        {
+            Vector3 inFashionPt = fashionCurves.GetInnerFashionPointAtZ(z, sSign);
+            inFashionPt = new Vector3(sSign * Mathf.Abs(inFashionPt.x), inFashionPt.y, z);
+            minInnerTransomY = inFashionPt.y;
+
+            float uTransomInner = 0.25f;
+            float ySpanInner = (fashionCurves.innerStbdP4.y - fashionCurves.innerStbdP1.y);
+            if (ySpanInner > 0.001f)
+            {
+                uTransomInner = Mathf.Lerp(0.25f, 1.00f, Mathf.Clamp01((inFashionPt.y - fashionCurves.innerStbdP1.y) / ySpanInner));
+            }
+
+            nodes.Add(new SectionPointNode
+            {
+                name = "Inner Fashion Transom Base",
+                uParam = uTransomInner,
+                point = inFashionPt
+            });
+
+            if (includePrimaryBoundaryNodes)
+            {
+                if (bilgeCurves != null && bilgeCurves.showInnerLine)
+                {
+                    Vector3 bAft = bilgeCurves.GetInnerBilgeSternTip(true);
+                    Vector3 bFwd = bilgeCurves.GetInnerBilgeBowTip(true);
+                    if (IsStationWithinCurveSpan(z, bFwd, bAft))
+                    {
+                        Vector3 inBilge = bilgeCurves.GetInnerBilgePointAtZ(z);
+                        if (inBilge.y > minInnerTransomY + 0.01f)
+                        {
+                            nodes.Add(new SectionPointNode
+                            {
+                                name = "Inner Bilge Curve",
+                                uParam = 0.50f,
+                                point = new Vector3(sSign * Mathf.Abs(inBilge.x), inBilge.y, z)
+                            });
+                        }
+                    }
+                }
+
+                if (breadthCurves != null && breadthCurves.showInnerLine)
+                {
+                    Vector3 brAft = breadthCurves.GetInnerBreadthSternTip(true);
+                    Vector3 brFwd = breadthCurves.GetInnerBreadthBowTip(true);
+                    if (IsStationWithinCurveSpan(z, brFwd, brAft))
+                    {
+                        Vector3 inBreadth = breadthCurves.GetInnerBreadthPointAtZ(z, sSign > 0f);
+                        if (inBreadth.y > minInnerTransomY + 0.01f)
+                        {
+                            nodes.Add(new SectionPointNode
+                            {
+                                name = "Inner Breadth Curve",
+                                uParam = 0.75f,
+                                point = new Vector3(sSign * Mathf.Abs(inBreadth.x), inBreadth.y, z)
+                            });
+                        }
+                    }
+                }
+
+                if (topLineCurves != null && topLineCurves.showInnerLine)
+                {
+                    Vector3 tlAft = topLineCurves.GetInnerTopLineSternTip(true);
+                    Vector3 tlFwd = topLineCurves.GetInnerTopLineBowTip(true);
+                    if (IsStationWithinCurveSpan(z, tlFwd, tlAft))
+                    {
+                        Vector3 inTopLine = topLineCurves.GetInnerTopLinePointAtZ(z, sSign > 0f);
+                        if (inTopLine.y > minInnerTransomY + 0.01f)
+                        {
+                            nodes.Add(new SectionPointNode
+                            {
+                                name = "Inner TopLine Curve",
+                                uParam = 1.00f,
+                                point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            float keelY = 0f;
+            if (sheerCurves != null)
+            {
+                if (z >= sheerCurves.stemP0.z)
+                {
+                    keelY = sheerCurves.GetStemProfileYAtZ(z);
+                }
+                else if (z <= sheerCurves.sternP0.z)
+                {
+                    keelY = sheerCurves.GetSternProfileYAtZ(z);
+                }
+                else
+                {
+                    keelY = sheerCurves.keelY;
+                }
+            }
+
+            nodes.Add(new SectionPointNode
+            {
+                name = "Inner Keel",
+                uParam = 0.0f,
+                point = new Vector3(sSign * hw, keelY + bottomSpacing, z)
+            });
+
+            if (includePrimaryBoundaryNodes)
+            {
+                if (floorCurves != null && floorCurves.showInnerLine)
+                {
+                    Vector3 fAft = floorCurves.GetInnerFloorSternTip(true);
+                    Vector3 fFwd = floorCurves.GetInnerFloorBowTip(true);
+                    if (IsStationWithinCurveSpan(z, fFwd, fAft))
+                    {
+                        Vector3 inFloor = floorCurves.GetInnerFloorPointAtZ(z);
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Inner Floor Curve",
+                            uParam = 0.25f,
+                            point = new Vector3(sSign * Mathf.Abs(inFloor.x), inFloor.y, z)
+                        });
+                    }
+                }
+
+                if (bilgeCurves != null && bilgeCurves.showInnerLine)
+                {
+                    Vector3 bAft = bilgeCurves.GetInnerBilgeSternTip(true);
+                    Vector3 bFwd = bilgeCurves.GetInnerBilgeBowTip(true);
+                    if (IsStationWithinCurveSpan(z, bFwd, bAft))
+                    {
+                        Vector3 inBilge = bilgeCurves.GetInnerBilgePointAtZ(z);
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Inner Bilge Curve",
+                            uParam = 0.50f,
+                            point = new Vector3(sSign * Mathf.Abs(inBilge.x), inBilge.y, z)
+                        });
+                    }
+                }
+
+                if (breadthCurves != null && breadthCurves.showInnerLine)
+                {
+                    Vector3 brAft = breadthCurves.GetInnerBreadthSternTip(true);
+                    Vector3 brFwd = breadthCurves.GetInnerBreadthBowTip(true);
+                    if (IsStationWithinCurveSpan(z, brFwd, brAft))
+                    {
+                        Vector3 inBreadth = breadthCurves.GetInnerBreadthPointAtZ(z, sSign > 0f);
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Inner Breadth Curve",
+                            uParam = 0.75f,
+                            point = new Vector3(sSign * Mathf.Abs(inBreadth.x), inBreadth.y, z)
+                        });
+                    }
+                }
+
+                if (topLineCurves != null && topLineCurves.showInnerLine)
+                {
+                    Vector3 tlAft = topLineCurves.GetInnerTopLineSternTip(true);
+                    Vector3 tlFwd = topLineCurves.GetInnerTopLineBowTip(true);
+                    if (IsStationWithinCurveSpan(z, tlFwd, tlAft))
+                    {
+                        Vector3 inTopLine = topLineCurves.GetInnerTopLinePointAtZ(z, sSign > 0f);
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Inner TopLine Curve",
+                            uParam = 1.00f,
+                            point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sort nodes strictly by uParam
+        nodes.Sort((a, b) => a.uParam.CompareTo(b.uParam));
+
+        // Deduplicate nodes
         List<SectionPointNode> uniqueNodes = new List<SectionPointNode>();
         for (int i = 0; i < nodes.Count; i++)
         {
@@ -363,7 +593,7 @@ public class SectionModelCurves : MonoBehaviour
     /// </summary>
     public List<StationInfo> GetAllSectionStations()
     {
-        FindReferences();
+        EnsureInitialized();
         List<StationInfo> stations = new List<StationInfo>();
 
         float masterZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
@@ -464,23 +694,45 @@ public class SectionModelCurves : MonoBehaviour
             float topSpacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.1f;
 
             bool shouldComputeInner = showTransverseSections && (bodyCurves != null && bodyCurves.showInnerLine && bodyCurves.innerLineSpacing > 0.0001f);
-
-            // Compute full inner section polylines BEFORE discarding points
-            List<Vector3> stbdInnerPts = (shouldComputeInner && stbdNodes.Count >= 2) ? GetInnerSectionPolylinePoints(stbdOuterPts, stbdNodes[0].point.y, stbdNodes[stbdNodes.Count - 1].point.y, bottomSpacing, topSpacing, 1f) : null;
-            List<Vector3> portInnerPts = (shouldComputeInner && portNodes.Count >= 2) ? GetInnerSectionPolylinePoints(portOuterPts, portNodes[0].point.y, portNodes[portNodes.Count - 1].point.y, bottomSpacing, topSpacing, -1f) : null;
-
-            // DISCARD POINTS BELOW FASHION / TRANSOM BOUNDARY (after both outer and inner lines are determined)
             bool isTransomRegion = (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f);
+
+            // Compute inner section polylines: in the transom region, sample directly from inner curve nodes
+            List<Vector3> stbdInnerPts = null;
+            List<Vector3> portInnerPts = null;
+            List<SectionPointNode> stbdInnerNodes = null;
+            List<SectionPointNode> portInnerNodes = null;
+
+            if (shouldComputeInner)
+            {
+                if (isTransomRegion || useKeyCurvesOnlyForSections || ribbandCurves == null || ribbandCurves.generatedRibbands == null || ribbandCurves.generatedRibbands.Count == 0)
+                {
+                    stbdInnerNodes = GetTransverseInnerSectionNodesAtZ(z, 1f);
+                    portInnerNodes = GetTransverseInnerSectionNodesAtZ(z, -1f);
+
+                    stbdInnerPts = (stbdInnerNodes.Count >= 2) ? GetOuterSectionPolylinePoints(stbdInnerNodes) : null;
+                    portInnerPts = (portInnerNodes.Count >= 2) ? GetOuterSectionPolylinePoints(portInnerNodes) : null;
+                }
+                else
+                {
+                    stbdInnerPts = (stbdNodes.Count >= 2) ? GetInnerSectionPolylinePoints(stbdOuterPts, stbdNodes[0].point.y, stbdNodes[stbdNodes.Count - 1].point.y, bottomSpacing, topSpacing, 1f) : null;
+                    portInnerPts = (portNodes.Count >= 2) ? GetInnerSectionPolylinePoints(portOuterPts, portNodes[0].point.y, portNodes[portNodes.Count - 1].point.y, bottomSpacing, topSpacing, -1f) : null;
+                }
+            }
+
+            // Discard points below fashion / transom boundary (filter each line at its OWN base height)
             if (isTransomRegion)
             {
-                float stbdMinY = fashionCurves.GetFashionPointAtZ(z, 1f).y;
-                float portMinY = fashionCurves.GetFashionPointAtZ(z, -1f).y;
+                float stbdMinY = (stbdNodes != null && stbdNodes.Count > 0) ? stbdNodes[0].point.y : fashionCurves.GetFashionPointAtZ(z, 1f).y;
+                float portMinY = (portNodes != null && portNodes.Count > 0) ? portNodes[0].point.y : fashionCurves.GetFashionPointAtZ(z, -1f).y;
 
                 FilterPointsBelowY(stbdOuterPts, stbdMinY);
                 FilterPointsBelowY(portOuterPts, portMinY);
 
-                if (stbdInnerPts != null) FilterPointsBelowY(stbdInnerPts, stbdMinY);
-                if (portInnerPts != null) FilterPointsBelowY(portInnerPts, portMinY);
+                float stbdInnerMinY = (stbdInnerNodes != null && stbdInnerNodes.Count > 0) ? stbdInnerNodes[0].point.y : ((fashionCurves != null) ? fashionCurves.GetInnerFashionPointAtZ(z, 1f).y : stbdMinY);
+                float portInnerMinY = (portInnerNodes != null && portInnerNodes.Count > 0) ? portInnerNodes[0].point.y : ((fashionCurves != null) ? fashionCurves.GetInnerFashionPointAtZ(z, -1f).y : portMinY);
+
+                if (stbdInnerPts != null) FilterPointsBelowY(stbdInnerPts, stbdInnerMinY);
+                if (portInnerPts != null) FilterPointsBelowY(portInnerPts, portInnerMinY);
             }
 
             // Draw Transverse Section Curves (X/Y cuts)
@@ -489,8 +741,8 @@ public class SectionModelCurves : MonoBehaviour
                 DrawPolyline(stbdOuterPts, stbdCol);
                 DrawPolyline(portOuterPts, portCol);
 
-                // Outer-to-Outer Bottom Connection across Keel width / Cut boundary
-                if (stbdOuterPts.Count > 0 && portOuterPts.Count > 0)
+                // Outer-to-Outer Bottom Connection across Keel width (ONLY ahead of transom cut)
+                if (!isTransomRegion && stbdOuterPts.Count > 0 && portOuterPts.Count > 0)
                 {
                     Gizmos.color = stbdCol;
                     Gizmos.DrawLine(portOuterPts[0], stbdOuterPts[0]);
@@ -501,11 +753,28 @@ public class SectionModelCurves : MonoBehaviour
                     DrawPolyline(stbdInnerPts, bodyCurves.innerLineColor);
                     DrawPolyline(portInnerPts, bodyCurves.innerLineColor);
 
-                    // Inner-to-Inner Bottom Connection across Keel width / Cut boundary
-                    if (stbdInnerPts.Count > 0 && portInnerPts.Count > 0)
+                    if (isTransomRegion)
                     {
-                        Gizmos.color = bodyCurves.innerLineColor;
-                        Gizmos.DrawLine(portInnerPts[0], stbdInnerPts[0]);
+                        // Transom Cut End Cap Lines (Outer cut to Inner cut on each side)
+                        if (stbdOuterPts.Count > 0 && stbdInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(stbdOuterPts[0], stbdInnerPts[0]);
+                        }
+                        if (portOuterPts.Count > 0 && portInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(portOuterPts[0], portInnerPts[0]);
+                        }
+                    }
+                    else
+                    {
+                        // Inner Keel Floor Connection across Keel width
+                        if (stbdInnerPts.Count > 0 && portInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(portInnerPts[0], stbdInnerPts[0]);
+                        }
                     }
 
                     // Outer-to-Inner Top Cap Lines
