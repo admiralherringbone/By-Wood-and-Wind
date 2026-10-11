@@ -59,9 +59,12 @@ public class BodyPlan : MonoBehaviour
     [Tooltip("The width of the physical Keel (P/S distance). The mould will start at keelWidth / 2.")]
     public float keelWidth = 0.5f;
 
-    [Header("Floor Hollow (Keel to Floor Arc)")]
+    [Header("Floor Hollow & Keel Entry Controls")]
     [Tooltip("Curvature of the Floor Hollow between Keel (p0) and Floor (p1). (0 = Straight deadrise, 1 = Full Bi-Arc hollow curve).")]
     [Range(0f, 1f)] public float floorHollow = 0.5f;
+
+    [Tooltip("Stiffness / influence of the Keel point (p0) entry tangent on segment 1. (0.0 = Relaxed keel entry for clean lump-free curves, 1.0 = Stiff keel tangent).")]
+    [Range(0f, 1f)] public float keelEntryInfluence = 0.0f;
 
     [Header("Backward Compatibility Settings")]
     [Tooltip("Length of the HoB downward control arm as a percentage (0 to 1) of the total HoB height.")]
@@ -251,7 +254,7 @@ public class BodyPlan : MonoBehaviour
     /// </summary>
     public Vector3 EvaluateBodySectionAtU(float u, SectionNodes nodes)
     {
-        Vector3 pt = GetEvaluator(curveMode).EvaluateSectionPoint(u, nodes, floorHollow, splineTension);
+        Vector3 pt = GetEvaluator(curveMode).EvaluateSectionPoint(u, nodes, floorHollow, splineTension, keelEntryInfluence);
 
         // Restriction 2: Section curve points sweeping toward the Keel (p0) can never cross inward past the vertical line extending upward from the Keel point (p0)
         float sideSign = Mathf.Sign(nodes.p3.x);

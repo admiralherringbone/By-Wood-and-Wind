@@ -32,6 +32,12 @@ public class TopLineCurves : MonoBehaviour
     public bool showLabels = true;
     public Color topLineCurveColor = new Color(0.85f, 0.2f, 0.95f, 0.95f); // Vibrant Magenta / Purple
 
+    [Header("Inner Line Settings")]
+    public bool showInnerLine = true;
+    [Tooltip("Spacing distance between the outer top line curve and the parallel inner top line curve.")]
+    [Range(0f, 2f)] public float innerLineSpacing = 0.2f;
+    public Color innerLineColor = new Color(0.95f, 0.4f, 0.95f, 0.95f);
+
     [Header("Initialization State")]
     public bool isInitialized = false;
 
@@ -105,6 +111,12 @@ public class TopLineCurves : MonoBehaviour
     [HideInInspector] public Vector3 cachedAftP2;
     [HideInInspector] public Vector3 cachedAftP3;
     [HideInInspector] public bool cachedIsAftCubic;
+    [HideInInspector] public Vector3 cachedInnerMidshipPt;
+    [HideInInspector] public Vector3 cachedOffsetVector;
+
+    private Vector3[] cachedStbdInnerPts;
+    private Vector3[] cachedPortInnerPts;
+
     [HideInInspector] public int changeVersion = 0;
 
     private void OnEnable()
@@ -176,12 +188,18 @@ public class TopLineCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    private bool isUpdatingCurves = false;
+
     public virtual void UpdateCachedCurves()
     {
-        EnsureInitialized();
-        FindReferences();
+        if (isUpdatingCurves) return;
+        isUpdatingCurves = true;
+        try
+        {
+            EnsureInitialized();
+            FindReferences();
 
-        cachedIsAftCubic = transomWidth <= 0.001f;
+            cachedIsAftCubic = transomWidth <= 0.001f;
 
         // TIE TO SHEER CURVES PROFILE LINES (Upper Stem Post Top, Transom Rake Top)
         if (sheerCurves != null)
@@ -308,7 +326,265 @@ public class TopLineCurves : MonoBehaviour
         cachedAftP2 = aftP2;
         cachedAftP3 = aftP3;
 
+        if (bodyCurves != null)
+        {
+            innerLineSpacing = bodyCurves.GetInnerLineSpacingAtY(fwdP3.y);
+        }
+
+        UpdateInnerParallelCurve();
+
         changeVersion++;
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
+    }
+
+    private void UpdateInnerParallelCurve()
+    {
+        if (!showInnerLine)
+        {
+            return;
+        }
+
+        Vector3 pOuter = cachedFwdP3;
+        Vector3 pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            pInner = bodyCurves.GetInnerNodePosition(4, cachedFwdP3.z, 1f);
+        }
+
+        cachedInnerMidshipPt = pInner;
+
+        // Inward transverse offset vector at midship (angle and distance)
+        float deltaX = pInner.x - pOuter.x; // Negative on starboard (inward toward centerline)
+        float deltaY = pInner.y - pOuter.y; // Vertical offset
+        cachedOffsetVector = new Vector3(deltaX, deltaY, 0f);
+
+        const int segmentsFwd = 40;
+        const int segmentsAft = 30;
+        int totalPts = segmentsFwd + segmentsAft + 1;
+
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+        {
+            cachedStbdInnerPts = new Vector3[totalPts];
+            cachedPortInnerPts = new Vector3[totalPts];
+        }
+
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        // Forward Span (Cubic Bezier: Bow P0 -> Midship P3)
+        for (int i = 0; i <= segmentsFwd; i++)
+        {
+            if (i == segmentsFwd)
+            {
+                // Exact midship apex point guaranteed to pass directly through BodyCurves inner TopLine point
+                cachedStbdInnerPts[i] = pInner;
+                cachedPortInnerPts[i] = MirrorX(pInner);
+                continue;
+            }
+
+            float t = (float)i / segmentsFwd;
+            Vector3 pt = CalculateCubicBezierPoint(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+            Vector3 deriv = CalculateCubicBezierDerivative(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+
+            // Horizontal tangent is (deriv.x, deriv.z). Curve moves bow (+Z) -> midship (0), so deriv.z <= 0.
+            // Inward normal towards centerline on starboard (+X) has negative X: (deriv.z, -deriv.x).
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
+
+            cachedStbdInnerPts[i] = innerPt;
+            cachedPortInnerPts[i] = MirrorX(innerPt);
+        }
+
+        // Aft Span:
+        // Harmonized Stern Inset & Height:
+        // Solves for parameter tEnd where the continuous parallel inner curve intersects
+        // the inner transom plane (Z = sternZ + absDeltaX), ensuring the inner transom line
+        // has the exact uniform spacing absDeltaX without any vertical pitch kink.
+        if (cachedIsAftCubic)
+        {
+            for (int j = 1; j <= segmentsAft; j++)
+            {
+                float t = (float)j / segmentsAft;
+                Vector3 pt = CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3);
+                Vector3 deriv = CalculateCubicBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3);
+
+                float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+                Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+                Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+                if (innerPt.x < 0f) innerPt.x = 0f;
+
+                int idx = segmentsFwd + j;
+                cachedStbdInnerPts[idx] = innerPt;
+                cachedPortInnerPts[idx] = MirrorX(innerPt);
+            }
+        }
+        else
+        {
+            float targetZ = cachedAftP2.z + absDeltaX;
+            float tEnd = 1.0f;
+
+            Vector3 derivEndCheck = CalculateQuadraticBezierDerivative(1f, cachedAftP0, cachedAftP1, cachedAftP2);
+            float lenEndCheck = Mathf.Sqrt(derivEndCheck.z * derivEndCheck.z + derivEndCheck.x * derivEndCheck.x);
+            float nZEndCheck = (lenEndCheck > 0.0001f) ? (-derivEndCheck.x / lenEndCheck) : 0f;
+            float zInnerAt1 = cachedAftP2.z + absDeltaX * nZEndCheck;
+
+            if (zInnerAt1 < targetZ && (cachedAftP0.z - targetZ) > 0.001f)
+            {
+                float tLow = 0f;
+                float tHigh = 1f;
+                for (int iter = 0; iter < 16; iter++)
+                {
+                    float tMid = (tLow + tHigh) * 0.5f;
+                    Vector3 ptMid = CalculateQuadraticBezierPoint(tMid, cachedAftP0, cachedAftP1, cachedAftP2);
+                    Vector3 derivMid = CalculateQuadraticBezierDerivative(tMid, cachedAftP0, cachedAftP1, cachedAftP2);
+                    float lenMid = Mathf.Sqrt(derivMid.z * derivMid.z + derivMid.x * derivMid.x);
+                    float nZMid = (lenMid > 0.0001f) ? (-derivMid.x / lenMid) : 0f;
+                    float zInnerMid = ptMid.z + absDeltaX * nZMid;
+                    if (zInnerMid > targetZ)
+                    {
+                        tLow = tMid;
+                    }
+                    else
+                    {
+                        tHigh = tMid;
+                    }
+                }
+                tEnd = (tLow + tHigh) * 0.5f;
+            }
+
+            for (int j = 1; j <= segmentsAft; j++)
+            {
+                float t = ((float)j / segmentsAft) * tEnd;
+                Vector3 pt = CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+                Vector3 deriv = CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
+
+                float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+                Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+                Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+                if (j == segmentsAft)
+                {
+                    innerPt.z = targetZ;
+                }
+                if (innerPt.x < 0f) innerPt.x = 0f;
+
+                int idx = segmentsFwd + j;
+                cachedStbdInnerPts[idx] = innerPt;
+                cachedPortInnerPts[idx] = MirrorX(innerPt);
+            }
+        }
+    }
+
+    // --- 3D INNER PARALLEL EVALUATION METHODS ---
+
+    public virtual Vector3[] GetInnerTopLinePoints(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length == 0)
+        {
+            UpdateInnerParallelCurve();
+        }
+        return starboard ? cachedStbdInnerPts : cachedPortInnerPts;
+    }
+
+    public virtual Vector3 GetInnerTopLinePointAtZ(float z, bool starboard = true)
+    {
+        EnsureInitialized();
+
+        Vector3 outerPt = GetTopLinePointAtZ(z);
+        Vector3 pOuter = cachedFwdP3;
+        Vector3 pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            pInner = bodyCurves.GetInnerNodePosition(4, cachedFwdP3.z, 1f);
+        }
+
+        float deltaX = pInner.x - pOuter.x;
+        float deltaY = pInner.y - pOuter.y;
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        if (Mathf.Abs(z - cachedFwdP3.z) < 0.001f)
+        {
+            return starboard ? pInner : MirrorX(pInner);
+        }
+
+        float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (z <= sternTipZ)
+        {
+            if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+            {
+                Vector3 tip = cachedStbdInnerPts[cachedStbdInnerPts.Length - 1];
+                return starboard ? tip : MirrorX(tip);
+            }
+        }
+
+        Vector3 deriv;
+        if (z >= cachedFwdP3.z)
+        {
+            float t = GetBezierTAtZ(cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3, z, false);
+            deriv = CalculateCubicBezierDerivative(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+        }
+        else
+        {
+            if (cachedIsAftCubic)
+            {
+                float t = GetBezierTAtZ(cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3, z, false);
+                deriv = CalculateCubicBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3);
+            }
+            else
+            {
+                float t = GetBezierTAtZ(cachedAftP0, cachedAftP1, cachedAftP2, Vector3.zero, z, false);
+                deriv = CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
+            }
+        }
+
+        float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+        Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+        Vector3 innerPt = outerPt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+        if (innerPt.x < 0f) innerPt.x = 0f;
+        return starboard ? innerPt : MirrorX(innerPt);
+    }
+
+    public virtual float GetInnerTopLineXAtZ(float z, bool starboard = true)
+    {
+        return GetInnerTopLinePointAtZ(z, starboard).x;
+    }
+
+    public virtual float GetInnerTopLineYAtZ(float z)
+    {
+        return GetInnerTopLinePointAtZ(z, true).y;
+    }
+
+    public virtual Vector3 GetInnerTopLineSternTip(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = cachedStbdInnerPts[cachedStbdInnerPts.Length - 1];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (cachedAftP2 + cachedOffsetVector) : MirrorX(cachedAftP2 + cachedOffsetVector);
+    }
+
+    public virtual Vector3 GetInnerTopLineBowTip(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = cachedStbdInnerPts[0];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (cachedFwdP0 + cachedOffsetVector) : MirrorX(cachedFwdP0 + cachedOffsetVector);
     }
 
     // --- 3D SPATIAL EVALUATION METHODS ---
@@ -382,6 +658,18 @@ public class TopLineCurves : MonoBehaviour
         float tt = t * t;
         float uu = u * u;
         return (uu * p0) + (2f * u * t * p1) + (tt * p2);
+    }
+
+    public Vector3 CalculateQuadraticBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2)
+    {
+        float u = 1f - t;
+        return 2f * u * (p1 - p0) + 2f * t * (p2 - p1);
+    }
+
+    public Vector3 CalculateCubicBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1f - t;
+        return 3f * u * u * (p1 - p0) + 6f * u * t * (p2 - p1) + 3f * t * t * (p3 - p2);
     }
 
     public Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
@@ -518,6 +806,35 @@ public class TopLineCurves : MonoBehaviour
             Gizmos.DrawLine(cachedAftP2, MirrorX(cachedAftP2));
         }
 
+        // Draw Inner Top Line Curves (Parallel Inset from BodyCurves TopLine Point)
+        if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 1)
+        {
+            Gizmos.color = innerLineColor;
+            for (int i = 0; i < cachedStbdInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedStbdInnerPts[i], cachedStbdInnerPts[i + 1]);
+            }
+
+            Color portInnerColor = new Color(innerLineColor.r, innerLineColor.g * 0.6f, innerLineColor.b, innerLineColor.a);
+            Gizmos.color = portInnerColor;
+            for (int i = 0; i < cachedPortInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedPortInnerPts[i], cachedPortInnerPts[i + 1]);
+            }
+
+            // Draw Inner Transom Connection Line
+            if (!cachedIsAftCubic)
+            {
+                int last = cachedStbdInnerPts.Length - 1;
+                Gizmos.color = innerLineColor;
+                Gizmos.DrawLine(cachedStbdInnerPts[last], cachedPortInnerPts[last]);
+            }
+
+            // Inner Midship Point Sphere
+            Gizmos.color = innerLineColor;
+            Gizmos.DrawSphere(cachedInnerMidshipPt, 0.10f);
+        }
+
         // Draw 3D Control Polygon Skeleton Arms
         Gizmos.color = new Color(0.9f, 0.2f, 0.9f, 0.6f);
         Gizmos.DrawLine(cachedFwdP0, cachedFwdP1);
@@ -548,6 +865,11 @@ public class TopLineCurves : MonoBehaviour
             Handles.Label(cachedFwdP3 + new Vector3(0, 0.2f, 0), $"Top Line Midship Apex (X={maxBeam:F2}, Y={cachedFwdP3.y:F2})", style);
             Handles.Label(cachedFwdP0 + new Vector3(0, 0.2f, 0), $"Upper Stem Tip (Y={cachedFwdP0.y:F2})", style);
             Handles.Label(cachedAftP2 + new Vector3(0, 0.2f, 0), cachedIsAftCubic ? $"Transom Rake Top Tip (Y={cachedAftP3.y:F2})" : $"Transom Rake Top Corner (Y={cachedAftP2.y:F2})", style);
+
+            if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 40)
+            {
+                Handles.Label(cachedInnerMidshipPt + new Vector3(0, 0.25f, 0), $"Inner Midship ({cachedInnerMidshipPt.x:F2}m)", style);
+            }
 
             // Render Inner Boundary Chord Lines (Cyan Dotted)
             Handles.color = new Color(0.2f, 0.9f, 1f, 0.6f);

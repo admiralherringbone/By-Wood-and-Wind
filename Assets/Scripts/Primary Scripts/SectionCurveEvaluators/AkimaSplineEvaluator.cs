@@ -6,7 +6,7 @@ public class AkimaSplineEvaluator : ISectionCurveEvaluator
     public string DisplayName => "Akima Monotone Spline (Non-Overshoot)";
     public bool UsesControlArms => true;
 
-    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension)
+    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension, float keelEntryInfluence = 0.0f)
     {
         u = Mathf.Clamp01(u);
         Vector3 P0 = nodes.p0;
@@ -26,8 +26,7 @@ public class AkimaSplineEvaluator : ISectionCurveEvaluator
             float t = u * 4f;
             Vector3 linearPt = Vector3.Lerp(P0, P1, t);
             Vector3 akimaPt = EvaluateHermiteSegment(P0, T0, P1, T1, t, tension);
-            float weight = Mathf.Lerp(floorHollow, 1.0f, t);
-            return Vector3.Lerp(linearPt, akimaPt, weight);
+            return Vector3.Lerp(linearPt, akimaPt, floorHollow);
         }
         else if (u <= 0.50f)
         {

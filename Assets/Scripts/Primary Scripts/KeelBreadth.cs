@@ -76,9 +76,43 @@ public class KeelBreadth : MonoBehaviour
         isInitialized = true;
     }
 
+    private static bool isSyncingKeelWidth = false;
+
+    public void SyncKeelWidth(float newWidth)
+    {
+        if (isSyncingKeelWidth) return;
+        isSyncingKeelWidth = true;
+        try
+        {
+            float clampedWidth = Mathf.Max(0.01f, newWidth);
+            keelWidth = clampedWidth;
+
+            FindReferences();
+            if (bodyCurves != null && Mathf.Abs(bodyCurves.keelWidth - clampedWidth) > 0.0001f)
+            {
+                bodyCurves.keelWidth = clampedWidth;
+                bodyCurves.UpdateCachedCurves();
+            }
+
+            BackboneCurves bb = GetComponentInParent<BackboneCurves>();
+            if (bb == null) bb = FindFirstObjectByType<BackboneCurves>();
+            if (bb != null && Mathf.Abs(bb.keelWidth - clampedWidth) > 0.0001f)
+            {
+                bb.keelWidth = clampedWidth;
+                bb.UpdateCachedCurves();
+            }
+
+            UpdateCachedCurves();
+        }
+        finally
+        {
+            isSyncingKeelWidth = false;
+        }
+    }
+
     private void OnValidate()
     {
-        UpdateCachedCurves();
+        SyncKeelWidth(keelWidth);
     }
 
     public virtual void UpdateCachedCurves()
@@ -91,13 +125,6 @@ public class KeelBreadth : MonoBehaviour
         float keelY = (sheerCurves != null) ? sheerCurves.keelY : 0f;
         float bowZ = (sheerCurves != null) ? sheerCurves.stemP0.z : 10f;
         float sternZ = (sheerCurves != null) ? sheerCurves.sternP0.z : -10f;
-
-        // Sync keelWidth with BodyCurves if assigned
-        if (bodyCurves != null && Mathf.Abs(bodyCurves.keelWidth - keelWidth) > 0.0001f)
-        {
-            bodyCurves.keelWidth = keelWidth;
-            bodyCurves.UpdateCachedCurves();
-        }
 
         // Starboard Keel Line (+X)
         stbdKeelStart = new Vector3(hw, keelY, bowZ);
@@ -232,18 +259,13 @@ public class KeelBreadthEditor : Editor
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(plan, "Drag Keel Width Handle");
-            float newHw = Mathf.Max(0.05f, newMidStbd.x);
-            plan.keelWidth = newHw * 2f;
-            plan.UpdateCachedCurves();
-            EditorUtility.SetDirty(plan);
+            if (plan.bodyCurves != null) Undo.RecordObject(plan.bodyCurves, "Drag Keel Width Handle");
 
-            if (plan.bodyCurves != null)
-            {
-                Undo.RecordObject(plan.bodyCurves, "Sync Keel Width to BodyCurves");
-                plan.bodyCurves.keelWidth = plan.keelWidth;
-                plan.bodyCurves.UpdateCachedCurves();
-                EditorUtility.SetDirty(plan.bodyCurves);
-            }
+            float newHw = Mathf.Max(0.05f, newMidStbd.x);
+            plan.SyncKeelWidth(newHw * 2f);
+
+            EditorUtility.SetDirty(plan);
+            if (plan.bodyCurves != null) EditorUtility.SetDirty(plan.bodyCurves);
         }
     }
 }

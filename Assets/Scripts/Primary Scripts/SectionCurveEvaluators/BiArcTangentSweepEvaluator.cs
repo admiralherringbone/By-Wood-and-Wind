@@ -6,7 +6,7 @@ public class BiArcTangentSweepEvaluator : ISectionCurveEvaluator
     public string DisplayName => "Bi-Arc Tangent Sweeps (Chapman)";
     public bool UsesControlArms => false;
 
-    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension)
+    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension, float keelEntryInfluence = 0.0f)
     {
         u = Mathf.Clamp01(u);
         float sideSign = Mathf.Sign(nodes.p3.x);

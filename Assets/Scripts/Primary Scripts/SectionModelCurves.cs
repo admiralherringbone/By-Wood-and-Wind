@@ -54,8 +54,18 @@ public class SectionModelCurves : MonoBehaviour
     public BackboneCurves backboneCurves;
 
     [Header("Transverse Cut Settings")]
-    [Tooltip("Number of transverse frame cuts generated at equal intervals down the hull length.")]
-    [Range(3, 50)] public int sectionCount = 15;
+    [Tooltip("Number of forward transverse frame cuts generated between Master Frame (BodyCurves) and Bow Stem.")]
+    [Range(1, 50)] public int forwardSectionCount = 10;
+
+    [Tooltip("Number of aft transverse frame cuts generated between Master Frame (BodyCurves) and Stern Transom.")]
+    [Range(1, 50)] public int aftSectionCount = 10;
+
+    [Tooltip("Include the central Master Frame section cut at Z = 0 (BodyCurves station).")]
+    public bool includeMasterSection = true;
+
+    [HideInInspector] public int sectionCount = 20;
+
+    public int TotalSectionCount => (includeMasterSection ? 1 : 0) + forwardSectionCount + aftSectionCount;
 
     [Tooltip("Include primary boundary nodes (Floor, Bilge, Breadth, TopLine) alongside Ribbands.")]
     public bool includePrimaryBoundaryNodes = true;
@@ -141,19 +151,30 @@ public class SectionModelCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    private bool isUpdatingCurves = false;
+
     public virtual void UpdateCachedCurves()
     {
-        FindReferences();
+        if (isUpdatingCurves) return;
+        isUpdatingCurves = true;
+        try
+        {
+            FindReferences();
 
-        if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
-        if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
-        if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
-        if (bilgeCurves != null) bilgeCurves.UpdateCachedCurves();
-        if (floorCurves != null) floorCurves.UpdateCachedCurves();
-        if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
-        if (ribbandCurves != null) ribbandCurves.UpdateCachedCurves();
+            if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
+            if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
+            if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
+            if (bilgeCurves != null) bilgeCurves.UpdateCachedCurves();
+            if (floorCurves != null) floorCurves.UpdateCachedCurves();
+            if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
+            if (ribbandCurves != null) ribbandCurves.UpdateCachedCurves();
 
-        changeVersion++;
+            changeVersion++;
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
     }
 
     /// <summary>
@@ -303,13 +324,7 @@ public class SectionModelCurves : MonoBehaviour
             }
         }
 
-        // 4. Discard any points falling below the Fashion / Transom boundary curve at station Z
-        if (isTransomRegion && minTransomY > -900f)
-        {
-            nodes.RemoveAll(n => n.name != "Fashion Transom Base" && n.point.y < minTransomY - 0.005f);
-        }
-
-        // 5. Sort nodes strictly by uParam (from Keel/Transom uParam to TopLine u=1)
+        // 4. Sort nodes strictly by uParam (from Keel/Transom uParam to TopLine u=1)
         nodes.Sort((a, b) => a.uParam.CompareTo(b.uParam));
 
         // 5. Remove any duplicate nodes positioned at almost identical locations
@@ -331,6 +346,76 @@ public class SectionModelCurves : MonoBehaviour
         }
 
         return uniqueNodes;
+    }
+
+    public struct StationInfo
+    {
+        public float z;
+        public string label;
+        public bool isMasterFrame;
+        public bool isForward;
+        public bool isAft;
+    }
+
+    /// <summary>
+    /// Computes all Z stations for transverse frame cuts divided into Forward Sections (Master Frame to Bow) 
+    /// and Aft Sections (Master Frame to Stern), ordered stern-to-stem.
+    /// </summary>
+    public List<StationInfo> GetAllSectionStations()
+    {
+        FindReferences();
+        List<StationInfo> stations = new List<StationInfo>();
+
+        float masterZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        float sternZ = (fashionCurves != null) ? fashionCurves.stbdP4.z : ((sheerCurves != null) ? sheerCurves.sternP3.z : -15f);
+
+        // 1. Aft Sections (from Stern Z up to near Master Frame Z)
+        int aftCount = Mathf.Max(1, aftSectionCount);
+        for (int i = aftCount; i >= 1; i--)
+        {
+            float t = (float)i / aftCount;
+            float z = Mathf.Lerp(masterZ, sternZ, t);
+            stations.Add(new StationInfo
+            {
+                z = z,
+                label = $"Aft Sec {i} (Z={z:F2}m)",
+                isMasterFrame = false,
+                isForward = false,
+                isAft = true
+            });
+        }
+
+        // 2. Master Section Cut (at Z = masterZ)
+        if (includeMasterSection)
+        {
+            stations.Add(new StationInfo
+            {
+                z = masterZ,
+                label = $"Master Frame (Z={masterZ:F2}m)",
+                isMasterFrame = true,
+                isForward = false,
+                isAft = false
+            });
+        }
+
+        // 3. Forward Sections (from near Master Frame Z out to Bow Stem Z)
+        int fwdCount = Mathf.Max(1, forwardSectionCount);
+        for (int i = 1; i <= fwdCount; i++)
+        {
+            float t = (float)i / fwdCount;
+            float z = Mathf.Lerp(masterZ, bowZ, t);
+            stations.Add(new StationInfo
+            {
+                z = z,
+                label = $"Fwd Sec {i} (Z={z:F2}m)",
+                isMasterFrame = false,
+                isForward = true,
+                isAft = false
+            });
+        }
+
+        return stations;
     }
 
     // --- GIZMO RENDERING ---
@@ -357,37 +442,96 @@ public class SectionModelCurves : MonoBehaviour
 
         UpdateCachedCurves();
 
-        float sternZ = (fashionCurves != null) ? fashionCurves.stbdP4.z : ((sheerCurves != null) ? sheerCurves.sternP3.z : -15f);
-        float stemZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        List<StationInfo> stations = GetAllSectionStations();
 
-        int count = Mathf.Max(2, sectionCount);
-
-        for (int s = 0; s < count; s++)
+        for (int s = 0; s < stations.Count; s++)
         {
-            float t = (float)s / (count - 1);
-            float z = Mathf.Lerp(stemZ, sternZ, t);
+            StationInfo info = stations[s];
+            float z = info.z;
 
             // Sample Starboard and Port transverse section nodes
             List<SectionPointNode> stbdNodes = GetTransverseSectionNodesAtZ(z, 1f);
             List<SectionPointNode> portNodes = GetTransverseSectionNodesAtZ(z, -1f);
 
+            Color stbdCol = info.isMasterFrame ? Color.yellow : starboardColor;
+            Color portCol = info.isMasterFrame ? Color.yellow : portColor;
+
+            // Compute full outer section polylines BEFORE discarding points
+            List<Vector3> stbdOuterPts = GetOuterSectionPolylinePoints(stbdNodes);
+            List<Vector3> portOuterPts = GetOuterSectionPolylinePoints(portNodes);
+
+            float bottomSpacing = (bodyCurves != null) ? bodyCurves.innerLineSpacing : 0.2f;
+            float topSpacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.1f;
+
+            bool shouldComputeInner = showTransverseSections && (bodyCurves != null && bodyCurves.showInnerLine && bodyCurves.innerLineSpacing > 0.0001f);
+
+            // Compute full inner section polylines BEFORE discarding points
+            List<Vector3> stbdInnerPts = (shouldComputeInner && stbdNodes.Count >= 2) ? GetInnerSectionPolylinePoints(stbdOuterPts, stbdNodes[0].point.y, stbdNodes[stbdNodes.Count - 1].point.y, bottomSpacing, topSpacing, 1f) : null;
+            List<Vector3> portInnerPts = (shouldComputeInner && portNodes.Count >= 2) ? GetInnerSectionPolylinePoints(portOuterPts, portNodes[0].point.y, portNodes[portNodes.Count - 1].point.y, bottomSpacing, topSpacing, -1f) : null;
+
+            // DISCARD POINTS BELOW FASHION / TRANSOM BOUNDARY (after both outer and inner lines are determined)
+            bool isTransomRegion = (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f);
+            if (isTransomRegion)
+            {
+                float stbdMinY = fashionCurves.GetFashionPointAtZ(z, 1f).y;
+                float portMinY = fashionCurves.GetFashionPointAtZ(z, -1f).y;
+
+                FilterPointsBelowY(stbdOuterPts, stbdMinY);
+                FilterPointsBelowY(portOuterPts, portMinY);
+
+                if (stbdInnerPts != null) FilterPointsBelowY(stbdInnerPts, stbdMinY);
+                if (portInnerPts != null) FilterPointsBelowY(portInnerPts, portMinY);
+            }
+
             // Draw Transverse Section Curves (X/Y cuts)
             if (showTransverseSections)
             {
-                DrawSectionPolyline(stbdNodes, starboardColor);
-                DrawSectionPolyline(portNodes, portColor);
+                DrawPolyline(stbdOuterPts, stbdCol);
+                DrawPolyline(portOuterPts, portCol);
+
+                // Outer-to-Outer Bottom Connection across Keel width / Cut boundary
+                if (stbdOuterPts.Count > 0 && portOuterPts.Count > 0)
+                {
+                    Gizmos.color = stbdCol;
+                    Gizmos.DrawLine(portOuterPts[0], stbdOuterPts[0]);
+                }
+
+                if (bodyCurves != null && bodyCurves.showInnerLine && bodyCurves.innerLineSpacing > 0.0001f && stbdInnerPts != null && portInnerPts != null)
+                {
+                    DrawPolyline(stbdInnerPts, bodyCurves.innerLineColor);
+                    DrawPolyline(portInnerPts, bodyCurves.innerLineColor);
+
+                    // Inner-to-Inner Bottom Connection across Keel width / Cut boundary
+                    if (stbdInnerPts.Count > 0 && portInnerPts.Count > 0)
+                    {
+                        Gizmos.color = bodyCurves.innerLineColor;
+                        Gizmos.DrawLine(portInnerPts[0], stbdInnerPts[0]);
+                    }
+
+                    // Outer-to-Inner Top Cap Lines
+                    if (stbdOuterPts.Count > 0 && stbdInnerPts.Count > 0)
+                    {
+                        Gizmos.color = bodyCurves.innerLineColor;
+                        Gizmos.DrawLine(stbdOuterPts[stbdOuterPts.Count - 1], stbdInnerPts[stbdInnerPts.Count - 1]);
+                    }
+                    if (portOuterPts.Count > 0 && portInnerPts.Count > 0)
+                    {
+                        Gizmos.color = bodyCurves.innerLineColor;
+                        Gizmos.DrawLine(portOuterPts[portOuterPts.Count - 1], portInnerPts[portInnerPts.Count - 1]);
+                    }
+                }
             }
 
             // Draw Node Spheres at Ribband Intersections
             if (showSectionNodes)
             {
-                Gizmos.color = starboardColor;
+                Gizmos.color = stbdCol;
                 for (int n = 0; n < stbdNodes.Count; n++)
                 {
                     Gizmos.DrawSphere(stbdNodes[n].point, nodeRadius);
                 }
 
-                Gizmos.color = portColor;
+                Gizmos.color = portCol;
                 for (int n = 0; n < portNodes.Count; n++)
                 {
                     Gizmos.DrawSphere(portNodes[n].point, nodeRadius);
@@ -407,19 +551,17 @@ public class SectionModelCurves : MonoBehaviour
             {
                 GUIStyle labelStyle = GetCachedLabelStyle();
                 Vector3 topPt = stbdNodes[stbdNodes.Count - 1].point;
-                Handles.Label(topPt + Vector3.up * 0.2f, $"Section {s + 1} (Z={z:F2}m)", labelStyle);
+                Handles.Label(topPt + Vector3.up * 0.2f, info.label, labelStyle);
             }
 #endif
         }
     }
 
-    private void DrawSectionPolyline(List<SectionPointNode> nodes, Color color, int stepsPerSegment = 8)
+    private List<Vector3> GetOuterSectionPolylinePoints(List<SectionPointNode> nodes, int stepsPerSegment = 8)
     {
-        if (nodes == null || nodes.Count < 2) return;
+        List<Vector3> outerPoints = new List<Vector3>();
+        if (nodes == null || nodes.Count < 2) return outerPoints;
 
-        Gizmos.color = color;
-
-        // Smooth Catmull-Rom or linear interpolation across ordered transverse section nodes
         for (int i = 0; i < nodes.Count - 1; i++)
         {
             Vector3 p0 = (i == 0) ? nodes[i].point : nodes[i - 1].point;
@@ -427,14 +569,80 @@ public class SectionModelCurves : MonoBehaviour
             Vector3 p2 = nodes[i + 1].point;
             Vector3 p3 = (i + 2 < nodes.Count) ? nodes[i + 2].point : nodes[i + 1].point;
 
-            Vector3 prev = p1;
-            for (int s = 1; s <= stepsPerSegment; s++)
+            int startS = (i == 0) ? 0 : 1;
+            for (int s = startS; s <= stepsPerSegment; s++)
             {
                 float t = (float)s / stepsPerSegment;
-                Vector3 curr = GetCatmullRomPoint(t, p0, p1, p2, p3);
-                Gizmos.DrawLine(prev, curr);
-                prev = curr;
+                outerPoints.Add(GetCatmullRomPoint(t, p0, p1, p2, p3));
             }
+        }
+        return outerPoints;
+    }
+
+    private List<Vector3> GetInnerSectionPolylinePoints(List<Vector3> outerPoints, float keelY, float topY, float bottomSpacing, float topSpacing, float sideSign)
+    {
+        if (outerPoints == null || outerPoints.Count < 2 || bottomSpacing <= 0.0001f) return null;
+        topSpacing = Mathf.Clamp(topSpacing, 0f, bottomSpacing);
+
+        float totalYSpan = topY - keelY;
+        if (totalYSpan <= 0.0001f) totalYSpan = 1.0f;
+
+        List<Vector3> innerPoints = new List<Vector3>(outerPoints.Count);
+
+        for (int i = 0; i < outerPoints.Count; i++)
+        {
+            Vector3 curr = outerPoints[i];
+
+            // Evaluate uTrue based on height relative to full hull span [keelY, topY]
+            float uTrue = Mathf.Clamp01((curr.y - keelY) / totalYSpan);
+            float currentSpacing = Mathf.Lerp(bottomSpacing, topSpacing, uTrue);
+
+            Vector3 prev = (i == 0) ? outerPoints[0] : outerPoints[i - 1];
+            Vector3 next = (i == outerPoints.Count - 1) ? outerPoints[outerPoints.Count - 1] : outerPoints[i + 1];
+
+            Vector3 tangent = (next - prev);
+            if (tangent.sqrMagnitude < 0.000001f)
+            {
+                tangent = (i > 0) ? (curr - outerPoints[i - 1]) : (outerPoints[1] - curr);
+            }
+            Vector2 t2D = new Vector2(tangent.x, tangent.y).normalized;
+
+            Vector2 normal2D = (sideSign >= 0f) ? new Vector2(-t2D.y, t2D.x) : new Vector2(t2D.y, -t2D.x);
+
+            Vector3 offsetPt = curr + new Vector3(normal2D.x, normal2D.y, 0f) * currentSpacing;
+            offsetPt.y = Mathf.Min(offsetPt.y, topY);
+            innerPoints.Add(offsetPt);
+        }
+
+        if (innerPoints.Count > 0)
+        {
+            Vector3 topPt = innerPoints[innerPoints.Count - 1];
+            topPt.y = topY;
+            innerPoints[innerPoints.Count - 1] = topPt;
+        }
+
+        return innerPoints;
+    }
+
+    private void FilterPointsBelowY(List<Vector3> pts, float minY)
+    {
+        if (pts == null || pts.Count == 0) return;
+        pts.RemoveAll(p => p.y < minY - 0.005f);
+        if (pts.Count > 0 && pts[0].y < minY)
+        {
+            Vector3 p = pts[0];
+            p.y = minY;
+            pts[0] = p;
+        }
+    }
+
+    private void DrawPolyline(List<Vector3> pts, Color color)
+    {
+        if (pts == null || pts.Count < 2) return;
+        Gizmos.color = color;
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            Gizmos.DrawLine(pts[i], pts[i + 1]);
         }
     }
 
@@ -487,7 +695,10 @@ public class SectionModelCurvesEditor : Editor
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Transverse Section Model Summary", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Active Stations Count:", $"{model.sectionCount}");
+        EditorGUILayout.LabelField("Forward Frame Cuts:", $"{model.forwardSectionCount}");
+        EditorGUILayout.LabelField("Aft Frame Cuts:", $"{model.aftSectionCount}");
+        EditorGUILayout.LabelField("Master Frame Rendered:", model.includeMasterSection ? "Yes (Z=0.0m)" : "No");
+        EditorGUILayout.LabelField("Total Frame Cuts Rendered:", $"{model.TotalSectionCount}");
 
         if (model.ribbandCurves != null)
         {

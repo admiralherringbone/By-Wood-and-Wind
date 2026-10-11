@@ -109,9 +109,40 @@ public class BackboneCurves : MonoBehaviour
         isInitialized = true;
     }
 
+    private static bool isSyncingKeelWidth = false;
+
+    public void SyncKeelWidth(float newWidth)
+    {
+        if (isSyncingKeelWidth) return;
+        isSyncingKeelWidth = true;
+        try
+        {
+            float clampedWidth = Mathf.Max(0.01f, newWidth);
+            keelWidth = clampedWidth;
+
+            FindReferences();
+            if (bodyCurves != null && Mathf.Abs(bodyCurves.keelWidth - clampedWidth) > 0.0001f)
+            {
+                bodyCurves.keelWidth = clampedWidth;
+                bodyCurves.UpdateCachedCurves();
+            }
+            if (keelBreadth != null && Mathf.Abs(keelBreadth.keelWidth - clampedWidth) > 0.0001f)
+            {
+                keelBreadth.keelWidth = clampedWidth;
+                keelBreadth.UpdateCachedCurves();
+            }
+
+            UpdateCachedCurves();
+        }
+        finally
+        {
+            isSyncingKeelWidth = false;
+        }
+    }
+
     private void OnValidate()
     {
-        UpdateCachedCurves();
+        SyncKeelWidth(keelWidth);
     }
 
     public virtual void UpdateCachedCurves()
@@ -121,18 +152,6 @@ public class BackboneCurves : MonoBehaviour
         if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
 
         float hw = keelWidth / 2f;
-
-        // Sync keelWidth across KeelBreadth and BodyCurves
-        if (keelBreadth != null && Mathf.Abs(keelBreadth.keelWidth - keelWidth) > 0.0001f)
-        {
-            keelBreadth.keelWidth = keelWidth;
-            keelBreadth.UpdateCachedCurves();
-        }
-        if (bodyCurves != null && Mathf.Abs(bodyCurves.keelWidth - keelWidth) > 0.0001f)
-        {
-            bodyCurves.keelWidth = keelWidth;
-            bodyCurves.UpdateCachedCurves();
-        }
 
         Vector3 sP0 = (sheerCurves != null) ? sheerCurves.stemP0 : new Vector3(0, 0, 10);
         Vector3 sP1 = (sheerCurves != null) ? sheerCurves.stemP1 : new Vector3(0, 2, 11);
@@ -362,26 +381,15 @@ public class BackboneCurvesEditor : Editor
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(plan, "Drag Backbone Width Handle");
+            if (plan.keelBreadth != null) Undo.RecordObject(plan.keelBreadth, "Drag Backbone Width Handle");
+            if (plan.bodyCurves != null) Undo.RecordObject(plan.bodyCurves, "Drag Backbone Width Handle");
+
             float newHw = Mathf.Max(0.05f, newMidStbd.x);
-            plan.keelWidth = newHw * 2f;
-            plan.UpdateCachedCurves();
+            plan.SyncKeelWidth(newHw * 2f);
+
             EditorUtility.SetDirty(plan);
-
-            if (plan.keelBreadth != null)
-            {
-                Undo.RecordObject(plan.keelBreadth, "Sync Width to KeelBreadth");
-                plan.keelBreadth.keelWidth = plan.keelWidth;
-                plan.keelBreadth.UpdateCachedCurves();
-                EditorUtility.SetDirty(plan.keelBreadth);
-            }
-
-            if (plan.bodyCurves != null)
-            {
-                Undo.RecordObject(plan.bodyCurves, "Sync Width to BodyCurves");
-                plan.bodyCurves.keelWidth = plan.keelWidth;
-                plan.bodyCurves.UpdateCachedCurves();
-                EditorUtility.SetDirty(plan.bodyCurves);
-            }
+            if (plan.keelBreadth != null) EditorUtility.SetDirty(plan.keelBreadth);
+            if (plan.bodyCurves != null) EditorUtility.SetDirty(plan.bodyCurves);
         }
     }
 }

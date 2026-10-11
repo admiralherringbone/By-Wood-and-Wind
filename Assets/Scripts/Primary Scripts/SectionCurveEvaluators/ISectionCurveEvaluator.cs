@@ -23,6 +23,6 @@ public interface ISectionCurveEvaluator
     SectionCurveMode Mode { get; }
     string DisplayName { get; }
     bool UsesControlArms { get; }
-    Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension);
+    Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension, float keelEntryInfluence = 0.0f);
     Vector3 GetNodeTangent(int nodeIndex, SectionNodes nodes);
 }

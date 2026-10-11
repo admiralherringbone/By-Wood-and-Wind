@@ -6,7 +6,7 @@ public class QuarticBezierEvaluator : ISectionCurveEvaluator
     public string DisplayName => "Quartic Bezier (Single Continuous Arc)";
     public bool UsesControlArms => false;
 
-    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension)
+    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension, float keelEntryInfluence = 0.0f)
     {
         u = Mathf.Clamp01(u);
         Vector3 P0 = nodes.p0;
@@ -20,8 +20,7 @@ public class QuarticBezierEvaluator : ISectionCurveEvaluator
             float t = u * 4f;
             Vector3 linearPt = Vector3.Lerp(P0, P1, t);
             Vector3 bezierPt = EvaluateQuarticBezier(P0, P1, P2, P3, P4, u);
-            float weight = Mathf.Lerp(floorHollow, 1.0f, t);
-            return Vector3.Lerp(linearPt, bezierPt, weight);
+            return Vector3.Lerp(linearPt, bezierPt, floorHollow);
         }
         else
         {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -23,6 +24,7 @@ public class SheerCurves : MonoBehaviour
     [Header("Gizmo Settings")]
     public bool showLabels = true;
     public Color profileColor = new Color(0.95f, 0.75f, 0.1f, 0.95f);
+
 
     [Header("Main Dimensions")]
     [Tooltip("Length between Perpendiculars (hull base length).")]
@@ -125,9 +127,15 @@ public class SheerCurves : MonoBehaviour
         UpdateCachedProfile();
     }
 
+    private bool isUpdatingProfile = false;
+
     public void UpdateCachedProfile()
     {
-        if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
+        if (isUpdatingProfile) return;
+        isUpdatingProfile = true;
+        try
+        {
+            if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
         if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
 
         // Enforce Y-Axis Height Restriction: Stem Top (stemP3) and Stern Post Top (sternP3) Y cannot be lower than Midship Apex Y (BreadthCurves.fwdP3.y)
@@ -233,8 +241,81 @@ public class SheerCurves : MonoBehaviour
         float upperStemY = Mathf.Lerp(stemP3.y, maxUpperY, Mathf.Clamp01(upperStemRatio));
         upperStemTop = new Vector3(0f, upperStemY, stemP3.z);
 
+
+        RebuildCachedProfileBuffers(30);
+
         changeVersion++;
+        }
+        finally
+        {
+            isUpdatingProfile = false;
+        }
     }
+
+    private readonly List<Vector3> cachedOuterProfile = new List<Vector3>();
+
+    private void RebuildCachedProfileBuffers(int stepsPerSegment)
+    {
+        cachedOuterProfile.Clear();
+
+        void AddPoint(Vector3 pt)
+        {
+            pt.x = 0f;
+            if (cachedOuterProfile.Count == 0 || Vector3.Distance(cachedOuterProfile[cachedOuterProfile.Count - 1], pt) > 0.0001f)
+            {
+                cachedOuterProfile.Add(pt);
+            }
+        }
+
+        // 1. Upper Stem Post Top (if extension exists)
+        if (upperStemTop.y > stemP3.y + 0.001f)
+        {
+            AddPoint(upperStemTop);
+        }
+
+        // 2. Stem Post (from Stem Post Top stemP3 down to Stem Post Bottom stemP0)
+        for (int i = 0; i <= stepsPerSegment; i++)
+        {
+            float t = 1.0f - ((float)i / stepsPerSegment);
+            AddPoint(CalculateCubicBezierPoint(t, stemP0, stemP1, stemP2, stemP3));
+        }
+
+        // 3. Keel Line (from stemP0 to sternP0)
+        AddPoint(sternP0);
+
+        // 4. Stern Post Line (from sternP0 to sternP3)
+        AddPoint(sternP3);
+
+        // 5. Counter Rake Curve (if enabled, from counterP0=sternP3 to counterP3)
+        if (enableCounter)
+        {
+            for (int i = 1; i <= stepsPerSegment; i++)
+            {
+                float t = (float)i / stepsPerSegment;
+                AddPoint(CalculateCubicBezierPoint(t, counterP0, counterP1, counterP2, counterP3));
+            }
+        }
+
+        // 6. Transom Rake Line (from transomP0 to transomP1)
+        AddPoint(transomP1);
+    }
+
+    /// <summary>
+    /// Evaluates the ordered sequence of 3D outer profile points along the centerline (X=0)
+    /// from Upper Stem Post top, down Stem Post, along Keel, up Stern Post, up Counter (if equipped), to Transom Rake top.
+    /// Highly optimized using precomputed profile buffers.
+    /// </summary>
+    public List<Vector3> GetOuterProfilePoints(int stepsPerSegment = 30)
+    {
+        if (stepsPerSegment == 30 && cachedOuterProfile.Count > 0)
+        {
+            return cachedOuterProfile;
+        }
+
+        UpdateCachedProfile();
+        return cachedOuterProfile;
+    }
+
 
     // --- STERN PROFILE INTERSECT EVALUATION (Z at Y) ---
 
@@ -244,7 +325,7 @@ public class SheerCurves : MonoBehaviour
     /// </summary>
     public float GetSternProfileZAtY(float targetY)
     {
-        UpdateCachedProfile();
+        if (cachedOuterProfile.Count == 0) UpdateCachedProfile();
 
         // 1. Transom Rake Section
         if (targetY >= transomP0.y)
@@ -276,7 +357,7 @@ public class SheerCurves : MonoBehaviour
     /// </summary>
     public float GetStemProfileZAtY(float targetY)
     {
-        UpdateCachedProfile();
+        if (cachedOuterProfile.Count == 0) UpdateCachedProfile();
 
         if (targetY >= stemP3.y)
         {
@@ -297,7 +378,7 @@ public class SheerCurves : MonoBehaviour
     /// </summary>
     public float GetStemProfileYAtZ(float targetZ)
     {
-        UpdateCachedProfile();
+        if (cachedOuterProfile.Count == 0) UpdateCachedProfile();
 
         if (targetZ >= stemP3.z) return stemP3.y;
         if (targetZ <= stemP0.z) return stemP0.y;
@@ -311,7 +392,7 @@ public class SheerCurves : MonoBehaviour
     /// </summary>
     public float GetSternProfileYAtZ(float targetZ)
     {
-        UpdateCachedProfile();
+        if (cachedOuterProfile.Count == 0) UpdateCachedProfile();
 
         if (targetZ <= sternP3.z) return sternP3.y;
         if (targetZ >= sternP0.z) return sternP0.y;
@@ -449,6 +530,7 @@ public class SheerCurves : MonoBehaviour
         // 5. Draw Transom Rake (Magenta)
         Gizmos.color = Color.magenta;
         Gizmos.DrawLine(transomP0, transomP1);
+
 
 #if UNITY_EDITOR
         // Draw 3D Control Polygon Skeleton Arms (Yellow / Green Dotted)

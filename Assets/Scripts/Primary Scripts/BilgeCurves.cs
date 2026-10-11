@@ -44,6 +44,12 @@ public class BilgeCurves : MonoBehaviour
     public bool showLabels = true;
     public Color bilgeCurveColor = new Color(0.1f, 0.9f, 0.4f, 0.95f);
 
+    [Header("Inner Line Settings")]
+    public bool showInnerLine = true;
+    [Tooltip("Spacing distance between the outer bilge curve and the parallel inner bilge curve.")]
+    [Range(0f, 2f)] public float innerLineSpacing = 0.2f;
+    public Color innerLineColor = new Color(0.2f, 0.95f, 0.6f, 0.95f);
+
     [Header("Forward Control Arm Guides (Dashed Lines)")]
     [Tooltip("Show the dashed 3D Bow Mould P1 section guide line (TopLine down to Floor).")]
     public bool showBowMouldP1Guide = true;
@@ -121,6 +127,11 @@ public class BilgeCurves : MonoBehaviour
     [HideInInspector] public Vector3 cachedAftP0;
     [HideInInspector] public Vector3 cachedAftP1;
     [HideInInspector] public Vector3 cachedAftP2;
+
+    [HideInInspector] public Vector3 cachedInnerMidshipPt;
+    [HideInInspector] public Vector3 cachedOffsetVector;
+    private Vector3[] cachedStbdInnerPts;
+    private Vector3[] cachedPortInnerPts;
 
     [HideInInspector] public int changeVersion = 0;
 
@@ -213,10 +224,16 @@ public class BilgeCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    private bool isUpdatingCurves = false;
+
     public virtual void UpdateCachedCurves()
     {
-        EnsureInitialized();
-        FindReferences();
+        if (isUpdatingCurves) return;
+        isUpdatingCurves = true;
+        try
+        {
+            EnsureInitialized();
+            FindReferences();
 
         if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
         if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
@@ -355,7 +372,139 @@ public class BilgeCurves : MonoBehaviour
         cachedAftP1 = aftP1;
         cachedAftP2 = aftP2;
 
+        if (bodyCurves != null)
+        {
+            innerLineSpacing = bodyCurves.GetInnerLineSpacingAtY(fwdP3.y);
+        }
+
+        UpdateInnerParallelCurve();
+
         changeVersion++;
+        }
+        finally
+        {
+            isUpdatingCurves = false;
+        }
+    }
+
+    private void UpdateInnerParallelCurve()
+    {
+        if (!showInnerLine)
+        {
+            return;
+        }
+
+        Vector3 pOuter = cachedFwdP3;
+        Vector3 pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            pInner = bodyCurves.GetInnerNodePosition(2, cachedFwdP3.z, 1f);
+        }
+
+        cachedInnerMidshipPt = pInner;
+
+        // Inward transverse offset vector at midship (angle and distance)
+        float deltaX = pInner.x - pOuter.x; // Negative on starboard (inward toward centerline)
+        float deltaY = pInner.y - pOuter.y; // Vertical offset
+        cachedOffsetVector = new Vector3(deltaX, deltaY, 0f);
+
+        const int segmentsFwd = 40;
+        const int segmentsAft = 30;
+        int totalPts = segmentsFwd + segmentsAft + 1;
+
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+        {
+            cachedStbdInnerPts = new Vector3[totalPts];
+            cachedPortInnerPts = new Vector3[totalPts];
+        }
+
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        // Forward Span (Cubic Bezier: Bow P0 -> Midship P3)
+        for (int i = 0; i <= segmentsFwd; i++)
+        {
+            if (i == segmentsFwd)
+            {
+                // Exact midship apex point guaranteed to pass directly through BodyCurves inner Bilge point
+                cachedStbdInnerPts[i] = pInner;
+                cachedPortInnerPts[i] = MirrorX(pInner);
+                continue;
+            }
+
+            float t = (float)i / segmentsFwd;
+            Vector3 pt = CalculateCubicBezierPoint(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+            Vector3 deriv = CalculateCubicBezierDerivative(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+
+            // Horizontal tangent is (deriv.x, deriv.z). Curve moves bow (+Z) -> midship (0), so deriv.z <= 0.
+            // Inward normal towards centerline on starboard (+X) has negative X: (deriv.z, -deriv.x).
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
+
+            cachedStbdInnerPts[i] = innerPt;
+            cachedPortInnerPts[i] = MirrorX(innerPt);
+        }
+
+        // Aft Span (Quadratic Bezier: Midship P0 -> Stern P2)
+        // Harmonized Stern Inset & Height:
+        // Solves for parameter tEnd where the continuous parallel inner curve intersects
+        // the inner transom plane (Z = sternZ + absDeltaX), ensuring the inner transom line
+        // has the exact uniform spacing absDeltaX without any vertical pitch kink.
+        float targetZ = cachedAftP2.z + absDeltaX;
+        float tEnd = 1.0f;
+
+        Vector3 derivEndCheck = CalculateQuadraticBezierDerivative(1f, cachedAftP0, cachedAftP1, cachedAftP2);
+        float lenEndCheck = Mathf.Sqrt(derivEndCheck.z * derivEndCheck.z + derivEndCheck.x * derivEndCheck.x);
+        float nZEndCheck = (lenEndCheck > 0.0001f) ? (-derivEndCheck.x / lenEndCheck) : 0f;
+        float zInnerAt1 = cachedAftP2.z + absDeltaX * nZEndCheck;
+
+        if (zInnerAt1 < targetZ && (cachedAftP0.z - targetZ) > 0.001f)
+        {
+            float tLow = 0f;
+            float tHigh = 1f;
+            for (int iter = 0; iter < 16; iter++)
+            {
+                float tMid = (tLow + tHigh) * 0.5f;
+                Vector3 ptMid = CalculateQuadraticBezierPoint(tMid, cachedAftP0, cachedAftP1, cachedAftP2);
+                Vector3 derivMid = CalculateQuadraticBezierDerivative(tMid, cachedAftP0, cachedAftP1, cachedAftP2);
+                float lenMid = Mathf.Sqrt(derivMid.z * derivMid.z + derivMid.x * derivMid.x);
+                float nZMid = (lenMid > 0.0001f) ? (-derivMid.x / lenMid) : 0f;
+                float zInnerMid = ptMid.z + absDeltaX * nZMid;
+                if (zInnerMid > targetZ)
+                {
+                    tLow = tMid;
+                }
+                else
+                {
+                    tHigh = tMid;
+                }
+            }
+            tEnd = (tLow + tHigh) * 0.5f;
+        }
+
+        for (int j = 1; j <= segmentsAft; j++)
+        {
+            float t = ((float)j / segmentsAft) * tEnd;
+            Vector3 pt = CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+            Vector3 deriv = CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
+
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            if (j == segmentsAft)
+            {
+                innerPt.z = targetZ;
+            }
+            if (innerPt.x < 0f) innerPt.x = 0f;
+
+            int idx = segmentsFwd + j;
+            cachedStbdInnerPts[idx] = innerPt;
+            cachedPortInnerPts[idx] = MirrorX(innerPt);
+        }
     }
 
     /// <summary>
@@ -789,6 +938,98 @@ public class BilgeCurves : MonoBehaviour
         }
     }
 
+    public virtual Vector3[] GetInnerBilgePoints(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length == 0)
+        {
+            UpdateInnerParallelCurve();
+        }
+        return starboard ? cachedStbdInnerPts : cachedPortInnerPts;
+    }
+
+    public virtual Vector3 GetInnerBilgePointAtZ(float z)
+    {
+        EnsureInitialized();
+
+        Vector3 outerPt = GetBilgePointAtZ(z);
+        Vector3 pOuter = cachedFwdP3;
+        Vector3 pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            pInner = bodyCurves.GetInnerNodePosition(2, cachedFwdP3.z, 1f);
+        }
+
+        float deltaX = pInner.x - pOuter.x;
+        float deltaY = pInner.y - pOuter.y;
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        if (Mathf.Abs(z - cachedFwdP3.z) < 0.001f)
+        {
+            return pInner;
+        }
+
+        if (z <= cachedAftP2.z)
+        {
+            if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+            {
+                return cachedStbdInnerPts[cachedStbdInnerPts.Length - 1];
+            }
+        }
+
+        Vector3 deriv;
+        if (z >= cachedFwdP3.z)
+        {
+            float t = GetBezierTAtZ(cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3, z, true);
+            deriv = CalculateCubicBezierDerivative(t, cachedFwdP0, cachedFwdP1, cachedFwdP2, cachedFwdP3);
+        }
+        else
+        {
+            float t = GetBezierTAtZQuadratic(cachedAftP0, cachedAftP1, cachedAftP2, z, false);
+            deriv = CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
+        }
+
+        float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+        Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+        Vector3 innerPt = outerPt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+        if (innerPt.x < 0f) innerPt.x = 0f;
+        return innerPt;
+    }
+
+    public virtual float GetInnerBilgeXAtZ(float z)
+    {
+        return GetInnerBilgePointAtZ(z).x;
+    }
+
+    public virtual float GetInnerBilgeYAtZ(float z)
+    {
+        return GetInnerBilgePointAtZ(z).y;
+    }
+
+    public virtual Vector3 GetInnerBilgeSternTip(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = cachedStbdInnerPts[cachedStbdInnerPts.Length - 1];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (cachedAftP2 + cachedOffsetVector) : MirrorX(cachedAftP2 + cachedOffsetVector);
+    }
+
+    public virtual Vector3 GetInnerBilgeBowTip(bool starboard = true)
+    {
+        EnsureInitialized();
+        if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = cachedStbdInnerPts[0];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (cachedFwdP0 + cachedOffsetVector) : MirrorX(cachedFwdP0 + cachedOffsetVector);
+    }
+
     // --- BEZIER MATH UTILITIES ---
 
     public Vector3 CalculateQuadraticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2)
@@ -797,6 +1038,18 @@ public class BilgeCurves : MonoBehaviour
         float tt = t * t;
         float uu = u * u;
         return (uu * p0) + (2f * u * t * p1) + (tt * p2);
+    }
+
+    public Vector3 CalculateQuadraticBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2)
+    {
+        float u = 1f - t;
+        return 2f * u * (p1 - p0) + 2f * t * (p2 - p1);
+    }
+
+    public Vector3 CalculateCubicBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1f - t;
+        return 3f * u * u * (p1 - p0) + 6f * u * t * (p2 - p1) + 3f * t * t * (p3 - p2);
     }
 
     public Vector3 CalculateCubicBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
@@ -911,6 +1164,32 @@ public class BilgeCurves : MonoBehaviour
         Gizmos.color = bilgeCurveColor;
         Gizmos.DrawLine(cachedAftP2, MirrorX(cachedAftP2));
 
+        // Draw Inner Bilge Lines (Parallel Inset from BodyCurves Bilge Point)
+        if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 1)
+        {
+            Gizmos.color = innerLineColor;
+            for (int i = 0; i < cachedStbdInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedStbdInnerPts[i], cachedStbdInnerPts[i + 1]);
+            }
+
+            Color portInnerColor = new Color(innerLineColor.r, innerLineColor.g * 0.6f, innerLineColor.b, innerLineColor.a);
+            Gizmos.color = portInnerColor;
+            for (int i = 0; i < cachedPortInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedPortInnerPts[i], cachedPortInnerPts[i + 1]);
+            }
+
+            // Draw Inner Transom Connection Line
+            int last = cachedStbdInnerPts.Length - 1;
+            Gizmos.color = innerLineColor;
+            Gizmos.DrawLine(cachedStbdInnerPts[last], cachedPortInnerPts[last]);
+
+            // Inner Midship Point Sphere
+            Gizmos.color = innerLineColor;
+            Gizmos.DrawSphere(cachedInnerMidshipPt, 0.10f);
+        }
+
         // Draw 3D Control Polygon Skeleton Arms
         Gizmos.color = new Color(0.1f, 0.9f, 0.4f, 0.6f);
         Gizmos.DrawLine(cachedFwdP0, cachedFwdP1);
@@ -934,6 +1213,11 @@ public class BilgeCurves : MonoBehaviour
             Handles.Label(cachedFwdP0 + Vector3.up * 0.2f, "Bilge Bow Tip (Stem)", labelStyle);
             Handles.Label(cachedFwdP3 + Vector3.up * 0.2f, $"Bilge Midship Apex ({cachedFwdP3.x:F2}m)", labelStyle);
             Handles.Label(cachedAftP2 + Vector3.up * 0.2f, "Bilge Transom Corner", labelStyle);
+
+            if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 40)
+            {
+                Handles.Label(cachedInnerMidshipPt + Vector3.up * 0.2f, "Bilge Inner Midship", labelStyle);
+            }
 
             // Render Inner Boundary Chord Line (Cyan Dotted)
             Handles.color = new Color(0.2f, 0.9f, 1f, 0.6f);

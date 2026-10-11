@@ -24,6 +24,9 @@ public class FashionCurves : MonoBehaviour
     [Tooltip("Reference to BreadthCurves for Fashion Breadth (P3) mid-section point.")]
     public BreadthCurves breadthCurves;
 
+    [Tooltip("Reference to BilgeCurves for Bilge transom corner point.")]
+    public BilgeCurves bilgeCurves;
+
     [Tooltip("Reference to FloorCurves for Floor Stern Tip (P1) bottom point.")]
     public FloorCurves floorCurves;
 
@@ -39,6 +42,11 @@ public class FashionCurves : MonoBehaviour
 
     [Tooltip("Relative width ratio of the Transom Bilge Point (P2) between Floor Stern Tip (0.0) and Fashion Breadth (1.0). Synced to BodyCurves.")]
     [Range(0.05f, 0.95f)] public float bilgeWidthRatio = 0.50f;
+
+    [Header("Inner Line Settings")]
+    [Tooltip("Enable rendering and evaluation of the Inner Fashion Timber curve passing through the transom corners.")]
+    public bool showInnerLine = true;
+    public Color innerLineColor = new Color(0.2f, 0.95f, 0.6f, 0.95f); // Vibrant Seafoam Green
 
     [Header("Gizmo Visualization Settings")]
     public bool showLabels = true;
@@ -60,6 +68,22 @@ public class FashionCurves : MonoBehaviour
     [HideInInspector] public Vector3 portP2;
     [HideInInspector] public Vector3 portP3;
     [HideInInspector] public Vector3 portP4;
+
+    // --- CACHED STARBOARD 3D INNER CONTROL NODES (P1..P4) ---
+    [HideInInspector] public Vector3 innerStbdP1; // Floor Inner Transom Corner / Stern Tip
+    [HideInInspector] public Vector3 innerStbdP2; // Bilge Inner Transom Corner
+    [HideInInspector] public Vector3 innerStbdP3; // Breadth Inner Transom Corner
+    [HideInInspector] public Vector3 innerStbdP4; // TopLine Inner Transom Corner
+
+    // --- CACHED PORT 3D INNER CONTROL NODES (P1..P4) ---
+    [HideInInspector] public Vector3 innerPortP1;
+    [HideInInspector] public Vector3 innerPortP2;
+    [HideInInspector] public Vector3 innerPortP3;
+    [HideInInspector] public Vector3 innerPortP4;
+
+    private Vector3[] cachedStbdInnerPts;
+    private Vector3[] cachedPortInnerPts;
+    private bool isUpdatingCurves = false;
 
     [HideInInspector] public int changeVersion = 0;
 
@@ -92,6 +116,9 @@ public class FashionCurves : MonoBehaviour
         if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
         if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
 
+        if (bilgeCurves == null) bilgeCurves = GetComponentInParent<BilgeCurves>();
+        if (bilgeCurves == null) bilgeCurves = FindFirstObjectByType<BilgeCurves>();
+
         if (floorCurves == null) floorCurves = GetComponentInParent<FloorCurves>();
         if (floorCurves == null) floorCurves = FindFirstObjectByType<FloorCurves>();
 
@@ -122,72 +149,89 @@ public class FashionCurves : MonoBehaviour
 
     public virtual void UpdateCachedCurves()
     {
-        FindReferences();
-
-        if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
-        if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
-        if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
-        if (floorCurves != null) floorCurves.UpdateCachedCurves();
-
-        float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
-
-        // Sync ratios from BodyCurves if assigned
-        if (bodyCurves != null)
+        if (isUpdatingCurves) return;
+        isUpdatingCurves = true;
+        try
         {
-            bilgeHeightRatio = bodyCurves.bilgeHeightRatio;
-            bilgeWidthRatio = bodyCurves.bilgeWidthRatio;
+            FindReferences();
+
+            if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
+            if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
+            if (breadthCurves != null) breadthCurves.UpdateCachedCurves();
+            if (floorCurves != null) floorCurves.UpdateCachedCurves();
+
+            float hw = (backboneCurves != null) ? (backboneCurves.keelWidth / 2f) : ((bodyCurves != null) ? (bodyCurves.keelWidth / 2f) : 0.25f);
+
+            // Sync ratios from BodyCurves if assigned
+            if (bodyCurves != null)
+            {
+                bilgeHeightRatio = bodyCurves.bilgeHeightRatio;
+                bilgeWidthRatio = bodyCurves.bilgeWidthRatio;
+            }
+
+            // 1. Bottom Node P1: Floor Stern Tip (u = 0.25)
+            float p1X = (floorCurves != null) ? floorCurves.aftP3.x : hw;
+            float p1Y = (floorCurves != null) ? floorCurves.aftP3.y : ((sheerCurves != null) ? sheerCurves.keelY + 0.5f : 0.5f);
+            float p1Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p1Y) : -10f;
+
+            stbdP1 = new Vector3(Mathf.Abs(p1X), p1Y, p1Z);
+
+            // 2. Middle Node P3: Fashion Breadth from BreadthCurves (u = 0.75)
+            float p3X = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3.x : breadthCurves.aftP2.x) : (hw + 2f);
+            float p3Y = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3.y : breadthCurves.aftP2.y) : (p1Y + 2f);
+            float p3Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p3Y) : -10f;
+
+            stbdP3 = new Vector3(Mathf.Abs(p3X), p3Y, p3Z);
+
+            // 3. Lower Mould Node P2: Transom Bilge Node (u = 0.50, derived from BodyCurves master bilge node)
+            float tY = Mathf.Clamp01(bilgeHeightRatio);
+            float tX = Mathf.Clamp01(bilgeWidthRatio);
+
+            if (bodyCurves != null)
+            {
+                float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+                SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
+                float bSpanX = bodyNodes.p3.x - bodyNodes.p1.x;
+                float bSpanY = bodyNodes.p3.y - bodyNodes.p1.y;
+
+                if (Mathf.Abs(bSpanX) > 0.001f) tX = Mathf.Clamp01((Mathf.Abs(bodyNodes.p2.x) - bodyNodes.p1.x) / bSpanX);
+                if (Mathf.Abs(bSpanY) > 0.001f) tY = Mathf.Clamp01((bodyNodes.p2.y - bodyNodes.p1.y) / bSpanY);
+            }
+
+            float p2Y = Mathf.Lerp(stbdP1.y, stbdP3.y, tY);
+            float p2X = Mathf.Lerp(stbdP1.x, stbdP3.x, tX);
+            float p2Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p2Y) : Mathf.Lerp(stbdP1.z, stbdP3.z, tY);
+
+            stbdP2 = new Vector3(p2X, p2Y, p2Z);
+
+            // 4. Upper Mould Top Node P4: Fashion TopLine Point (u = 1.00)
+            // MUST ALWAYS BE 100% COMPLETELY ALIGNED WITH TRANSOM RAKE TOP CORNER (topLineCurves.aftP2 / sheerCurves.transomP1)
+            float p4X = (topLineCurves != null) ? topLineCurves.aftP2.x : ((breadthCurves != null) ? breadthCurves.GetAftProjectionPointAtZ(stbdP3.z).x : p3X);
+            float p4Y = (topLineCurves != null) ? topLineCurves.aftP2.y : ((sheerCurves != null) ? sheerCurves.transomP1.y : p3Y + 1.5f);
+            float p4Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p4Y) : ((topLineCurves != null) ? topLineCurves.aftP2.z : -10f);
+
+            stbdP4 = new Vector3(Mathf.Abs(p4X), p4Y, p4Z);
+
+            // Mirror Port Nodes (-X)
+            portP1 = MirrorX(stbdP1);
+            portP2 = MirrorX(stbdP2);
+            portP3 = MirrorX(stbdP3);
+            portP4 = MirrorX(stbdP4);
+
+            // Update BilgeCurves so its aftP2 reflects stbdP2 and its inner curve is synchronized
+            if (bilgeCurves != null)
+            {
+                bilgeCurves.UpdateCachedCurves();
+            }
+
+            UpdateInnerFashionCurve();
+
+            changeVersion++;
         }
-
-        // 1. Bottom Node P1: Floor Stern Tip (u = 0.25)
-        float p1X = (floorCurves != null) ? floorCurves.aftP3.x : hw;
-        float p1Y = (floorCurves != null) ? floorCurves.aftP3.y : ((sheerCurves != null) ? sheerCurves.keelY + 0.5f : 0.5f);
-        float p1Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p1Y) : -10f;
-
-        stbdP1 = new Vector3(Mathf.Abs(p1X), p1Y, p1Z);
-
-        // 2. Middle Node P3: Fashion Breadth from BreadthCurves (u = 0.75)
-        float p3X = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3.x : breadthCurves.aftP2.x) : (hw + 2f);
-        float p3Y = (breadthCurves != null) ? (breadthCurves.cachedIsAftCubic ? breadthCurves.aftP3.y : breadthCurves.aftP2.y) : (p1Y + 2f);
-        float p3Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p3Y) : -10f;
-
-        stbdP3 = new Vector3(Mathf.Abs(p3X), p3Y, p3Z);
-
-        // 3. Lower Mould Node P2: Transom Bilge Node (u = 0.50, derived from BodyCurves master bilge node)
-        float tY = Mathf.Clamp01(bilgeHeightRatio);
-        float tX = Mathf.Clamp01(bilgeWidthRatio);
-
-        if (bodyCurves != null)
+        finally
         {
-            float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
-            SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
-            float bSpanX = bodyNodes.p3.x - bodyNodes.p1.x;
-            float bSpanY = bodyNodes.p3.y - bodyNodes.p1.y;
-
-            if (Mathf.Abs(bSpanX) > 0.001f) tX = Mathf.Clamp01((Mathf.Abs(bodyNodes.p2.x) - bodyNodes.p1.x) / bSpanX);
-            if (Mathf.Abs(bSpanY) > 0.001f) tY = Mathf.Clamp01((bodyNodes.p2.y - bodyNodes.p1.y) / bSpanY);
+            isUpdatingCurves = false;
         }
-
-        float p2Y = Mathf.Lerp(stbdP1.y, stbdP3.y, tY);
-        float p2X = Mathf.Lerp(stbdP1.x, stbdP3.x, tX);
-        float p2Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p2Y) : Mathf.Lerp(stbdP1.z, stbdP3.z, tY);
-
-        stbdP2 = new Vector3(p2X, p2Y, p2Z);
-
-        // 4. Upper Mould Top Node P4: Fashion TopLine Point (u = 1.00)
-        // MUST ALWAYS BE 100% COMPLETELY ALIGNED WITH TRANSOM RAKE TOP CORNER (topLineCurves.aftP2 / sheerCurves.transomP1)
-        float p4X = (topLineCurves != null) ? topLineCurves.aftP2.x : ((breadthCurves != null) ? breadthCurves.GetAftProjectionPointAtZ(stbdP3.z).x : p3X);
-        float p4Y = (topLineCurves != null) ? topLineCurves.aftP2.y : ((sheerCurves != null) ? sheerCurves.transomP1.y : p3Y + 1.5f);
-        float p4Z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p4Y) : ((topLineCurves != null) ? topLineCurves.aftP2.z : -10f);
-
-        stbdP4 = new Vector3(Mathf.Abs(p4X), p4Y, p4Z);
-
-        // Mirror Port Nodes (-X)
-        portP1 = MirrorX(stbdP1);
-        portP2 = MirrorX(stbdP2);
-        portP3 = MirrorX(stbdP3);
-        portP4 = MirrorX(stbdP4);
-
-        changeVersion++;
     }
 
     /// <summary>
@@ -239,7 +283,8 @@ public class FashionCurves : MonoBehaviour
                 float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
                 SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
                 float hollowVal = bodyCurves.floorHollow;
-                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(u, bodyNodes, hollowVal, 1.0f);
+                float keelInf = bodyCurves.keelEntryInfluence;
+                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(u, bodyNodes, hollowVal, 1.0f, keelInf);
 
                 float bFloorX = bodyNodes.p1.x;
                 float bFloorY = bodyNodes.p1.y;
@@ -289,7 +334,7 @@ public class FashionCurves : MonoBehaviour
                 float midZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
                 SectionNodes bodyNodes = bodyCurves.GetSectionNodesAtZ(midZ, 1f);
                 float uNurbs = 0.75f + 0.25f * uUpper;
-                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(uNurbs, bodyNodes, bodyCurves.floorHollow, 1.0f);
+                Vector3 bodyPt = nurbsEvaluator.EvaluateSectionPoint(uNurbs, bodyNodes, bodyCurves.floorHollow, 1.0f, bodyCurves.keelEntryInfluence);
                 float bChord = Mathf.Lerp(bodyNodes.p3.x, bodyNodes.p4.x, uUpper);
                 if (bChord > 0.001f)
                 {
@@ -391,9 +436,243 @@ public class FashionCurves : MonoBehaviour
         return new Vector3(-pt.x, pt.y, pt.z);
     }
 
+    // --- INNER FASHION TIMBER CURVE IMPLEMENTATION ---
+
+    private void UpdateInnerFashionCurve()
+    {
+        // Sample exact inner transom corners from longitudinal curves
+        innerStbdP1 = (floorCurves != null) ? floorCurves.GetInnerFloorSternTip(true) : stbdP1;
+        innerStbdP2 = (bilgeCurves != null) ? bilgeCurves.GetInnerBilgeSternTip(true) : stbdP2;
+        innerStbdP3 = (breadthCurves != null) ? breadthCurves.GetInnerBreadthSternTip(true) : stbdP3;
+        innerStbdP4 = (topLineCurves != null) ? topLineCurves.GetInnerTopLineSternTip(true) : stbdP4;
+
+        innerPortP1 = MirrorX(innerStbdP1);
+        innerPortP2 = MirrorX(innerStbdP2);
+        innerPortP3 = MirrorX(innerStbdP3);
+        innerPortP4 = MirrorX(innerStbdP4);
+
+        const int totalSteps = 60;
+        int totalPts = totalSteps + 1;
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+        {
+            cachedStbdInnerPts = new Vector3[totalPts];
+            cachedPortInnerPts = new Vector3[totalPts];
+        }
+
+        for (int i = 0; i <= totalSteps; i++)
+        {
+            float t = (float)i / totalSteps;
+            cachedStbdInnerPts[i] = GetInnerFashionPointAtT(t, 1f);
+            cachedPortInnerPts[i] = GetInnerFashionPointAtT(t, -1f);
+        }
+    }
+
+    private Vector2 EvaluateHermiteSegment2D(Vector2 pA, Vector2 tA, Vector2 pB, Vector2 tB, float s)
+    {
+        s = Mathf.Clamp01(s);
+        float dist = Vector2.Distance(pA, pB);
+        if (dist <= 0.0001f) return pA;
+
+        Vector2 cA = pA + tA * (dist / 3f);
+        Vector2 cB = pB - tB * (dist / 3f);
+
+        float u = 1f - s;
+        float u2 = u * u;
+        float u3 = u2 * u;
+        float s2 = s * s;
+        float s3 = s2 * s;
+
+        return (u3 * pA) + (3f * u2 * s * cA) + (3f * u * s2 * cB) + (s3 * pB);
+    }
+
+    private float EvaluateHermite1D(float pA, float tA, float pB, float tB, float s)
+    {
+        s = Mathf.Clamp01(s);
+        float s2 = s * s;
+        float s3 = s2 * s;
+        float h00 = 2f * s3 - 3f * s2 + 1f;
+        float h10 = s3 - 2f * s2 + s;
+        float h01 = -2f * s3 + 3f * s2;
+        float h11 = s3 - s2;
+        return (h00 * pA) + (h10 * tA) + (h01 * pB) + (h11 * tB);
+    }
+
+    /// <summary>
+    /// Evaluates 3D point on the Inner Fashion Timber curve:
+    /// Parallels the 3D Stern Profile from SheerCurves while passing 100% exactly through:
+    /// - Floor Inner Transom Corner / Stern Tip at t = 0.00 (innerStbdP1)
+    /// - Bilge Inner Transom Corner at t = 0.33 (innerStbdP2)
+    /// - Breadth Inner Transom Corner at t = 0.67 (innerStbdP3)
+    /// - TopLine Inner Transom Corner at t = 1.00 (innerStbdP4)
+    /// </summary>
+    public virtual Vector3 GetInnerFashionPointAtT(float t, float side = 1f)
+    {
+        EnsureInitialized();
+
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
+        Vector3 p2 = (sideSign > 0f) ? innerStbdP2 : innerPortP2;
+        Vector3 p3 = (sideSign > 0f) ? innerStbdP3 : innerPortP3;
+        Vector3 p4 = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
+
+        float clampedT = Mathf.Clamp01(t);
+
+        // 1. Evaluate 2D (X, Y) curve through the 4 inner transom corners
+        Vector2 p1XY = new Vector2(p1.x, p1.y);
+        Vector2 p2XY = new Vector2(p2.x, p2.y);
+        Vector2 p3XY = new Vector2(p3.x, p3.y);
+        Vector2 p4XY = new Vector2(p4.x, p4.y);
+
+        Vector2 t2XY = (p3XY - p1XY).sqrMagnitude > 0.0001f ? (p3XY - p1XY).normalized : Vector2.up;
+        Vector2 t3XY = (p4XY - p2XY).sqrMagnitude > 0.0001f ? (p4XY - p2XY).normalized : Vector2.up;
+
+        Vector2 d12XY = (p2XY - p1XY).sqrMagnitude > 0.0001f ? (p2XY - p1XY).normalized : Vector2.up;
+        Vector2 v1XY = 2f * d12XY - t2XY;
+        Vector2 t1XY = v1XY.sqrMagnitude > 0.001f ? v1XY.normalized : d12XY;
+
+        Vector2 d34XY = (p4XY - p3XY).sqrMagnitude > 0.0001f ? (p4XY - p3XY).normalized : Vector2.up;
+        Vector2 v4XY = 2f * d34XY - t3XY;
+        Vector2 t4XY = v4XY.sqrMagnitude > 0.001f ? v4XY.normalized : d34XY;
+
+        // 2. Compute Stern Profile forward offsets deltaZ at all 4 corners
+        float zStern1 = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p1.y) : p1.z;
+        float zStern2 = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p2.y) : p2.z;
+        float zStern3 = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p3.y) : p3.z;
+        float zStern4 = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(p4.y) : p4.z;
+
+        float dz1 = p1.z - zStern1;
+        float dz2 = p2.z - zStern2;
+        float dz3 = p3.z - zStern3;
+        float dz4 = p4.z - zStern4;
+
+        float slope2 = 0.5f * (dz3 - dz1);
+        float slope3 = 0.5f * (dz4 - dz2);
+        float slope1 = 2f * (dz2 - dz1) - slope2;
+        float slope4 = 2f * (dz4 - dz3) - slope3;
+
+        Vector2 ptXY;
+        float deltaZ;
+
+        if (clampedT <= (1f / 3f))
+        {
+            float s = clampedT * 3f;
+            ptXY = EvaluateHermiteSegment2D(p1XY, t1XY, p2XY, t2XY, s);
+            deltaZ = EvaluateHermite1D(dz1, slope1, dz2, slope2, s);
+        }
+        else if (clampedT <= (2f / 3f))
+        {
+            float s = (clampedT - (1f / 3f)) * 3f;
+            ptXY = EvaluateHermiteSegment2D(p2XY, t2XY, p3XY, t3XY, s);
+            deltaZ = EvaluateHermite1D(dz2, slope2, dz3, slope3, s);
+        }
+        else
+        {
+            float s = (clampedT - (2f / 3f)) * 3f;
+            ptXY = EvaluateHermiteSegment2D(p3XY, t3XY, p4XY, t4XY, s);
+            deltaZ = EvaluateHermite1D(dz3, slope3, dz4, slope4, s);
+        }
+
+        // 3. Synthesize Z: lock 100% to Stern Profile at evaluated height Y, offset by smooth deltaZ
+        float zStern = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(ptXY.y) : Mathf.Lerp(p1.z, p4.z, clampedT);
+        float finalZ = zStern + deltaZ;
+
+        return new Vector3(ptXY.x, ptXY.y, finalZ);
+    }
+
+    /// <summary>
+    /// Evaluates 3D point on the Inner Fashion Timber curve at target height Y for specified side (+1 Starboard, -1 Port).
+    /// </summary>
+    public virtual Vector3 GetInnerFashionPointAtY(float targetY, float side = 1f)
+    {
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
+        Vector3 p4 = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
+
+        float ySpan = p4.y - p1.y;
+        if (ySpan < 0.0001f)
+        {
+            return GetInnerFashionPointAtT(0f, sideSign);
+        }
+
+        float t = Mathf.Clamp01((targetY - p1.y) / ySpan);
+        for (int i = 0; i < 6; i++)
+        {
+            Vector3 pt = GetInnerFashionPointAtT(t, sideSign);
+            float error = pt.y - targetY;
+            if (Mathf.Abs(error) < 0.0001f) break;
+
+            float delta = 0.001f;
+            Vector3 ptPlus = GetInnerFashionPointAtT(Mathf.Clamp01(t + delta), sideSign);
+            float dydt = (ptPlus.y - pt.y) / delta;
+            if (Mathf.Abs(dydt) > 0.0001f)
+            {
+                t = Mathf.Clamp01(t - error / dydt);
+            }
+        }
+
+        return GetInnerFashionPointAtT(t, sideSign);
+    }
+
+    /// <summary>
+    /// Evaluates 3D point on the Inner Fashion Timber curve at target station Z for specified side (+1 Starboard, -1 Port).
+    /// </summary>
+    public virtual Vector3 GetInnerFashionPointAtZ(float targetZ, float side = 1f)
+    {
+        float sideSign = Mathf.Approximately(side, 0f) ? 1f : Mathf.Sign(side);
+        Vector3 p1 = (sideSign > 0f) ? innerStbdP1 : innerPortP1;
+        Vector3 p4 = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
+
+        float zSpan = p4.z - p1.z;
+        if (Mathf.Abs(zSpan) < 0.0001f)
+        {
+            return GetInnerFashionPointAtT(0f, sideSign);
+        }
+
+        if (targetZ >= p1.z) return GetInnerFashionPointAtT(0f, sideSign);
+        if (targetZ <= p4.z) return GetInnerFashionPointAtT(1f, sideSign);
+
+        float minT = 0f;
+        float maxT = 1f;
+        float t = Mathf.Clamp01((targetZ - p1.z) / zSpan);
+
+        for (int i = 0; i < 12; i++)
+        {
+            Vector3 pt = GetInnerFashionPointAtT(t, sideSign);
+            float error = pt.z - targetZ;
+            if (Mathf.Abs(error) < 0.0001f) return pt;
+
+            if (p1.z > p4.z)
+            {
+                if (pt.z > targetZ) minT = t;
+                else maxT = t;
+            }
+            else
+            {
+                if (pt.z < targetZ) minT = t;
+                else maxT = t;
+            }
+            t = (minT + maxT) * 0.5f;
+        }
+
+        return GetInnerFashionPointAtT(t, sideSign);
+    }
+
+    /// <summary>
+    /// Returns precomputed points along the Inner Fashion Timber curve with 0 GC heap allocations.
+    /// </summary>
+    public virtual Vector3[] GetInnerFashionPoints(bool starboard = true)
+    {
+        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length == 0)
+        {
+            UpdateCachedCurves();
+        }
+        return starboard ? cachedStbdInnerPts : cachedPortInnerPts;
+    }
+
     // --- GIZMO RENDERING ---
 
     private static GUIStyle cachedLabelStyle;
+    private static GUIStyle cachedInnerLabelStyle;
 #if UNITY_EDITOR
     private static GUIStyle GetCachedLabelStyle()
     {
@@ -406,6 +685,19 @@ public class FashionCurves : MonoBehaviour
             cachedLabelStyle.fontStyle = FontStyle.Bold;
         }
         return cachedLabelStyle;
+    }
+
+    private static GUIStyle GetCachedInnerLabelStyle()
+    {
+        if (cachedInnerLabelStyle == null)
+        {
+            cachedInnerLabelStyle = new GUIStyle();
+            cachedInnerLabelStyle.normal.textColor = new Color(0.2f, 0.95f, 0.6f);
+            cachedInnerLabelStyle.fontSize = 9;
+            cachedInnerLabelStyle.alignment = TextAnchor.LowerCenter;
+            cachedInnerLabelStyle.fontStyle = FontStyle.Normal;
+        }
+        return cachedInnerLabelStyle;
     }
 #endif
 
@@ -448,6 +740,47 @@ public class FashionCurves : MonoBehaviour
         Gizmos.color = Color.magenta;
         Gizmos.DrawSphere(portP4, 0.14f);
 
+        // 5. Draw Inner Fashion Timber Curve (Zero GC heap allocations)
+        if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 1)
+        {
+            Gizmos.color = innerLineColor;
+            for (int i = 0; i < cachedStbdInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedStbdInnerPts[i], cachedStbdInnerPts[i + 1]);
+            }
+
+            Color portInnerColor = new Color(innerLineColor.r * 0.8f, innerLineColor.g, innerLineColor.b * 0.8f, innerLineColor.a);
+            Gizmos.color = portInnerColor;
+            for (int i = 0; i < cachedPortInnerPts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(cachedPortInnerPts[i], cachedPortInnerPts[i + 1]);
+            }
+
+            // Inner crossbars connecting Starboard and Port at inner corners
+            Gizmos.color = new Color(innerLineColor.r, innerLineColor.g, innerLineColor.b, 0.5f);
+            Gizmos.DrawLine(innerStbdP1, innerPortP1);
+            Gizmos.DrawLine(innerStbdP2, innerPortP2);
+            Gizmos.DrawLine(innerStbdP3, innerPortP3);
+            Gizmos.DrawLine(innerStbdP4, innerPortP4);
+
+            // Inner Transom Corner Spheres (matching corner colors)
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawSphere(innerStbdP1, 0.08f);
+            Gizmos.DrawSphere(innerPortP1, 0.08f);
+
+            Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
+            Gizmos.DrawSphere(innerStbdP2, 0.09f);
+            Gizmos.DrawSphere(innerPortP2, 0.09f);
+
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawSphere(innerStbdP3, 0.09f);
+            Gizmos.DrawSphere(innerPortP3, 0.09f);
+
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(innerStbdP4, 0.09f);
+            Gizmos.DrawSphere(innerPortP4, 0.09f);
+        }
+
 #if UNITY_EDITOR
         if (showLabels)
         {
@@ -456,6 +789,15 @@ public class FashionCurves : MonoBehaviour
             Handles.Label(stbdP3 + Vector3.up * 0.18f, "Fashion Breadth (u=0.75)", labelStyle);
             Handles.Label(stbdP2 + Vector3.up * 0.15f, "Fashion Bilge Node (u=0.50)", labelStyle);
             Handles.Label(stbdP1 + Vector3.up * 0.15f, "Fashion NURBS Base (u=0.25)", labelStyle);
+
+            if (showInnerLine)
+            {
+                GUIStyle innerLabelStyle = GetCachedInnerLabelStyle();
+                Handles.Label(innerStbdP4 + Vector3.up * 0.12f, "Inner Fashion TopLine", innerLabelStyle);
+                Handles.Label(innerStbdP3 + Vector3.up * 0.12f, "Inner Fashion Breadth", innerLabelStyle);
+                Handles.Label(innerStbdP2 + Vector3.up * 0.12f, "Inner Fashion Bilge", innerLabelStyle);
+                Handles.Label(innerStbdP1 + Vector3.up * 0.12f, "Inner Fashion Base", innerLabelStyle);
+            }
         }
 #endif
     }
@@ -490,6 +832,16 @@ public class FashionCurvesEditor : Editor
         EditorGUILayout.LabelField("P2 Transom Bilge Node (u=0.50):", $"X: {curves.stbdP2.x:F2}, Y: {curves.stbdP2.y:F2}, Z: {curves.stbdP2.z:F2}");
         EditorGUILayout.LabelField("P3 Fashion Breadth (u=0.75):", $"X: {curves.stbdP3.x:F2}, Y: {curves.stbdP3.y:F2}, Z: {curves.stbdP3.z:F2}");
         EditorGUILayout.LabelField("P4 Transom Rake Top Corner (u=1.00):", $"X: {curves.stbdP4.x:F2}, Y: {curves.stbdP4.y:F2}, Z: {curves.stbdP4.z:F2}");
+
+        if (curves.showInnerLine)
+        {
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField("Inner Fashion Curve Transom Nodes Readout", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Inner P1 Floor Transom Corner:", $"X: {curves.innerStbdP1.x:F2}, Y: {curves.innerStbdP1.y:F2}, Z: {curves.innerStbdP1.z:F2}");
+            EditorGUILayout.LabelField("Inner P2 Bilge Transom Corner:", $"X: {curves.innerStbdP2.x:F2}, Y: {curves.innerStbdP2.y:F2}, Z: {curves.innerStbdP2.z:F2}");
+            EditorGUILayout.LabelField("Inner P3 Breadth Transom Corner:", $"X: {curves.innerStbdP3.x:F2}, Y: {curves.innerStbdP3.y:F2}, Z: {curves.innerStbdP3.z:F2}");
+            EditorGUILayout.LabelField("Inner P4 TopLine Transom Corner:", $"X: {curves.innerStbdP4.x:F2}, Y: {curves.innerStbdP4.y:F2}, Z: {curves.innerStbdP4.z:F2}");
+        }
 
         EditorGUILayout.Space(10);
         if (GUILayout.Button("Update Fashion Curves Profile", GUILayout.Height(30)))

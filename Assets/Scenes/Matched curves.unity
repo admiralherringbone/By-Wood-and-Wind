@@ -157,38 +157,43 @@ MonoBehaviour:
   fashionCurves: {fileID: 2019170296}
   bowCtrlArmGuide: {fileID: 0}
   enableInteractiveHandles: 1
-  showLabels: 1
+  showLabels: 0
   bilgeCurveColor: {r: 0.1, g: 0.9, b: 0.4, a: 0.95}
-  showBowMouldP1Guide: 1
-  showFwdP2Guide: 1
+  showInnerLine: 1
+  innerLineSpacing: 0.23286627
+  innerLineColor: {r: 0.2, g: 0.95, b: 0.6, a: 0.95}
+  showBowMouldP1Guide: 0
+  showFwdP2Guide: 0
   bowMouldGuideColor: {r: 0.1, g: 0.95, b: 0.85, a: 0.95}
   fwdP2GuideColor: {r: 0.95, g: 0.85, b: 0.1, a: 0.95}
-  showAftMouldA1Guide: 1
-  showSternTransomGuide: 1
+  showAftMouldA1Guide: 0
+  showSternTransomGuide: 0
   aftMouldGuideColor: {r: 0.75, g: 0.25, b: 0.95, a: 0.95}
   sternTransomGuideColor: {r: 0.95, g: 0.25, b: 0.55, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0.25, y: 2.2417428, z: 12.319279}
-  fwdP1: {x: 2.621317, y: 1.093559, z: 9.588188}
-  fwdP2: {x: 2.622119, y: 1.093559, z: 8.525151}
-  fwdP3: {x: 2.622119, y: 1.093559, z: -0.39888996}
-  aftP1: {x: 2.622119, y: 1.093559, z: -5.9979753}
-  aftP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
-  bilgeWidthRatio: 0.7724883
-  bilgeHeightRatio: 0.24219428
-  fwdP2Ratio: 0.7016766
-  fwdP1Ratio: 0.78526074
-  aftP1Ratio: 0.48876333
-  fwdP1XRatio: 0.99966186
+  fwdP0: {x: 0.125, y: 2.6261244, z: 12.464299}
+  fwdP1: {x: 2.7677834, y: 1.7520193, z: 10.573466}
+  fwdP2: {x: 2.7686772, y: 1.7520193, z: 8.93182}
+  fwdP3: {x: 2.7686772, y: 1.7520193, z: -0.47306794}
+  aftP1: {x: 2.7686772, y: 1.7520193, z: -5.577367}
+  aftP2: {x: 1.3470587, y: 3.4075868, z: -11.603903}
+  bilgeWidthRatio: 0.7819817
+  bilgeHeightRatio: 0.39553744
+  fwdP2Ratio: 0.7269553
+  fwdP1Ratio: 0.85384715
+  aftP1Ratio: 0.54142714
+  fwdP1XRatio: 0.9996619
   fwdP1YRatio: 0.42994612
-  cachedFwdP0: {x: 0.25, y: 2.2417428, z: 12.319279}
-  cachedFwdP1: {x: 2.621317, y: 1.093559, z: 9.588188}
-  cachedFwdP2: {x: 2.622119, y: 1.093559, z: 8.525151}
-  cachedFwdP3: {x: 2.622119, y: 1.093559, z: -0.39888996}
-  cachedAftP0: {x: 2.622119, y: 1.093559, z: -0.39888996}
-  cachedAftP1: {x: 2.622119, y: 1.093559, z: -5.9979753}
-  cachedAftP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
-  changeVersion: 2953647
+  cachedFwdP0: {x: 0.125, y: 2.6261244, z: 12.464299}
+  cachedFwdP1: {x: 2.7677834, y: 1.7520193, z: 10.573466}
+  cachedFwdP2: {x: 2.7686772, y: 1.7520193, z: 8.93182}
+  cachedFwdP3: {x: 2.7686772, y: 1.7520193, z: -0.47306794}
+  cachedAftP0: {x: 2.7686772, y: 1.7520193, z: -0.47306794}
+  cachedAftP1: {x: 2.7686772, y: 1.7520193, z: -5.577367}
+  cachedAftP2: {x: 1.3470587, y: 3.4075868, z: -11.603903}
+  cachedInnerMidshipPt: {x: 2.5495858, y: 1.8309219, z: -0.47306794}
+  cachedOffsetVector: {x: -0.21909142, y: 0.0789026, z: 0}
+  changeVersion: 4818057
 --- !u!4 &186442760
 Transform:
   m_ObjectHideFlags: 0
@@ -253,29 +258,34 @@ MonoBehaviour:
   sheerCurves: {fileID: 1818396365}
   breadthCurves: {fileID: 1799144730}
   enableInteractiveHandles: 1
-  showLabels: 1
+  showLabels: 0
   floorCurveColor: {r: 0, g: 0, b: 0, a: 0.95}
+  showInnerLine: 1
+  innerLineSpacing: 0.28015825
+  innerLineColor: {r: 1, g: 0.65, b: 0.2, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0.25, y: 1.639806, z: 12.051445}
-  fwdP1: {x: 1.2926486, y: 0.2803154, z: 8.235941}
-  fwdP2: {x: 1.2926486, y: 0.2803154, z: 8.235941}
-  fwdP3: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
-  aftP1: {x: 1.2926486, y: 0.2803154, z: -5.7859273}
-  aftP2: {x: 0.25, y: 2.7326477, z: -11.173461}
-  maxFloorBeam: 1.2926486
-  midshipHeightRatio: 0.07704929
-  fwdP2Ratio: 0.69354206
-  fwdP1Ratio: 0.69354206
-  aftP1Ratio: 0.500023
+  fwdP0: {x: 0.125, y: 1.645217, z: 12.083961}
+  fwdP1: {x: 1.8899378, y: 0.5178193, z: 8.235761}
+  fwdP2: {x: 1.8899378, y: 0.5178193, z: 8.235761}
+  fwdP3: {x: 1.8899378, y: 0.5178193, z: -0.47306794}
+  aftP1: {x: 1.8899378, y: 0.5178193, z: -4.795956}
+  aftP2: {x: 0.125, y: 2.7326477, z: -11.286219}
+  maxFloorBeam: 1.8899378
+  midshipHeightRatio: 0.14233114
+  fwdP2Ratio: 0.6935421
+  fwdP1Ratio: 0.6935421
+  aftP1Ratio: 0.60021937
   fwdP1XRatio: 0.511224
-  cachedFwdP0: {x: 0.25, y: 1.639806, z: 12.051445}
-  cachedFwdP1: {x: 1.2926486, y: 0.2803154, z: 8.235941}
-  cachedFwdP2: {x: 1.2926486, y: 0.2803154, z: 8.235941}
-  cachedFwdP3: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
-  cachedAftP0: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
-  cachedAftP1: {x: 1.2926486, y: 0.2803154, z: -5.7859273}
-  cachedAftP2: {x: 0.25, y: 2.7326477, z: -11.173461}
-  changeVersion: 78112566
+  cachedFwdP0: {x: 0.125, y: 1.645217, z: 12.083961}
+  cachedFwdP1: {x: 1.8899378, y: 0.5178193, z: 8.235761}
+  cachedFwdP2: {x: 1.8899378, y: 0.5178193, z: 8.235761}
+  cachedFwdP3: {x: 1.8899378, y: 0.5178193, z: -0.47306794}
+  cachedAftP0: {x: 1.8899378, y: 0.5178193, z: -0.47306794}
+  cachedAftP1: {x: 1.8899378, y: 0.5178193, z: -4.795956}
+  cachedAftP2: {x: 0.125, y: 2.7326477, z: -11.286219}
+  cachedInnerMidshipPt: {x: 1.7351725, y: 0.75134945, z: -0.47306794}
+  cachedOffsetVector: {x: -0.15476525, y: 0.23353016, z: 0}
+  changeVersion: 125886347
 --- !u!1 &264070283
 GameObject:
   m_ObjectHideFlags: 0
@@ -310,36 +320,41 @@ MonoBehaviour:
   sheerCurves: {fileID: 1818396365}
   breadthCurves: {fileID: 1799144730}
   enableInteractiveHandles: 1
-  showLabels: 1
+  showLabels: 0
   topLineCurveColor: {r: 0.85, g: 0.2, b: 0.95, a: 0.95}
+  showInnerLine: 1
+  innerLineSpacing: 0.1
+  innerLineColor: {r: 0.95, g: 0.4, b: 0.95, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0.25, y: 6.178974, z: 12.629255}
-  fwdP1: {x: 2.6597054, y: 6.0776367, z: 12.205609}
-  fwdP2: {x: 2.6597054, y: 5.6539702, z: 9.258327}
-  fwdP3: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
-  aftP1: {x: 2.6597054, y: 5.6539702, z: -7.382319}
-  aftP2: {x: 1.1413531, y: 7.379114, z: -14.205765}
+  fwdP0: {x: 0.125, y: 5.566162, z: 12.629255}
+  fwdP1: {x: 2.6597054, y: 5.295617, z: 12.229295}
+  fwdP2: {x: 2.6597054, y: 5.21949, z: 8.234234}
+  fwdP3: {x: 2.6597054, y: 5.21949, z: -0.47306794}
+  aftP1: {x: 2.6597054, y: 5.21949, z: -7.0122623}
+  aftP2: {x: 1.3433044, y: 6.3251524, z: -13.401649}
   aftP3: {x: 0.25, y: 8.125153, z: -14.971435}
-  transomWidth: 0.3699013
+  transomWidth: 0.36990732
   maxBeam: 2.6597054
-  midshipApexZPercentage: 0.51450956
-  fwdP2Ratio: 0.74125797
-  fwdP1Ratio: 0.96748227
+  midshipApexZPercentage: 0.49666277
+  fwdP2Ratio: 0.6645616
+  fwdP1Ratio: 0.9694741
   aftP1Ratio: 0.49420637
   fwdP2XRatio: 0.9
   fwdP1XRatio: 1
   aftP1XRatio: 0.9
-  fwdP1YRatio: 0.92297345
-  cachedFwdP0: {x: 0.25, y: 6.178974, z: 12.629255}
-  cachedFwdP1: {x: 2.6597054, y: 6.0776367, z: 12.205609}
-  cachedFwdP2: {x: 2.6597054, y: 5.6539702, z: 9.258327}
-  cachedFwdP3: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
-  cachedAftP0: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
-  cachedAftP1: {x: 2.6597054, y: 5.6539702, z: -7.382319}
-  cachedAftP2: {x: 1.1413531, y: 7.379114, z: -14.205765}
+  fwdP1YRatio: 0.24157733
+  cachedFwdP0: {x: 0.125, y: 5.566162, z: 12.629255}
+  cachedFwdP1: {x: 2.6597054, y: 5.295617, z: 12.229295}
+  cachedFwdP2: {x: 2.6597054, y: 5.21949, z: 8.234234}
+  cachedFwdP3: {x: 2.6597054, y: 5.21949, z: -0.47306794}
+  cachedAftP0: {x: 2.6597054, y: 5.21949, z: -0.47306794}
+  cachedAftP1: {x: 2.6597054, y: 5.21949, z: -7.0122623}
+  cachedAftP2: {x: 1.3433044, y: 6.3251524, z: -13.401649}
   cachedAftP3: {x: 0.25, y: 8.125153, z: -14.971435}
   cachedIsAftCubic: 0
-  changeVersion: 67497682
+  cachedInnerMidshipPt: {x: 2.5597548, y: 5.21949, z: -0.47306794}
+  cachedOffsetVector: {x: -0.09995055, y: 0, z: 0}
+  changeVersion: 115238113
 --- !u!4 &264070285
 Transform:
   m_ObjectHideFlags: 0
@@ -347,360 +362,6 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 264070283}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &291057394
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 291057396}
-  - component: {fileID: 291057395}
-  m_Layer: 0
-  m_Name: RibbandCurvesBG
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &291057395
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 291057394}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2be6e2c2c7e04cc9b3414d6383e3173, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RibbandCurvesBG
-  bowCtrlArmGuide: {fileID: 0}
-  sheerCurves: {fileID: 1818396365}
-  topLineCurves: {fileID: 264070284}
-  breadthCurves: {fileID: 1799144730}
-  bilgeCurves: {fileID: 186442759}
-  floorCurves: {fileID: 216798052}
-  bodyCurves: {fileID: 2032973263}
-  backboneCurves: {fileID: 747401016}
-  fashionCurves: {fileID: 2019170296}
-  region: 4
-  ribbandCountPerBand: 6
-  showLabels: 1
-  showControlArms: 1
-  showPolygonSkeleton: 0
-  ribbandColor:
-    r: 0.2
-    g: 0.75
-    b: 1
-    a: 0.95
-  isInitialized: 1
-  generatedRibbands:
-  - name: Upper Mould (TopLine to Breadth) 1 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 0
-    tRatio: 0.14285715
-    uSectionParam: 0.78571427
-    fwdP0: {x: 0.25, y: 4.4185557, z: 12.629255}
-    fwdP1: {x: 2.9922755, y: 3.970862, z: 10.854578}
-    fwdP2: {x: 2.9938657, y: 3.9288056, z: 8.826259}
-    fwdP3: {x: 2.9938657, y: 3.9288056, z: -0.39888996}
-    aftP0: {x: 2.9938657, y: 3.9288056, z: -0.39888996}
-    aftP1: {x: 2.9938657, y: 3.9288056, z: -6.7644367}
-    aftP2: {x: 1.6618383, y: 4.8590436, z: -12.310794}
-  - name: Upper Mould (TopLine to Breadth) 2 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 1
-    tRatio: 0.2857143
-    uSectionParam: 0.8214286
-    fwdP0: {x: 0.25, y: 4.711959, z: 12.629255}
-    fwdP1: {x: 2.9415343, y: 4.3070626, z: 11.070176}
-    fwdP2: {x: 2.9428349, y: 4.2167845, z: 8.901863}
-    fwdP3: {x: 2.9428349, y: 4.2167845, z: -0.39888996}
-    aftP0: {x: 2.9428349, y: 4.2167845, z: -0.39888996}
-    aftP1: {x: 2.9428349, y: 4.2167845, z: -6.8674173}
-    aftP2: {x: 1.5316117, y: 5.2790556, z: -12.821199}
-  - name: Upper Mould (TopLine to Breadth) 3 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 2
-    tRatio: 0.42857143
-    uSectionParam: 0.85714287
-    fwdP0: {x: 0.25, y: 5.005362, z: 12.629255}
-    fwdP1: {x: 2.872148, y: 4.6477585, z: 11.288657}
-    fwdP2: {x: 2.8731616, y: 4.5031447, z: 8.977445}
-    fwdP3: {x: 2.8731616, y: 4.5031447, z: -0.39888996}
-    aftP0: {x: 2.8731616, y: 4.5031447, z: -0.39888996}
-    aftP1: {x: 2.8731616, y: 4.5031447, z: -6.9703975}
-    aftP2: {x: 1.324383, y: 5.6990676, z: -13.580697}
-  - name: Upper Mould (TopLine to Breadth) 4 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 3
-    tRatio: 0.5714286
-    uSectionParam: 0.89285713
-    fwdP0: {x: 0.25, y: 5.298765, z: 12.629255}
-    fwdP1: {x: 2.7966917, y: 4.9940214, z: 11.510709}
-    fwdP2: {x: 2.7974298, y: 4.7889643, z: 9.053275}
-    fwdP3: {x: 2.7974298, y: 4.7889643, z: -0.39888996}
-    aftP0: {x: 2.7974298, y: 4.7889643, z: -0.39888996}
-    aftP1: {x: 2.7974298, y: 4.7889643, z: -7.073378}
-    aftP2: {x: 1.2733369, y: 6.119079, z: -13.736964}
-  - name: Upper Mould (TopLine to Breadth) 5 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 4
-    tRatio: 0.71428573
-    uSectionParam: 0.92857146
-    fwdP0: {x: 0.25, y: 5.592168, z: 12.629255}
-    fwdP1: {x: 2.7277424, y: 5.3469715, z: 11.737049}
-    fwdP2: {x: 2.7282212, y: 5.0753236, z: 9.129628}
-    fwdP3: {x: 2.7282212, y: 5.0753236, z: -0.39888996}
-    aftP0: {x: 2.7282212, y: 5.0753236, z: -0.39888996}
-    aftP1: {x: 2.7282212, y: 5.0753236, z: -7.176358}
-    aftP2: {x: 1.2197235, y: 6.539091, z: -13.89323}
-  - name: Upper Mould (TopLine to Breadth) 6 BG
-    subRegionName: Upper Mould (TopLine to Breadth)
-    index: 5
-    tRatio: 0.85714287
-    uSectionParam: 0.96428573
-    fwdP0: {x: 0.25, y: 5.885571, z: 12.629255}
-    fwdP1: {x: 2.6778846, y: 5.707773, z: 11.968424}
-    fwdP2: {x: 2.6781192, y: 5.3632994, z: 9.206782}
-    fwdP3: {x: 2.6781192, y: 5.3632994, z: -0.39888996}
-    aftP0: {x: 2.6781192, y: 5.3632994, z: -0.39888996}
-    aftP1: {x: 2.6781192, y: 5.3632994, z: -7.279339}
-    aftP2: {x: 1.1740953, y: 6.959102, z: -14.049498}
-  - name: Upper (Breadth to Bilge) 1 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 6
-    tRatio: 0.14285715
-    uSectionParam: 0.53571427
-    fwdP0: {x: 0.25, y: 2.6276026, z: 12.435499}
-    fwdP1: {x: 2.7749708, y: 1.5890998, z: 9.96485}
-    fwdP2: {x: 2.7759466, y: 1.5890998, z: 8.5633135}
-    fwdP3: {x: 2.7759466, y: 1.5890998, z: -0.39888996}
-    aftP0: {x: 2.7759466, y: 1.5890998, z: -0.39888996}
-    aftP1: {x: 2.7759466, y: 1.5890998, z: -6.2862296}
-    aftP2: {x: 1.5926648, y: 3.383205, z: -11.452826}
-  - name: Upper (Breadth to Bilge) 2 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 7
-    tRatio: 0.2857143
-    uSectionParam: 0.5714286
-    fwdP0: {x: 0.25, y: 2.8771944, z: 12.492968}
-    fwdP1: {x: 2.875354, y: 1.9141728, z: 10.181124}
-    fwdP2: {x: 2.8764958, y: 1.9141728, z: 8.623125}
-    fwdP3: {x: 2.8764958, y: 1.9141728, z: -0.39888996}
-    aftP0: {x: 2.8764958, y: 1.9141728, z: -0.39888996}
-    aftP1: {x: 2.8764958, y: 1.9141728, z: -6.3487678}
-    aftP2: {x: 1.663519, y: 3.5385108, z: -11.519517}
-  - name: Upper (Breadth to Bilge) 3 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 8
-    tRatio: 0.42857143
-    uSectionParam: 0.60714287
-    fwdP0: {x: 0.25, y: 3.126786, z: 12.538656}
-    fwdP1: {x: 2.942441, y: 2.2511606, z: 10.348596}
-    fwdP2: {x: 2.943742, y: 2.2511606, z: 8.669441}
-    fwdP3: {x: 2.943742, y: 2.2511606, z: -0.39888996}
-    aftP0: {x: 2.943742, y: 2.2511606, z: -0.39888996}
-    aftP1: {x: 2.943742, y: 2.2511606, z: -6.4113054}
-    aftP2: {x: 1.7084326, y: 3.7039783, z: -11.590573}
-  - name: Upper (Breadth to Bilge) 4 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 9
-    tRatio: 0.5714286
-    uSectionParam: 0.64285713
-    fwdP0: {x: 0.25, y: 3.3763776, z: 12.5740185}
-    fwdP1: {x: 2.9829311, y: 2.5960572, z: 10.472527}
-    fwdP2: {x: 2.9843838, y: 2.5960572, z: 8.703714}
-    fwdP3: {x: 2.9843838, y: 2.5960572, z: -0.39888996}
-    aftP0: {x: 2.9843838, y: 2.5960572, z: -0.39888996}
-    aftP1: {x: 2.9843838, y: 2.5960572, z: -6.473843}
-    aftP2: {x: 1.7332295, y: 3.8781867, z: -11.665382}
-  - name: Upper (Breadth to Bilge) 5 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 10
-    tRatio: 0.71428573
-    uSectionParam: 0.67857146
-    fwdP0: {x: 0.25, y: 3.6259694, z: 12.600256}
-    fwdP1: {x: 3.003524, y: 2.9448562, z: 10.559029}
-    fwdP2: {x: 3.0051208, y: 2.9448562, z: 8.727637}
-    fwdP3: {x: 3.0051208, y: 2.9448562, z: -0.39888996}
-    aftP0: {x: 3.0051208, y: 2.9448562, z: -0.39888996}
-    aftP1: {x: 3.0051208, y: 2.9448562, z: -6.536381}
-    aftP2: {x: 1.743732, y: 4.0597134, z: -11.743334}
-  - name: Upper (Breadth to Bilge) 6 BG
-    subRegionName: Upper (Breadth to Bilge)
-    index: 11
-    tRatio: 0.85714287
-    uSectionParam: 0.71428573
-    fwdP0: {x: 0.25, y: 3.875561, z: 12.6183815}
-    fwdP1: {x: 3.0109162, y: 3.2935495, z: 10.613501}
-    fwdP2: {x: 3.0126507, y: 3.2935495, z: 8.7427025}
-    fwdP3: {x: 3.0126507, y: 3.2935495, z: -0.39888996}
-    aftP0: {x: 3.0126507, y: 3.2935495, z: -0.39888996}
-    aftP1: {x: 3.0126507, y: 3.2935495, z: -6.598919}
-    aftP2: {x: 1.7457635, y: 4.247136, z: -11.843965}
-  - name: Middle (Bilge to Floor) 1 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 12
-    tRatio: 0.14285715
-    uSectionParam: 0.2857143
-    fwdP0: {x: 0.25, y: 1.7452639, z: 12.10765}
-    fwdP1: {x: 1.4199525, y: 0.3988183, z: 8.325181}
-    fwdP2: {x: 1.420009, y: 0.3988183, z: 8.109853}
-    fwdP3: {x: 1.420009, y: 0.3988183, z: -0.39888996}
-    aftP0: {x: 1.420009, y: 0.3988183, z: -0.39888996}
-    aftP1: {x: 1.420009, y: 0.3988183, z: -5.848465}
-    aftP2: {x: 0.35474968, y: 2.8766434, z: -11.235296}
-  - name: Middle (Bilge to Floor) 2 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 13
-    tRatio: 0.2857143
-    uSectionParam: 0.32142857
-    fwdP0: {x: 0.25, y: 1.8507217, z: 12.159531}
-    fwdP1: {x: 1.6549116, y: 0.5120991, z: 8.578922}
-    fwdP2: {x: 1.6550474, y: 0.5120991, z: 8.180026}
-    fwdP3: {x: 1.6550474, y: 0.5120991, z: -0.39888996}
-    aftP0: {x: 1.6550474, y: 0.5120991, z: -0.39888996}
-    aftP1: {x: 1.6550474, y: 0.5120991, z: -5.911003}
-    aftP2: {x: 0.5172129, y: 2.9613633, z: -11.271677}
-  - name: Middle (Bilge to Floor) 3 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 14
-    tRatio: 0.42857143
-    uSectionParam: 0.35714287
-    fwdP0: {x: 0.25, y: 1.9561796, z: 12.207422}
-    fwdP1: {x: 1.8886148, y: 0.63000983, z: 8.810155}
-    fwdP2: {x: 1.8888522, y: 0.63000983, z: 8.243976}
-    fwdP3: {x: 1.8888522, y: 0.63000983, z: -0.39888996}
-    aftP0: {x: 1.8888522, y: 0.63000983, z: -0.39888996}
-    aftP1: {x: 1.8888522, y: 0.63000983, z: -5.973541}
-    aftP2: {x: 0.71724176, y: 3.0080545, z: -11.291727}
-  - name: Middle (Bilge to Floor) 4 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 15
-    tRatio: 0.5714286
-    uSectionParam: 0.39285713
-    fwdP0: {x: 0.25, y: 2.0616374, z: 12.251616}
-    fwdP1: {x: 2.1122465, y: 0.75915027, z: 9.032083}
-    fwdP2: {x: 2.1126063, y: 0.75915027, z: 8.305351}
-    fwdP3: {x: 2.1126063, y: 0.75915027, z: -0.39888996}
-    aftP0: {x: 2.1126063, y: 0.75915027, z: -0.39888996}
-    aftP1: {x: 2.1126063, y: 0.75915027, z: -6.0360785}
-    aftP2: {x: 0.9346876, y: 3.0379643, z: -11.304571}
-  - name: Middle (Bilge to Floor) 5 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 16
-    tRatio: 0.71428573
-    uSectionParam: 0.42857143
-    fwdP0: {x: 0.25, y: 2.1670952, z: 12.292376}
-    fwdP1: {x: 2.316994, y: 0.90612054, z: 9.253377}
-    fwdP2: {x: 2.3174932, y: 0.90612054, z: 8.366551}
-    fwdP3: {x: 2.3174932, y: 0.90612054, z: -0.39888996}
-    aftP0: {x: 2.3174932, y: 0.90612054, z: -0.39888996}
-    aftP1: {x: 2.3174932, y: 0.90612054, z: -6.098616}
-    aftP2: {x: 1.1494029, y: 3.072341, z: -11.319333}
-  - name: Middle (Bilge to Floor) 6 BG
-    subRegionName: Middle (Bilge to Floor)
-    index: 17
-    tRatio: 0.85714287
-    uSectionParam: 0.46428573
-    fwdP0: {x: 0.25, y: 2.2725532, z: 12.329935}
-    fwdP1: {x: 2.4940453, y: 1.0775206, z: 9.474492}
-    fwdP2: {x: 2.4946957, y: 1.0775206, z: 8.427702}
-    fwdP3: {x: 2.4946957, y: 1.0775206, z: -0.39888996}
-    aftP0: {x: 2.4946957, y: 1.0775206, z: -0.39888996}
-    aftP1: {x: 2.4946957, y: 1.0775206, z: -6.1611543}
-    aftP2: {x: 1.3412392, y: 3.1324315, z: -11.345138}
-  - name: Lower (Floor to Keel) 1 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 18
-    tRatio: 0.14285715
-    uSectionParam: 0.035714287
-    fwdP0: {x: 0.25, y: 0.23425801, z: 10.557581}
-    fwdP1: {x: 0.3853086, y: 0.038919415, z: 7.7998533}
-    fwdP2: {x: 0.3853086, y: 0.038919415, z: 7.7998533}
-    fwdP3: {x: 0.3853086, y: 0.038919415, z: -0.39888996}
-    aftP0: {x: 0.3853086, y: 0.038919415, z: -0.39888996}
-    aftP1: {x: 0.3853086, y: 0.038919415, z: -4.5240417}
-    aftP2: {x: 0.25, y: 0.39037827, z: -10.167637}
-  - name: Lower (Floor to Keel) 2 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 19
-    tRatio: 0.2857143
-    uSectionParam: 0.071428575
-    fwdP0: {x: 0.25, y: 0.46851602, z: 10.964374}
-    fwdP1: {x: 0.5214946, y: 0.075718544, z: 7.8401737}
-    fwdP2: {x: 0.5214946, y: 0.075718544, z: 7.8401737}
-    fwdP3: {x: 0.5214946, y: 0.075718544, z: -0.39888996}
-    aftP0: {x: 0.5214946, y: 0.075718544, z: -0.39888996}
-    aftP1: {x: 0.5214946, y: 0.075718544, z: -4.734356}
-    aftP2: {x: 0.25, y: 0.78075653, z: -10.335275}
-  - name: Lower (Floor to Keel) 3 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 20
-    tRatio: 0.42857143
-    uSectionParam: 0.10714286
-    fwdP0: {x: 0.25, y: 0.70277405, z: 11.27963}
-    fwdP1: {x: 0.65789986, y: 0.11198759, z: 7.8776336}
-    fwdP2: {x: 0.65789986, y: 0.11198759, z: 7.8776336}
-    fwdP3: {x: 0.65789986, y: 0.11198759, z: -0.39888996}
-    aftP0: {x: 0.65789986, y: 0.11198759, z: -0.39888996}
-    aftP1: {x: 0.65789986, y: 0.11198759, z: -4.94467}
-    aftP2: {x: 0.25, y: 1.1711347, z: -10.502912}
-  - name: Lower (Floor to Keel) 4 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 21
-    tRatio: 0.5714286
-    uSectionParam: 0.14285715
-    fwdP0: {x: 0.25, y: 0.93703204, z: 11.532133}
-    fwdP1: {x: 0.79386663, y: 0.14931679, z: 7.9137483}
-    fwdP2: {x: 0.79386663, y: 0.14931679, z: 7.9137483}
-    fwdP3: {x: 0.79386663, y: 0.14931679, z: -0.39888996}
-    aftP0: {x: 0.79386663, y: 0.14931679, z: -0.39888996}
-    aftP1: {x: 0.79386663, y: 0.14931679, z: -5.1549845}
-    aftP2: {x: 0.25, y: 1.5615131, z: -10.670549}
-  - name: Lower (Floor to Keel) 5 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 22
-    tRatio: 0.71428573
-    uSectionParam: 0.17857143
-    fwdP0: {x: 0.25, y: 1.17129, z: 11.7384615}
-    fwdP1: {x: 0.92873645, y: 0.18929633, z: 7.9498963}
-    fwdP2: {x: 0.92873645, y: 0.18929633, z: 7.9498963}
-    fwdP3: {x: 0.92873645, y: 0.18929633, z: -0.39888996}
-    aftP0: {x: 0.92873645, y: 0.18929633, z: -0.39888996}
-    aftP1: {x: 0.92873645, y: 0.18929633, z: -5.3652987}
-    aftP2: {x: 0.25, y: 1.9518912, z: -10.838186}
-  - name: Lower (Floor to Keel) 6 BG
-    subRegionName: Lower (Floor to Keel)
-    index: 23
-    tRatio: 0.85714287
-    uSectionParam: 0.21428572
-    fwdP0: {x: 0.25, y: 1.4055481, z: 11.909165}
-    fwdP1: {x: 1.0618515, y: 0.23351648, z: 7.987755}
-    fwdP2: {x: 1.0618515, y: 0.23351648, z: 7.987755}
-    fwdP3: {x: 1.0618515, y: 0.23351648, z: -0.39888996}
-    aftP0: {x: 1.0618515, y: 0.23351648, z: -0.39888996}
-    aftP1: {x: 1.0618515, y: 0.23351648, z: -5.575613}
-    aftP2: {x: 0.25, y: 2.3422694, z: -11.005824}
-  changeVersion: 29352
---- !u!4 &291057396
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 291057394}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -741,29 +402,29 @@ MonoBehaviour:
   sheerCurves: {fileID: 1818396365}
   bodyCurves: {fileID: 2032973263}
   keelBreadth: {fileID: 882306903}
-  keelWidth: 0.5
+  keelWidth: 0.25
   showLabels: 1
   backboneColor: {r: 0.95, g: 0.6, b: 0.1, a: 0.95}
   isInitialized: 1
-  stbdStemP0: {x: 0.25, y: 0, z: 10}
-  stbdStemP1: {x: 0.25, y: 0.6361033, z: 11.8196125}
-  stbdStemP2: {x: 0.25, y: 2.0037498, z: 12.565482}
-  stbdStemP3: {x: 0.25, y: 4.1251526, z: 12.629255}
-  stbdUpperStemTop: {x: 0.25, y: 6.178974, z: 12.629255}
-  stbdKeelStart: {x: 0.25, y: 0, z: 10}
-  stbdKeelEnd: {x: 0.25, y: 0, z: -10}
-  stbdSternP0: {x: 0.25, y: 0, z: -10}
-  stbdSternP3: {x: 0.25, y: 4.1251526, z: -11.771435}
-  portStemP0: {x: -0.25, y: 0, z: 10}
-  portStemP1: {x: -0.25, y: 0.6361033, z: 11.8196125}
-  portStemP2: {x: -0.25, y: 2.0037498, z: 12.565482}
-  portStemP3: {x: -0.25, y: 4.1251526, z: 12.629255}
-  portUpperStemTop: {x: -0.25, y: 6.178974, z: 12.629255}
-  portKeelStart: {x: -0.25, y: 0, z: 10}
-  portKeelEnd: {x: -0.25, y: 0, z: -10}
-  portSternP0: {x: -0.25, y: 0, z: -10}
-  portSternP3: {x: -0.25, y: 4.1251526, z: -11.771435}
-  changeVersion: 1222889
+  stbdStemP0: {x: 0.125, y: 0, z: 10}
+  stbdStemP1: {x: 0.125, y: 0.6361033, z: 11.8196125}
+  stbdStemP2: {x: 0.125, y: 1.9853086, z: 12.629255}
+  stbdStemP3: {x: 0.125, y: 4.1251526, z: 12.629255}
+  stbdUpperStemTop: {x: 0.125, y: 5.566162, z: 12.629255}
+  stbdKeelStart: {x: 0.125, y: 0, z: 10}
+  stbdKeelEnd: {x: 0.125, y: 0, z: -10}
+  stbdSternP0: {x: 0.125, y: 0, z: -10}
+  stbdSternP3: {x: 0.125, y: 4.1251526, z: -11.94165}
+  portStemP0: {x: -0.125, y: 0, z: 10}
+  portStemP1: {x: -0.125, y: 0.6361033, z: 11.8196125}
+  portStemP2: {x: -0.125, y: 1.9853086, z: 12.629255}
+  portStemP3: {x: -0.125, y: 4.1251526, z: 12.629255}
+  portUpperStemTop: {x: -0.125, y: 5.566162, z: 12.629255}
+  portKeelStart: {x: -0.125, y: 0, z: 10}
+  portKeelEnd: {x: -0.125, y: 0, z: -10}
+  portSternP0: {x: -0.125, y: 0, z: -10}
+  portSternP3: {x: -0.125, y: 4.1251526, z: -11.94165}
+  changeVersion: 1981566
 --- !u!4 &747401017
 Transform:
   m_ObjectHideFlags: 0
@@ -810,15 +471,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KeelBreadth
   sheerCurves: {fileID: 1818396365}
   bodyCurves: {fileID: 2032973263}
-  keelWidth: 0.5
-  showLabels: 1
+  keelWidth: 0.25
+  showLabels: 0
   keelColor: {r: 1, g: 0.85, b: 0.1, a: 0.95}
   isInitialized: 1
-  stbdKeelStart: {x: 0.25, y: 0, z: 10}
-  stbdKeelEnd: {x: 0.25, y: 0, z: -10}
-  portKeelStart: {x: -0.25, y: 0, z: 10}
-  portKeelEnd: {x: -0.25, y: 0, z: -10}
-  changeVersion: 1225594
+  stbdKeelStart: {x: 0.125, y: 0, z: 10}
+  stbdKeelEnd: {x: 0.125, y: 0, z: -10}
+  portKeelStart: {x: -0.125, y: 0, z: 10}
+  portKeelEnd: {x: -0.125, y: 0, z: -10}
+  changeVersion: 1991392
 --- !u!4 &882306904
 Transform:
   m_ObjectHideFlags: 0
@@ -872,17 +533,17 @@ MonoBehaviour:
   backboneCurves: {fileID: 747401016}
   fashionCurves: {fileID: 2019170296}
   region: 4
-  ribbandCountPerBand: 1
+  ribbandCountPerBand: 6
   showLabels: 0
   showControlArms: 1
   showPolygonSkeleton: 0
   ribbandColor: {r: 0, g: 0.014314713, b: 0.46226418, a: 1}
-  showBowMouldP1Guide: 1
-  showFwdP2Guide: 1
+  showBowMouldP1Guide: 0
+  showFwdP2Guide: 0
   bowMouldGuideColor: {r: 0.1, g: 0.95, b: 0.85, a: 0.95}
   fwdP2GuideColor: {r: 0.95, g: 0.85, b: 0.1, a: 0.95}
-  showAftMouldA1Guide: 1
-  showSternTransomGuide: 1
+  showAftMouldA1Guide: 0
+  showSternTransomGuide: 0
   aftMouldGuideColor: {r: 0.75, g: 0.25, b: 0.95, a: 0.95}
   sternTransomGuideColor: {r: 0.95, g: 0.25, b: 0.55, a: 0.95}
   isInitialized: 1
@@ -890,52 +551,292 @@ MonoBehaviour:
   - name: Upper Mould (TopLine to Breadth) 1
     subRegionName: Upper Mould (TopLine to Breadth)
     index: 0
-    tRatio: 0.5
-    uSectionParam: 0.875
-    fwdP0: {x: 0.25, y: 5.1520634, z: 12.629255}
-    fwdP1: {x: 2.8337064, y: 4.8201294, z: 11.399196}
-    fwdP2: {x: 2.8345802, y: 4.646059, z: 9.004347}
-    fwdP3: {x: 2.8345802, y: 4.646059, z: -0.39888996}
-    aftP0: {x: 2.8345802, y: 4.646059, z: -0.39888996}
-    aftP1: {x: 2.8345802, y: 4.646059, z: -6.86895}
-    aftP2: {x: 1.3011625, y: 5.909073, z: -13.65883}
+    tRatio: 0.14285715
+    uSectionParam: 0.78571427
+    fwdP0: {x: 0.125, y: 4.3310113, z: 12.629255}
+    fwdP1: {x: 2.9932919, y: 3.8755336, z: 11.49358}
+    fwdP2: {x: 2.994955, y: 3.8674755, z: 9.033572}
+    fwdP3: {x: 2.994955, y: 3.8674755, z: -0.47306794}
+    aftP0: {x: 2.994955, y: 3.8674755, z: -0.47306794}
+    aftP1: {x: 2.994955, y: 3.8674755, z: -6.792363}
+    aftP2: {x: 1.6370597, y: 4.708478, z: -12.311174}
+  - name: Upper Mould (TopLine to Breadth) 2
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 1
+    tRatio: 0.2857143
+    uSectionParam: 0.8214286
+    fwdP0: {x: 0.125, y: 4.5368695, z: 12.629255}
+    fwdP1: {x: 2.9451032, y: 4.110475, z: 11.615298}
+    fwdP2: {x: 2.946466, y: 4.093417, z: 8.899991}
+    fwdP3: {x: 2.946466, y: 4.093417, z: -0.47306794}
+    aftP0: {x: 2.946466, y: 4.093417, z: -0.47306794}
+    aftP1: {x: 2.946466, y: 4.093417, z: -6.812895}
+    aftP2: {x: 1.5484341, y: 4.977924, z: -12.6536875}
+  - name: Upper Mould (TopLine to Breadth) 3
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 2
+    tRatio: 0.42857143
+    uSectionParam: 0.85714287
+    fwdP0: {x: 0.125, y: 4.742728, z: 12.629255}
+    fwdP1: {x: 2.8786337, y: 4.3442955, z: 11.736435}
+    fwdP2: {x: 2.879698, y: 4.317309, z: 8.767622}
+    fwdP3: {x: 2.879698, y: 4.317309, z: -0.47306794}
+    aftP0: {x: 2.879698, y: 4.317309, z: -0.47306794}
+    aftP1: {x: 2.879698, y: 4.317309, z: -6.834714}
+    aftP2: {x: 1.4635017, y: 5.24737, z: -12.970537}
+  - name: Upper Mould (TopLine to Breadth) 4
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 3
+    tRatio: 0.5714286
+    uSectionParam: 0.89285713
+    fwdP0: {x: 0.125, y: 4.9485865, z: 12.629255}
+    fwdP1: {x: 2.805368, y: 4.5783496, z: 11.857694}
+    fwdP2: {x: 2.806145, y: 4.5405073, z: 8.635662}
+    fwdP3: {x: 2.806145, y: 4.5405073, z: -0.47306794}
+    aftP0: {x: 2.806145, y: 4.5405073, z: -0.47306794}
+    aftP1: {x: 2.806145, y: 4.5405073, z: -6.8608627}
+    aftP2: {x: 1.4312745, y: 5.516815, z: -13.078315}
+  - name: Upper Mould (TopLine to Breadth) 5
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 4
+    tRatio: 0.71428573
+    uSectionParam: 0.92857146
+    fwdP0: {x: 0.125, y: 5.154445, z: 12.629255}
+    fwdP1: {x: 2.7367947, y: 4.814002, z: 11.97978}
+    fwdP2: {x: 2.7372994, y: 4.764367, z: 8.503312}
+    fwdP3: {x: 2.7372994, y: 4.764367, z: -0.47306794}
+    aftP0: {x: 2.7372994, y: 4.764367, z: -0.47306794}
+    aftP1: {x: 2.7372994, y: 4.764367, z: -6.897959}
+    aftP2: {x: 1.392106, y: 5.786261, z: -13.186093}
+  - name: Upper Mould (TopLine to Breadth) 6
+    subRegionName: Upper Mould (TopLine to Breadth)
+    index: 5
+    tRatio: 0.85714287
+    uSectionParam: 0.96428573
+    fwdP0: {x: 0.125, y: 5.3603034, z: 12.629255}
+    fwdP1: {x: 2.6844082, y: 5.052629, z: 12.103408}
+    fwdP2: {x: 2.6846554, y: 4.990243, z: 8.369769}
+    fwdP3: {x: 2.6846554, y: 4.990243, z: -0.47306794}
+    aftP0: {x: 2.6846554, y: 4.990243, z: -0.47306794}
+    aftP1: {x: 2.6846554, y: 4.990243, z: -6.9571705}
+    aftP2: {x: 1.3608755, y: 6.0557065, z: -13.293871}
   - name: Upper (Breadth to Bilge) 1
     subRegionName: Upper (Breadth to Bilge)
-    index: 1
-    tRatio: 0.5
-    uSectionParam: 0.625
-    fwdP0: {x: 0.25, y: 3.1834478, z: 12.547543}
-    fwdP1: {x: 2.9633055, y: 2.3304188, z: 10.4024515}
-    fwdP2: {x: 2.964682, y: 2.3304188, z: 8.699301}
-    fwdP3: {x: 2.964682, y: 2.3304188, z: -0.39888996}
-    aftP0: {x: 2.964682, y: 2.3304188, z: -0.39888996}
-    aftP1: {x: 2.964682, y: 2.3304188, z: -6.320479}
-    aftP2: {x: 1.6895705, y: 3.7390432, z: -11.605631}
+    index: 6
+    tRatio: 0.14285715
+    uSectionParam: 0.53571427
+    fwdP0: {x: 0.125, y: 2.8402712, z: 12.512289}
+    fwdP1: {x: 2.848834, y: 2.0110414, z: 10.809808}
+    fwdP2: {x: 2.849887, y: 2.0110414, z: 9.002192}
+    fwdP3: {x: 2.849887, y: 2.0110414, z: -0.47306794}
+    aftP0: {x: 2.849887, y: 2.0110414, z: -0.47306794}
+    aftP1: {x: 2.849887, y: 2.0110414, z: -5.7413616}
+    aftP2: {x: 1.4599966, y: 3.5492365, z: -11.670575}
+  - name: Upper (Breadth to Bilge) 2
+    subRegionName: Upper (Breadth to Bilge)
+    index: 7
+    tRatio: 0.2857143
+    uSectionParam: 0.5714286
+    fwdP0: {x: 0.125, y: 3.054418, z: 12.550732}
+    fwdP1: {x: 2.9099789, y: 2.275894, z: 10.997668}
+    fwdP2: {x: 2.91119, y: 2.275894, z: 9.058128}
+    fwdP3: {x: 2.91119, y: 2.275894, z: -0.47306794}
+    aftP0: {x: 2.91119, y: 2.275894, z: -0.47306794}
+    aftP1: {x: 2.91119, y: 2.275894, z: -5.909048}
+    aftP2: {x: 1.5452505, y: 3.6940749, z: -11.738749}
+  - name: Upper (Breadth to Bilge) 3
+    subRegionName: Upper (Breadth to Bilge)
+    index: 8
+    tRatio: 0.42857143
+    uSectionParam: 0.60714287
+    fwdP0: {x: 0.125, y: 3.268565, z: 12.580602}
+    fwdP1: {x: 2.9539216, y: 2.5451627, z: 11.1424465}
+    fwdP2: {x: 2.9552884, y: 2.5451627, z: 9.101236}
+    fwdP3: {x: 2.9552884, y: 2.5451627, z: -0.47306794}
+    aftP0: {x: 2.9552884, y: 2.5451627, z: -0.47306794}
+    aftP1: {x: 2.9552884, y: 2.5451627, z: -6.0795302}
+    aftP2: {x: 1.6065776, y: 3.841328, z: -11.808058}
+  - name: Upper (Breadth to Bilge) 4
+    subRegionName: Upper (Breadth to Bilge)
+    index: 9
+    tRatio: 0.5714286
+    uSectionParam: 0.64285713
+    fwdP0: {x: 0.125, y: 3.482712, z: 12.602727}
+    fwdP1: {x: 2.983364, y: 2.8174343, z: 11.247904}
+    fwdP2: {x: 2.9848835, y: 2.8174343, z: 9.132636}
+    fwdP3: {x: 2.9848835, y: 2.8174343, z: -0.47306794}
+    aftP0: {x: 2.9848835, y: 2.8174343, z: -0.47306794}
+    aftP1: {x: 2.9848835, y: 2.8174343, z: -6.2519145}
+    aftP2: {x: 1.6477361, y: 3.9902234, z: -11.878141}
+  - name: Upper (Breadth to Bilge) 5
+    subRegionName: Upper (Breadth to Bilge)
+    index: 10
+    tRatio: 0.71428573
+    uSectionParam: 0.67857146
+    fwdP0: {x: 0.125, y: 3.696859, z: 12.617813}
+    fwdP1: {x: 3.0010107, y: 3.0912957, z: 11.318644}
+    fwdP2: {x: 3.0026784, y: 3.0912957, z: 9.1537}
+    fwdP3: {x: 3.0026784, y: 3.0912957, z: -0.47306794}
+    aftP0: {x: 3.0026784, y: 3.0912957, z: -0.47306794}
+    aftP1: {x: 3.0026784, y: 3.0912957, z: -6.4253044}
+    aftP2: {x: 1.672483, y: 4.1399884, z: -11.948896}
+  - name: Upper (Breadth to Bilge) 6
+    subRegionName: Upper (Breadth to Bilge)
+    index: 11
+    tRatio: 0.85714287
+    uSectionParam: 0.71428573
+    fwdP0: {x: 0.125, y: 3.9110057, z: 12.626475}
+    fwdP1: {x: 3.0095618, y: 3.3653326, z: 11.358247}
+    fwdP2: {x: 3.011374, y: 3.3653326, z: 9.165491}
+    fwdP3: {x: 3.011374, y: 3.3653326, z: -0.47306794}
+    aftP0: {x: 3.011374, y: 3.3653326, z: -0.47306794}
+    aftP1: {x: 3.011374, y: 3.3653326, z: -6.598806}
+    aftP2: {x: 1.6845759, y: 4.2898493, z: -12.025032}
   - name: Middle (Bilge to Floor) 1
     subRegionName: Middle (Bilge to Floor)
-    index: 2
-    tRatio: 0.5
-    uSectionParam: 0.375
-    fwdP0: {x: 0.25, y: 1.9407744, z: 12.200664}
-    fwdP1: {x: 2.0451386, y: 0.5951313, z: 8.901873}
-    fwdP2: {x: 2.045442, y: 0.5951313, z: 8.378366}
-    fwdP3: {x: 2.045442, y: 0.5951313, z: -0.39888996}
-    aftP0: {x: 2.045442, y: 0.5951313, z: -0.39888996}
-    aftP1: {x: 2.045442, y: 0.5951313, z: -5.8680134}
-    aftP2: {x: 0.7844586, y: 2.9745553, z: -11.277342}
+    index: 12
+    tRatio: 0.14285715
+    uSectionParam: 0.2857143
+    fwdP0: {x: 0.125, y: 1.7853466, z: 12.158317}
+    fwdP1: {x: 2.062091, y: 0.6490949, z: 8.634881}
+    fwdP2: {x: 2.0621846, y: 0.6490949, z: 8.3546}
+    fwdP3: {x: 2.0621846, y: 0.6490949, z: -0.47306794}
+    aftP0: {x: 2.0621846, y: 0.6490949, z: -0.47306794}
+    aftP1: {x: 2.0621846, y: 0.6490949, z: -4.8790708}
+    aftP2: {x: 0.36454278, y: 2.8044374, z: -11.320008}
+  - name: Middle (Bilge to Floor) 2
+    subRegionName: Middle (Bilge to Floor)
+    index: 13
+    tRatio: 0.2857143
+    uSectionParam: 0.32142857
+    fwdP0: {x: 0.125, y: 1.9254762, z: 12.224932}
+    fwdP1: {x: 2.2181103, y: 0.80138904, z: 9.03589}
+    fwdP2: {x: 2.2183125, y: 0.80138904, z: 8.474002}
+    fwdP3: {x: 2.2183125, y: 0.80138904, z: -0.47306794}
+    aftP0: {x: 2.2183125, y: 0.80138904, z: -0.47306794}
+    aftP1: {x: 2.2183125, y: 0.80138904, z: -4.975492}
+    aftP2: {x: 0.58166915, y: 2.8877215, z: -11.359209}
+  - name: Middle (Bilge to Floor) 3
+    subRegionName: Middle (Bilge to Floor)
+    index: 14
+    tRatio: 0.42857143
+    uSectionParam: 0.35714287
+    fwdP0: {x: 0.125, y: 2.0656059, z: 12.284538}
+    fwdP1: {x: 2.3583274, y: 0.97109854, z: 9.415102}
+    fwdP2: {x: 2.3586512, y: 0.97109854, z: 8.586914}
+    fwdP3: {x: 2.3586512, y: 0.97109854, z: -0.47306794}
+    aftP0: {x: 2.3586512, y: 0.97109854, z: -0.47306794}
+    aftP1: {x: 2.3586512, y: 0.97109854, z: -5.0829406}
+    aftP2: {x: 0.77683747, y: 2.9805295, z: -11.402893}
+  - name: Middle (Bilge to Floor) 4
+    subRegionName: Middle (Bilge to Floor)
+    index: 15
+    tRatio: 0.5714286
+    uSectionParam: 0.39285713
+    fwdP0: {x: 0.125, y: 2.2057354, z: 12.337768}
+    fwdP1: {x: 2.4830725, y: 1.1546197, z: 9.763771}
+    fwdP2: {x: 2.4835281, y: 1.1546197, z: 8.690731}
+    fwdP3: {x: 2.4835281, y: 1.1546197, z: -0.47306794}
+    aftP0: {x: 2.4835281, y: 1.1546197, z: -0.47306794}
+    aftP1: {x: 2.4835281, y: 1.1546197, z: -5.199134}
+    aftP2: {x: 0.95050323, y: 3.0808907, z: -11.450131}
+  - name: Middle (Bilge to Floor) 5
+    subRegionName: Middle (Bilge to Floor)
+    index: 16
+    tRatio: 0.71428573
+    uSectionParam: 0.42857143
+    fwdP0: {x: 0.125, y: 2.345865, z: 12.385162}
+    fwdP1: {x: 2.5926764, y: 1.3483491, z: 10.074361}
+    fwdP2: {x: 2.5932724, y: 1.3483491, z: 8.78321}
+    fwdP3: {x: 2.5932724, y: 1.3483491, z: -0.47306794}
+    aftP0: {x: 2.5932724, y: 1.3483491, z: -0.47306794}
+    aftP1: {x: 2.5932724, y: 1.3483491, z: -5.3217897}
+    aftP2: {x: 1.1031244, y: 3.1868343, z: -11.499997}
+  - name: Middle (Bilge to Floor) 6
+    subRegionName: Middle (Bilge to Floor)
+    index: 17
+    tRatio: 0.85714287
+    uSectionParam: 0.46428573
+    fwdP0: {x: 0.125, y: 2.4859948, z: 12.4272}
+    fwdP1: {x: 2.68747, y: 1.5486836, z: 10.34474}
+    fwdP2: {x: 2.6882129, y: 1.5486836, z: 8.863716}
+    fwdP3: {x: 2.6882129, y: 1.5486836, z: -0.47306794}
+    aftP0: {x: 2.6882129, y: 1.5486836, z: -0.47306794}
+    aftP1: {x: 2.6882129, y: 1.5486836, z: -5.448628}
+    aftP2: {x: 1.2351573, y: 3.2963898, z: -11.551563}
   - name: Lower (Floor to Keel) 1
     subRegionName: Lower (Floor to Keel)
-    index: 3
-    tRatio: 0.5
-    uSectionParam: 0.125
-    fwdP0: {x: 0.25, y: 0.819903, z: 11.412504}
-    fwdP1: {x: 0.7771509, y: 0.124060914, z: 7.785949}
-    fwdP2: {x: 0.7771509, y: 0.124060914, z: 8.139699}
-    fwdP3: {x: 0.7771509, y: 0.124060914, z: -0.39888996}
-    aftP0: {x: 0.7771509, y: 0.124060914, z: -0.39888996}
-    aftP1: {x: 0.7771509, y: 0.124060914, z: -5.745185}
-    aftP2: {x: 0.25, y: 1.3663238, z: -10.586731}
-  changeVersion: 1208342
+    index: 18
+    tRatio: 0.14285715
+    uSectionParam: 0.035714287
+    fwdP0: {x: 0.125, y: 0.23503101, z: 10.562352}
+    fwdP1: {x: 0.19594635, y: 0.010909779, z: 5.892778}
+    fwdP2: {x: 0.19594635, y: 0.010909779, z: 7.53813}
+    fwdP3: {x: 0.19594635, y: 0.010909779, z: -0.47306794}
+    aftP0: {x: 0.19594635, y: 0.010909779, z: -0.47306794}
+    aftP1: {x: 0.19594635, y: 0.010909779, z: -4.4750156}
+    aftP2: {x: 0.125, y: 0.39037827, z: -10.183745}
+  - name: Lower (Floor to Keel) 2
+    subRegionName: Lower (Floor to Keel)
+    index: 19
+    tRatio: 0.2857143
+    uSectionParam: 0.071428575
+    fwdP0: {x: 0.125, y: 0.47006202, z: 10.97557}
+    fwdP1: {x: 0.38550064, y: 0.04341109, z: 6.1029305}
+    fwdP2: {x: 0.38550064, y: 0.04341109, z: 7.6007032}
+    fwdP3: {x: 0.38550064, y: 0.04341109, z: -0.47306794}
+    aftP0: {x: 0.38550064, y: 0.04341109, z: -0.47306794}
+    aftP1: {x: 0.38550064, y: 0.04341109, z: -4.4955935}
+    aftP2: {x: 0.125, y: 0.78075653, z: -10.367491}
+  - name: Lower (Floor to Keel) 3
+    subRegionName: Lower (Floor to Keel)
+    index: 20
+    tRatio: 0.42857143
+    uSectionParam: 0.10714286
+    fwdP0: {x: 0.125, y: 0.70509297, z: 11.296963}
+    fwdP1: {x: 0.6587355, y: 0.09716189, z: 6.4258313}
+    fwdP2: {x: 0.6587355, y: 0.09716189, z: 7.6968484}
+    fwdP3: {x: 0.6587355, y: 0.09716189, z: -0.47306794}
+    aftP0: {x: 0.6587355, y: 0.09716189, z: -0.47306794}
+    aftP1: {x: 0.6587355, y: 0.09716189, z: -4.529624}
+    aftP2: {x: 0.125, y: 1.1711347, z: -10.551236}
+  - name: Lower (Floor to Keel) 4
+    subRegionName: Lower (Floor to Keel)
+    index: 21
+    tRatio: 0.5714286
+    uSectionParam: 0.14285715
+    fwdP0: {x: 0.125, y: 0.94012403, z: 11.554779}
+    fwdP1: {x: 0.980724, y: 0.17182016, z: 6.829369}
+    fwdP2: {x: 0.980724, y: 0.17182016, z: 7.817003}
+    fwdP3: {x: 0.980724, y: 0.17182016, z: -0.47306794}
+    aftP0: {x: 0.980724, y: 0.17182016, z: -0.47306794}
+    aftP1: {x: 0.980724, y: 0.17182016, z: -4.576893}
+    aftP2: {x: 0.125, y: 1.5615131, z: -10.7349825}
+  - name: Lower (Floor to Keel) 5
+    subRegionName: Lower (Floor to Keel)
+    index: 22
+    tRatio: 0.71428573
+    uSectionParam: 0.17857143
+    fwdP0: {x: 0.125, y: 1.175155, z: 11.7654295}
+    fwdP1: {x: 1.3165386, y: 0.26704383, z: 7.2819266}
+    fwdP2: {x: 1.3165386, y: 0.26704383, z: 7.9517536}
+    fwdP3: {x: 1.3165386, y: 0.26704383, z: -0.47306794}
+    aftP0: {x: 1.3165386, y: 0.26704383, z: -0.47306794}
+    aftP1: {x: 1.3165386, y: 0.26704383, z: -4.6371813}
+    aftP2: {x: 0.125, y: 1.9518912, z: -10.918728}
+  - name: Lower (Floor to Keel) 6
+    subRegionName: Lower (Floor to Keel)
+    index: 23
+    tRatio: 0.85714287
+    uSectionParam: 0.21428572
+    fwdP0: {x: 0.125, y: 1.4101859, z: 11.939423}
+    fwdP1: {x: 1.6312523, y: 0.38249087, z: 7.7588015}
+    fwdP2: {x: 1.6312523, y: 0.38249087, z: 8.093744}
+    fwdP3: {x: 1.6312523, y: 0.38249087, z: -0.47306794}
+    aftP0: {x: 1.6312523, y: 0.38249087, z: -0.47306794}
+    aftP1: {x: 1.6312523, y: 0.38249087, z: -4.7102747}
+    aftP2: {x: 0.125, y: 2.3422694, z: -11.102473}
+  changeVersion: 1816338
 --- !u!4 &1349209205
 Transform:
   m_ObjectHideFlags: 0
@@ -1096,18 +997,22 @@ MonoBehaviour:
   ribbandCurves: {fileID: 1349209204}
   fashionCurves: {fileID: 2019170296}
   backboneCurves: {fileID: 747401016}
-  sectionCount: 15
+  forwardSectionCount: 10
+  aftSectionCount: 10
+  includeMasterSection: 1
+  sectionCount: 20
   includePrimaryBoundaryNodes: 1
   showTransverseSections: 1
   showSectionNodes: 0
   showPolygonSkeleton: 0
-  showLabels: 1
+  showLabels: 0
   nodeRadius: 0.06
   sectionColor: {r: 0.2, g: 0.85, b: 0.45, a: 0.95}
   starboardColor: {r: 0.2, g: 0.95, b: 0.4, a: 0.95}
   portColor: {r: 0.95, g: 0.25, b: 0.4, a: 0.95}
+  useKeyCurvesOnlyForSections: 1
   isInitialized: 1
-  changeVersion: 81082
+  changeVersion: 167267
 --- !u!1 &1799144729
 GameObject:
   m_ObjectHideFlags: 0
@@ -1141,37 +1046,42 @@ MonoBehaviour:
   backboneCurves: {fileID: 747401016}
   sheerCurves: {fileID: 1818396365}
   enableInteractiveHandles: 1
-  showLabels: 1
+  showLabels: 0
   showAftProjectionLine: 1
   breadthCurveColor: {r: 0.9428512, g: 0.9490196, b: 0.10196079, a: 0.95}
+  showInnerLine: 1
+  innerLineSpacing: 0.1605944
+  innerLineColor: {r: 0.2, g: 0.9, b: 0.8, a: 0.95}
   isInitialized: 1
-  fwdP0: {x: 0.25, y: 4.1251526, z: 12.629255}
-  fwdP1: {x: 3.0118032, y: 3.6381307, z: 10.641204}
-  fwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750363}
-  fwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
-  aftP1: {x: 3.0136719, y: 3.6381307, z: -6.6614566}
-  aftP2: {x: 1.7451465, y: 4.4390326, z: -11.968783}
+  fwdP0: {x: 0.125, y: 4.1251526, z: 12.629255}
+  fwdP1: {x: 3.0117188, y: 3.6381307, z: 11.370586}
+  fwdP2: {x: 3.0136719, y: 3.6381307, z: 9.169166}
+  fwdP3: {x: 3.0136719, y: 3.6381307, z: -0.47306794}
+  aftP1: {x: 3.0136719, y: 3.6381307, z: -6.7715225}
+  aftP2: {x: 1.6877716, y: 4.4390326, z: -12.109281}
   aftP3: {x: 0.125, y: 4.1251526, z: -10.216921}
   transomWidth: 0.541
   maxBeam: 3.0136719
-  midshipApexZPercentage: 0.47035837
-  fwdP2Ratio: 0.7022683
-  fwdP1Ratio: 0.84740335
-  aftP1Ratio: 0.45871872
+  midshipApexZPercentage: 0.47036788
+  fwdP2Ratio: 0.73591787
+  fwdP1Ratio: 0.90393543
+  aftP1Ratio: 0.45871955
   fwdP2XRatio: 0.9
   fwdP1XRatio: 0.99932384
   aftP1XRatio: 0.9
   fwdP1YRatio: 0
-  cachedFwdP0: {x: 0.25, y: 4.1251526, z: 12.629255}
-  cachedFwdP1: {x: 3.0118032, y: 3.6381307, z: 10.641204}
-  cachedFwdP2: {x: 3.0136719, y: 3.6381307, z: 8.750363}
-  cachedFwdP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
-  cachedAftP0: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
-  cachedAftP1: {x: 3.0136719, y: 3.6381307, z: -6.6614566}
-  cachedAftP2: {x: 1.7451465, y: 4.4390326, z: -11.968783}
+  cachedFwdP0: {x: 0.125, y: 4.1251526, z: 12.629255}
+  cachedFwdP1: {x: 3.0117188, y: 3.6381307, z: 11.370586}
+  cachedFwdP2: {x: 3.0136719, y: 3.6381307, z: 9.169166}
+  cachedFwdP3: {x: 3.0136719, y: 3.6381307, z: -0.47306794}
+  cachedAftP0: {x: 3.0136719, y: 3.6381307, z: -0.47306794}
+  cachedAftP1: {x: 3.0136719, y: 3.6381307, z: -6.7715225}
+  cachedAftP2: {x: 1.6877716, y: 4.4390326, z: -12.109281}
   cachedAftP3: {x: 0.125, y: 4.1251526, z: -10.216921}
   cachedIsAftCubic: 0
-  changeVersion: 311217291
+  cachedInnerMidshipPt: {x: 2.8530774, y: 3.6381307, z: -0.47306794}
+  cachedOffsetVector: {x: -0.16059446, y: 0, z: 0}
+  changeVersion: 516330672
 --- !u!4 &1799144731
 Transform:
   m_ObjectHideFlags: 0
@@ -1217,7 +1127,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SheerCurves
   breadthCurves: {fileID: 1799144730}
-  showLabels: 1
+  showLabels: 0
   profileColor: {r: 0.95, g: 0.75, b: 0.1, a: 0.95}
   lengthBetweenPerpendiculars: 20
   keelY: 0
@@ -1225,38 +1135,38 @@ MonoBehaviour:
   stemRake: 2.6292553
   stemBottomControlZ: 0.6920638
   stemBottomControlY: 0.15420115
-  stemTopControlZ: 0.9757448
-  stemTopControlY: 0.48573956
+  stemTopControlZ: 1
+  stemTopControlY: 0.48126915
   linkSternHeightToStem: 1
   sternPostHeight: 4.1251526
-  sternPostRake: 1.7714348
+  sternPostRake: 1.9416504
   enableCounter: 1
-  counterLength: 1.8036747
-  counterHeight: 1.5588975
-  counterBottomControlZ: 0.25557423
-  counterBottomControlY: 0.51323473
-  counterTopControlZ: 0.5243104
-  counterTopControlY: 0.7492179
-  transomRakeAft: 0.6306553
-  transomRakeHeight: 1.6950641
-  upperStemRatio: 0.63117576
+  counterLength: 0.97999954
+  counterHeight: 1
+  counterBottomControlZ: 0.25557414
+  counterBottomControlY: 0.5132346
+  counterTopControlZ: 0.42256355
+  counterTopControlY: 0.7151184
+  transomRakeAft: 0.47999954
+  transomRakeHeight: 1.1999998
+  upperStemRatio: 0.6550044
   stemP0: {x: 0, y: 0, z: 10}
   stemP1: {x: 0, y: 0.6361033, z: 11.8196125}
-  stemP2: {x: 0, y: 2.0037498, z: 12.565482}
+  stemP2: {x: 0, y: 1.9853086, z: 12.629255}
   stemP3: {x: 0, y: 4.1251526, z: 12.629255}
   keelStart: {x: 0, y: 0, z: 10}
   keelEnd: {x: 0, y: 0, z: -10}
   sternP0: {x: 0, y: 0, z: -10}
-  sternP3: {x: 0, y: 4.1251526, z: -11.771435}
-  counterP0: {x: 0, y: 4.1251526, z: -11.771435}
-  counterP1: {x: 0, y: 4.925233, z: -12.232408}
-  counterP2: {x: 0, y: 5.2931066, z: -12.71712}
-  counterP3: {x: 0, y: 5.68405, z: -13.5751095}
-  transomP0: {x: 0, y: 5.68405, z: -13.5751095}
-  transomP1: {x: 0, y: 7.379114, z: -14.205765}
-  upperStemTop: {x: 0, y: 6.178974, z: 12.629255}
+  sternP3: {x: 0, y: 4.1251526, z: -11.94165}
+  counterP0: {x: 0, y: 4.1251526, z: -11.94165}
+  counterP1: {x: 0, y: 4.638387, z: -12.192113}
+  counterP2: {x: 0, y: 4.840271, z: -12.3557625}
+  counterP3: {x: 0, y: 5.1251526, z: -12.92165}
+  transomP0: {x: 0, y: 5.1251526, z: -12.92165}
+  transomP1: {x: 0, y: 6.3251524, z: -13.401649}
+  upperStemTop: {x: 0, y: 5.566162, z: 12.629255}
   isInitialized: 1
-  changeVersion: 1341237357
+  changeVersion: -2052766834
 --- !u!4 &1818396366
 Transform:
   m_ObjectHideFlags: 0
@@ -1431,23 +1341,34 @@ MonoBehaviour:
   sheerCurves: {fileID: 1818396365}
   topLineCurves: {fileID: 264070284}
   breadthCurves: {fileID: 1799144730}
+  bilgeCurves: {fileID: 186442759}
   floorCurves: {fileID: 216798052}
   bodyCurves: {fileID: 2032973263}
   backboneCurves: {fileID: 747401016}
-  bilgeHeightRatio: 0.24219428
-  bilgeWidthRatio: 0.7724883
+  bilgeHeightRatio: 0.39553744
+  bilgeWidthRatio: 0.7819817
+  showInnerLine: 1
+  innerLineColor: {r: 0.2, g: 0.95, b: 0.6, a: 0.95}
   showLabels: 1
   fashionCurveColor: {r: 0.95, g: 0.25, b: 0.85, a: 0.95}
   isInitialized: 1
-  stbdP1: {x: 0.25, y: 2.7326477, z: -11.173461}
-  stbdP2: {x: 1.4049832, y: 3.1459243, z: -11.350932}
-  stbdP3: {x: 1.7451465, y: 4.4390326, z: -11.968783}
-  stbdP4: {x: 1.1413531, y: 7.379114, z: -14.205765}
-  portP1: {x: -0.25, y: 2.7326477, z: -11.173461}
-  portP2: {x: -1.4049832, y: 3.1459243, z: -11.350932}
-  portP3: {x: -1.7451465, y: 4.4390326, z: -11.968783}
-  portP4: {x: -1.1413531, y: 7.379114, z: -14.205765}
-  changeVersion: 71453653
+  stbdP1: {x: 0.125, y: 2.7326477, z: -11.286219}
+  stbdP2: {x: 1.3470587, y: 3.4075868, z: -11.603903}
+  stbdP3: {x: 1.6877716, y: 4.4390326, z: -12.109281}
+  stbdP4: {x: 1.3433044, y: 6.3251524, z: -13.401649}
+  portP1: {x: -0.125, y: 2.7326477, z: -11.286219}
+  portP2: {x: -1.3470587, y: 3.4075868, z: -11.603903}
+  portP3: {x: -1.6877716, y: 4.4390326, z: -12.109281}
+  portP4: {x: -1.3433044, y: 6.3251524, z: -13.401649}
+  innerStbdP1: {x: 0.006619066, y: 2.927249, z: -11.1314535}
+  innerStbdP2: {x: 1.173384, y: 3.440259, z: -11.384811}
+  innerStbdP3: {x: 1.5619857, y: 4.420794, z: -11.948687}
+  innerStbdP4: {x: 1.2617842, y: 6.311378, z: -13.301699}
+  innerPortP1: {x: -0.006619066, y: 2.927249, z: -11.1314535}
+  innerPortP2: {x: -1.173384, y: 3.440259, z: -11.384811}
+  innerPortP3: {x: -1.5619857, y: 4.420794, z: -11.948687}
+  innerPortP4: {x: -1.2617842, y: 6.311378, z: -13.301699}
+  changeVersion: 115766705
 --- !u!4 &2019170297
 Transform:
   m_ObjectHideFlags: 0
@@ -1498,23 +1419,28 @@ MonoBehaviour:
   floorCurves: {fileID: 216798052}
   bilgeCurves: {fileID: 186442759}
   topLineCurves: {fileID: 264070284}
-  keelWidth: 0.5
-  floorHollow: 0.5
-  bilgeHeightRatio: 0.24219428
-  bilgeWidthRatio: 0.7724883
+  keelWidth: 0.25
+  floorHollow: 1
+  keelEntryInfluence: 0
+  bilgeHeightRatio: 0.39553744
+  bilgeWidthRatio: 0.7819817
   minConvexArcFactor: 0.2
-  showLabels: 1
+  showInnerLine: 1
+  innerLineSpacing: 0.3
+  topInnerLineSpacing: 0.1
+  innerLineColor: {r: 0.2, g: 0.9, b: 0.8, a: 0.95}
+  showLabels: 0
   showPolygonSkeleton: 1
   showControlArms: 1
   controlArmLengthScale: 0.6
   starboardColor: {r: 0, g: 1, b: 0, a: 1}
   portColor: {r: 1, g: 0, b: 0, a: 1}
-  cachedP0: {x: 0.25, y: 0, z: -0.39888996}
-  cachedP1: {x: 1.2926486, y: 0.2803154, z: -0.39888996}
-  cachedP2: {x: 2.622119, y: 1.093559, z: -0.39888996}
-  cachedP3: {x: 3.0136719, y: 3.6381307, z: -0.39888996}
-  cachedP4: {x: 2.6597054, y: 5.6539702, z: -0.39888996}
-  changeVersion: 1246059
+  cachedP0: {x: 0.125, y: 0, z: -0.47306794}
+  cachedP1: {x: 1.8899378, y: 0.5178193, z: -0.47306794}
+  cachedP2: {x: 2.7686772, y: 1.7520193, z: -0.47306794}
+  cachedP3: {x: 3.0136719, y: 3.6381307, z: -0.47306794}
+  cachedP4: {x: 2.6597054, y: 5.21949, z: -0.47306794}
+  changeVersion: 1728906
 --- !u!4 &2032973264
 Transform:
   m_ObjectHideFlags: 0
@@ -1547,4 +1473,3 @@ SceneRoots:
   - {fileID: 2019170297}
   - {fileID: 264070285}
   - {fileID: 1591367782}
-  - {fileID: 291057396}

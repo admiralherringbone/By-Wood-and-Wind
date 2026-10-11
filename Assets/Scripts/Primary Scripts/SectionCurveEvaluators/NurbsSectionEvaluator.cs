@@ -6,7 +6,7 @@ public class NurbsSectionEvaluator : ISectionCurveEvaluator
     public string DisplayName => "Cubic B-Spline (Modern CAD)";
     public bool UsesControlArms => false;
 
-    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension)
+    public Vector3 EvaluateSectionPoint(float u, SectionNodes nodes, float floorHollow, float tension, float keelEntryInfluence = 0.0f)
     {
         u = Mathf.Clamp01(u);
         Vector3 P0 = nodes.p0;
@@ -25,9 +25,8 @@ public class NurbsSectionEvaluator : ISectionCurveEvaluator
         {
             float t = u * 4f;
             Vector3 linearPt = Vector3.Lerp(P0, P1, t);
-            Vector3 nurbsPt = EvaluateInterpolatingSegment(P0, T0, P1, T1, t);
-            float weight = Mathf.Lerp(floorHollow, 1.0f, t);
-            return Vector3.Lerp(linearPt, nurbsPt, weight);
+            Vector3 nurbsPt = EvaluateInterpolatingSegment(P0, T0, P1, T1, t, keelEntryInfluence);
+            return Vector3.Lerp(linearPt, nurbsPt, floorHollow);
         }
         else if (u <= 0.50f)
         {
@@ -65,13 +64,13 @@ public class NurbsSectionEvaluator : ISectionCurveEvaluator
         }
     }
 
-    private Vector3 EvaluateInterpolatingSegment(Vector3 pA, Vector3 tA, Vector3 pB, Vector3 tB, float t)
+    private Vector3 EvaluateInterpolatingSegment(Vector3 pA, Vector3 tA, Vector3 pB, Vector3 tB, float t, float startTangentWeight = 1.0f)
     {
         t = Mathf.Clamp01(t);
         float dist = Vector3.Distance(pA, pB);
         if (dist <= 0.0001f) return pA;
 
-        Vector3 cA = pA + tA * (dist / 3f);
+        Vector3 cA = pA + tA * (dist / 3f) * Mathf.Clamp01(startTangentWeight);
         Vector3 cB = pB - tB * (dist / 3f);
 
         float u = 1f - t;
