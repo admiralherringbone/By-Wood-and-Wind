@@ -43,6 +43,11 @@ public class RibbandCurves : MonoBehaviour
         public Vector3 aftP0; // Synced to fwdP3
         public Vector3 aftP1;
         public Vector3 aftP2;
+
+        [HideInInspector] public Vector3 cachedInnerMidshipPt;
+        [HideInInspector] public Vector3 cachedOffsetVector;
+        [HideInInspector] public Vector3[] cachedStbdInnerPts;
+        [HideInInspector] public Vector3[] cachedPortInnerPts;
     }
 
     [Header("Primary Curve References")]
@@ -82,6 +87,14 @@ public class RibbandCurves : MonoBehaviour
     public bool showControlArms = true;
     public bool showPolygonSkeleton = false;
     public Color ribbandColor = new Color(0.2f, 0.75f, 1.0f, 0.95f);
+
+    [Header("Inner Line Settings")]
+    public bool showInnerLines = true;
+    [Tooltip("Spacing distance between the outer ribbands and the parallel inner ribbands. Synced to BodyCurves.")]
+    [Range(0f, 2f)] public float innerLineSpacing = 0.2f;
+    [Tooltip("Use harmonized bright hue derived from each ribband's unique color, or use innerLineColor fallback.")]
+    public bool useHarmonizedInnerColor = true;
+    public Color innerLineColor = new Color(0.2f, 0.85f, 0.95f, 0.95f);
 
     [Header("Forward Control Arm Guides (Dashed Lines)")]
     [Tooltip("Show the dashed 3D Bow Mould P1 section guide line (TopLine down to Floor).")]
@@ -203,6 +216,20 @@ public class RibbandCurves : MonoBehaviour
             GenerateSubRegion(RibbandRegion.BreadthToBilge, "Upper (Breadth to Bilge)", ribbandCountPerBand, 0.50f, 0.75f);
             GenerateSubRegion(RibbandRegion.BilgeToFloor, "Middle (Bilge to Floor)", ribbandCountPerBand, 0.25f, 0.50f);
             GenerateSubRegion(RibbandRegion.FloorToKeel, "Lower (Floor to Keel)", ribbandCountPerBand, 0.00f, 0.25f);
+        }
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            float midY = (breadthCurves != null) ? breadthCurves.fwdP3.y : 2f;
+            innerLineSpacing = bodyCurves.GetInnerLineSpacingAtY(midY);
+        }
+
+        if (showInnerLines)
+        {
+            for (int r = 0; r < generatedRibbands.Count; r++)
+            {
+                UpdateInnerParallelCurveForRibband(generatedRibbands[r]);
+            }
         }
 
         changeVersion++;
@@ -842,7 +869,233 @@ public class RibbandCurves : MonoBehaviour
         }
     }
 
+    public Vector3 GetInnerRibbandPointAtZ(int ribbandIndex, float z)
+    {
+        EnsureInitialized();
+        if (ribbandIndex < 0 || ribbandIndex >= generatedRibbands.Count) return Vector3.zero;
+
+        SingleRibband rib = generatedRibbands[ribbandIndex];
+        if (rib.cachedStbdInnerPts == null || rib.cachedStbdInnerPts.Length == 0)
+        {
+            UpdateInnerParallelCurveForRibband(rib);
+        }
+
+        Vector3 outerPt = GetRibbandPointAtZ(ribbandIndex, z);
+        Vector3 pOuter = rib.fwdP3;
+        Vector3 pInner = rib.cachedInnerMidshipPt;
+
+        float deltaX = pInner.x - pOuter.x;
+        float deltaY = pInner.y - pOuter.y;
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        if (Mathf.Abs(z - rib.fwdP3.z) < 0.001f)
+        {
+            return pInner;
+        }
+
+        if (z <= rib.aftP2.z)
+        {
+            if (rib.cachedStbdInnerPts != null && rib.cachedStbdInnerPts.Length > 0)
+            {
+                return rib.cachedStbdInnerPts[rib.cachedStbdInnerPts.Length - 1];
+            }
+        }
+
+        Vector3 deriv;
+        if (z >= rib.fwdP3.z)
+        {
+            float t = GetBezierTAtZ(rib.fwdP0, rib.fwdP1, rib.fwdP2, rib.fwdP3, z, true);
+            deriv = CalculateCubicBezierDerivative(t, rib.fwdP0, rib.fwdP1, rib.fwdP2, rib.fwdP3);
+        }
+        else
+        {
+            float t = GetBezierTAtZQuadratic(rib.aftP0, rib.aftP1, rib.aftP2, z, false);
+            deriv = CalculateQuadraticBezierDerivative(t, rib.aftP0, rib.aftP1, rib.aftP2);
+        }
+
+        float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+        Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+        Vector3 innerPt = outerPt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+        if (innerPt.x < 0f) innerPt.x = 0f;
+        return innerPt;
+    }
+
+    public Vector3 GetInnerRibbandBowTip(int ribbandIndex, bool starboard = true)
+    {
+        EnsureInitialized();
+        if (ribbandIndex < 0 || ribbandIndex >= generatedRibbands.Count) return Vector3.zero;
+        SingleRibband rib = generatedRibbands[ribbandIndex];
+        if (rib.cachedStbdInnerPts != null && rib.cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = rib.cachedStbdInnerPts[0];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (rib.fwdP0 + rib.cachedOffsetVector) : MirrorX(rib.fwdP0 + rib.cachedOffsetVector);
+    }
+
+    public Vector3 GetInnerRibbandSternTip(int ribbandIndex, bool starboard = true)
+    {
+        EnsureInitialized();
+        if (ribbandIndex < 0 || ribbandIndex >= generatedRibbands.Count) return Vector3.zero;
+        SingleRibband rib = generatedRibbands[ribbandIndex];
+        if (rib.cachedStbdInnerPts != null && rib.cachedStbdInnerPts.Length > 0)
+        {
+            Vector3 tip = rib.cachedStbdInnerPts[rib.cachedStbdInnerPts.Length - 1];
+            return starboard ? tip : MirrorX(tip);
+        }
+        return starboard ? (rib.aftP2 + rib.cachedOffsetVector) : MirrorX(rib.aftP2 + rib.cachedOffsetVector);
+    }
+
+    public Vector3[] GetInnerRibbandPoints(int ribbandIndex, bool starboard = true)
+    {
+        EnsureInitialized();
+        if (ribbandIndex < 0 || ribbandIndex >= generatedRibbands.Count) return null;
+        SingleRibband rib = generatedRibbands[ribbandIndex];
+        if (rib.cachedStbdInnerPts == null || rib.cachedStbdInnerPts.Length == 0)
+        {
+            UpdateInnerParallelCurveForRibband(rib);
+        }
+        return starboard ? rib.cachedStbdInnerPts : rib.cachedPortInnerPts;
+    }
+
+    private void UpdateInnerParallelCurveForRibband(SingleRibband rib)
+    {
+        if (rib == null || !showInnerLines) return;
+
+        float targetApexZ = (breadthCurves != null) ? breadthCurves.fwdP3.z : 0f;
+        Vector3 pOuter = rib.fwdP3;
+        Vector3 pInner;
+
+        if (bodyCurves != null && bodyCurves.showInnerLine)
+        {
+            SectionNodes midNodes = bodyCurves.GetSectionNodesAtZ(targetApexZ, 1f);
+            float du = 0.002f;
+            Vector3 secPtNext = bodyCurves.EvaluateBodySectionAtU(Mathf.Min(1.0f, rib.uSectionParam + du), midNodes);
+            Vector3 secPtPrev = bodyCurves.EvaluateBodySectionAtU(Mathf.Max(0.0f, rib.uSectionParam - du), midNodes);
+            Vector2 t2D = new Vector2(secPtNext.x - secPtPrev.x, secPtNext.y - secPtPrev.y).normalized;
+            if (t2D.sqrMagnitude < 0.000001f) t2D = Vector2.right;
+
+            Vector2 n2D = new Vector2(-t2D.y, t2D.x); // Inward normal towards centerline on Starboard
+            float spacing = bodyCurves.GetInnerLineSpacingAtY(pOuter.y);
+            pInner = pOuter + new Vector3(n2D.x, n2D.y, 0f) * spacing;
+            if (rib.uSectionParam >= 0.999f) pInner.y = midNodes.p4.y;
+        }
+        else
+        {
+            pInner = pOuter + new Vector3(-innerLineSpacing, 0f, 0f);
+        }
+
+        rib.cachedInnerMidshipPt = pInner;
+
+        float deltaX = pInner.x - pOuter.x; // Negative on Starboard
+        float deltaY = pInner.y - pOuter.y;
+        rib.cachedOffsetVector = new Vector3(deltaX, deltaY, 0f);
+
+        const int segmentsFwd = 40;
+        const int segmentsAft = 30;
+        int totalPts = segmentsFwd + segmentsAft + 1;
+
+        if (rib.cachedStbdInnerPts == null || rib.cachedStbdInnerPts.Length != totalPts)
+        {
+            rib.cachedStbdInnerPts = new Vector3[totalPts];
+            rib.cachedPortInnerPts = new Vector3[totalPts];
+        }
+
+        float absDeltaX = Mathf.Abs(deltaX);
+
+        // Forward Span (Cubic Bezier: Bow P0 -> Midship P3)
+        for (int i = 0; i <= segmentsFwd; i++)
+        {
+            if (i == segmentsFwd)
+            {
+                rib.cachedStbdInnerPts[i] = pInner;
+                rib.cachedPortInnerPts[i] = MirrorX(pInner);
+                continue;
+            }
+
+            float t = (float)i / segmentsFwd;
+            Vector3 pt = CalculateCubicBezierPoint(t, rib.fwdP0, rib.fwdP1, rib.fwdP2, rib.fwdP3);
+            Vector3 deriv = CalculateCubicBezierDerivative(t, rib.fwdP0, rib.fwdP1, rib.fwdP2, rib.fwdP3);
+
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            if (innerPt.x < 0f) innerPt.x = 0f;
+
+            rib.cachedStbdInnerPts[i] = innerPt;
+            rib.cachedPortInnerPts[i] = MirrorX(innerPt);
+        }
+
+        // Aft Span (Quadratic Bezier: Midship P0 -> Stern P2)
+        float targetZ = rib.aftP2.z + absDeltaX;
+        float tEnd = 1.0f;
+
+        Vector3 derivEndCheck = CalculateQuadraticBezierDerivative(1f, rib.aftP0, rib.aftP1, rib.aftP2);
+        float lenEndCheck = Mathf.Sqrt(derivEndCheck.z * derivEndCheck.z + derivEndCheck.x * derivEndCheck.x);
+        float nZEndCheck = (lenEndCheck > 0.0001f) ? (-derivEndCheck.x / lenEndCheck) : 0f;
+        float zInnerAt1 = rib.aftP2.z + absDeltaX * nZEndCheck;
+
+        if (zInnerAt1 < targetZ && (rib.aftP0.z - targetZ) > 0.001f)
+        {
+            float tLow = 0f;
+            float tHigh = 1f;
+            for (int iter = 0; iter < 16; iter++)
+            {
+                float tMid = (tLow + tHigh) * 0.5f;
+                Vector3 ptMid = CalculateQuadraticBezierPoint(tMid, rib.aftP0, rib.aftP1, rib.aftP2);
+                Vector3 derivMid = CalculateQuadraticBezierDerivative(tMid, rib.aftP0, rib.aftP1, rib.aftP2);
+                float lenMid = Mathf.Sqrt(derivMid.z * derivMid.z + derivMid.x * derivMid.x);
+                float nZMid = (lenMid > 0.0001f) ? (-derivMid.x / lenMid) : 0f;
+                float zInnerMid = ptMid.z + absDeltaX * nZMid;
+                if (zInnerMid > targetZ)
+                {
+                    tLow = tMid;
+                }
+                else
+                {
+                    tHigh = tMid;
+                }
+            }
+            tEnd = (tLow + tHigh) * 0.5f;
+        }
+
+        for (int j = 1; j <= segmentsAft; j++)
+        {
+            float t = ((float)j / segmentsAft) * tEnd;
+            Vector3 pt = CalculateQuadraticBezierPoint(t, rib.aftP0, rib.aftP1, rib.aftP2);
+            Vector3 deriv = CalculateQuadraticBezierDerivative(t, rib.aftP0, rib.aftP1, rib.aftP2);
+
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            if (j == segmentsAft)
+            {
+                innerPt.z = targetZ;
+            }
+            if (innerPt.x < 0f) innerPt.x = 0f;
+
+            int idx = segmentsFwd + j;
+            rib.cachedStbdInnerPts[idx] = innerPt;
+            rib.cachedPortInnerPts[idx] = MirrorX(innerPt);
+        }
+    }
+
     // --- BEZIER MATH UTILITIES ---
+
+    public Vector3 CalculateQuadraticBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2)
+    {
+        float u = 1f - t;
+        return 2f * u * (p1 - p0) + 2f * t * (p2 - p1);
+    }
+
+    public Vector3 CalculateCubicBezierDerivative(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+    {
+        float u = 1f - t;
+        return 3f * u * u * (p1 - p0) + 6f * u * t * (p2 - p1) + 3f * t * t * (p3 - p2);
+    }
 
     public Vector3 CalculateQuadraticBezierPoint(float t, Vector3 p0, Vector3 p1, Vector3 p2)
     {
@@ -968,6 +1221,32 @@ public class RibbandCurves : MonoBehaviour
             // Draw Transom Line connecting Starboard and Port Transom Corners
             Gizmos.color = c;
             Gizmos.DrawLine(rib.aftP2, MirrorX(rib.aftP2));
+
+            // Draw Inner Ribband Lines
+            if (showInnerLines && rib.cachedStbdInnerPts != null && rib.cachedStbdInnerPts.Length > 1)
+            {
+                Color innerColor = useHarmonizedInnerColor
+                    ? Color.HSVToRGB((float)i / Mathf.Max(1, generatedRibbands.Count) * 0.65f + 0.40f, 0.40f, 1.0f)
+                    : innerLineColor;
+
+                Gizmos.color = innerColor;
+                for (int p = 0; p < rib.cachedStbdInnerPts.Length - 1; p++)
+                {
+                    Gizmos.DrawLine(rib.cachedStbdInnerPts[p], rib.cachedStbdInnerPts[p + 1]);
+                }
+
+                Color portInnerColor = new Color(innerColor.r, innerColor.g * 0.6f, innerColor.b, innerColor.a);
+                Gizmos.color = portInnerColor;
+                for (int p = 0; p < rib.cachedPortInnerPts.Length - 1; p++)
+                {
+                    Gizmos.DrawLine(rib.cachedPortInnerPts[p], rib.cachedPortInnerPts[p + 1]);
+                }
+
+                // Inner Transom Connection Line
+                int last = rib.cachedStbdInnerPts.Length - 1;
+                Gizmos.color = innerColor;
+                Gizmos.DrawLine(rib.cachedStbdInnerPts[last], rib.cachedPortInnerPts[last]);
+            }
 
             // Draw 3D Control Polygon Skeleton Arms (Forward & Aft)
             if (showControlArms || showPolygonSkeleton)

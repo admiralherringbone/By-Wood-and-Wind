@@ -479,11 +479,55 @@ public class SectionModelCurves : MonoBehaviour
                 }
             }
 
+            // Determine projected deadrise height at centerline X = 0 from lowest active curve
+            float yKeelTop = keelY + bottomSpacing;
+            float yCenter = yKeelTop;
+
+            if (floorCurves != null && floorCurves.showInnerLine)
+            {
+                Vector3 fAft = floorCurves.GetInnerFloorSternTip(true);
+                Vector3 fFwd = floorCurves.GetInnerFloorBowTip(true);
+                if (IsStationWithinCurveSpan(z, fFwd, fAft))
+                {
+                    Vector3 outerFloor = floorCurves.GetFloorPointAtZ(z);
+                    Vector3 inFloor = floorCurves.GetInnerFloorPointAtZ(z);
+                    float dX = Mathf.Abs(outerFloor.x) - hw;
+                    float dY = outerFloor.y - keelY;
+                    if (dX > 0.005f)
+                    {
+                        float deadriseSlope = dY / dX;
+                        yCenter = inFloor.y - deadriseSlope * Mathf.Abs(inFloor.x);
+                    }
+                }
+            }
+            else if (bilgeCurves != null && bilgeCurves.showInnerLine)
+            {
+                Vector3 bAft = bilgeCurves.GetInnerBilgeSternTip(true);
+                Vector3 bFwd = bilgeCurves.GetInnerBilgeBowTip(true);
+                if (IsStationWithinCurveSpan(z, bFwd, bAft))
+                {
+                    Vector3 outerBilge = bilgeCurves.GetBilgePointAtZ(z);
+                    Vector3 inBilge = bilgeCurves.GetInnerBilgePointAtZ(z);
+                    float dX = Mathf.Abs(outerBilge.x) - hw;
+                    float dY = outerBilge.y - keelY;
+                    if (dX > 0.005f)
+                    {
+                        float deadriseSlope = dY / dX;
+                        yCenter = inBilge.y - deadriseSlope * Mathf.Abs(inBilge.x);
+                    }
+                }
+            }
+
+            float yCross = Mathf.Max(yKeelTop, yCenter);
+
+            // Allow the inner line to naturally project across the centerline (into opposite side)
+            // so the resulting spline crosses X = 0 and the portion beyond the crossing can be discarded
+            float xExt = -0.25f * hw;
             nodes.Add(new SectionPointNode
             {
-                name = "Inner Keel",
+                name = "Inner Keel Extension",
                 uParam = 0.0f,
-                point = new Vector3(sSign * hw, keelY + bottomSpacing, z)
+                point = new Vector3(sSign * xExt, yCross, z)
             });
 
             if (includePrimaryBoundaryNodes)
@@ -548,6 +592,30 @@ public class SectionModelCurves : MonoBehaviour
                             name = "Inner TopLine Curve",
                             uParam = 1.00f,
                             point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sample Longitudinal Inner Ribbands if enabled (discard if station Z is outside ribband span)
+        if (!useKeyCurvesOnlyForSections && ribbandCurves != null && ribbandCurves.showInnerLines && ribbandCurves.generatedRibbands != null)
+        {
+            for (int i = 0; i < ribbandCurves.generatedRibbands.Count; i++)
+            {
+                RibbandCurves.SingleRibband rib = ribbandCurves.generatedRibbands[i];
+                Vector3 ribFwd = ribbandCurves.GetInnerRibbandBowTip(i, true);
+                Vector3 ribAft = ribbandCurves.GetInnerRibbandSternTip(i, true);
+                if (IsStationWithinCurveSpan(z, ribFwd, ribAft))
+                {
+                    Vector3 inRibPt = ribbandCurves.GetInnerRibbandPointAtZ(i, z);
+                    if (!isTransomRegion || inRibPt.y > minInnerTransomY + 0.01f)
+                    {
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = $"Inner {rib.name}",
+                            uParam = rib.uSectionParam,
+                            point = new Vector3(sSign * Mathf.Abs(inRibPt.x), inRibPt.y, z)
                         });
                     }
                 }
@@ -734,6 +802,15 @@ public class SectionModelCurves : MonoBehaviour
                 if (stbdInnerPts != null) FilterPointsBelowY(stbdInnerPts, stbdInnerMinY);
                 if (portInnerPts != null) FilterPointsBelowY(portInnerPts, portInnerMinY);
             }
+            else
+            {
+                // Discard inner curve portion extending beyond centerline crossing point (clipping at X = 0)
+                if (shouldComputeInner)
+                {
+                    if (stbdInnerPts != null) ClipInnerPolylineAtCenterline(stbdInnerPts, true);
+                    if (portInnerPts != null) ClipInnerPolylineAtCenterline(portInnerPts, false);
+                }
+            }
 
             // Draw Transverse Section Curves (X/Y cuts)
             if (showTransverseSections)
@@ -902,6 +979,79 @@ public class SectionModelCurves : MonoBehaviour
             Vector3 p = pts[0];
             p.y = minY;
             pts[0] = p;
+        }
+    }
+
+    /// <summary>
+    /// Clips the inner section polyline at the centerline plane (X = 0).
+    /// If the curve extends past the centerline crossing point (X < 0 for Starboard, X > 0 for Port),
+    /// the tail extending beyond the crossing is discarded, and the exact crossing point at X = 0
+    /// becomes the base endpoint of the inner line.
+    /// If the curve stops short of X = 0, it is extended to the centerline.
+    /// </summary>
+    private void ClipInnerPolylineAtCenterline(List<Vector3> pts, bool isStarboard)
+    {
+        if (pts == null || pts.Count < 2) return;
+
+        // Starboard valid domain is X >= 0; Port valid domain is X <= 0.
+        bool startsOnOppositeSide = isStarboard ? (pts[0].x < -0.0001f) : (pts[0].x > 0.0001f);
+
+        if (startsOnOppositeSide)
+        {
+            // Find the first segment that crosses the centerline plane (X = 0)
+            int crossIdx = -1;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                bool curOpposite = isStarboard ? (pts[i].x < 0f) : (pts[i].x > 0f);
+                bool nextCorrect = isStarboard ? (pts[i + 1].x >= 0f) : (pts[i + 1].x <= 0f);
+
+                if (curOpposite && nextCorrect)
+                {
+                    crossIdx = i;
+                    break;
+                }
+            }
+
+            if (crossIdx >= 0)
+            {
+                Vector3 pA = pts[crossIdx];
+                Vector3 pB = pts[crossIdx + 1];
+
+                float dx = pB.x - pA.x;
+                float t = (Mathf.Abs(dx) > 0.00001f) ? Mathf.Clamp01((0f - pA.x) / dx) : 0f;
+                Vector3 crossPt = Vector3.Lerp(pA, pB, t);
+                crossPt.x = 0f;
+
+                // Discard all points extending beyond the crossing point
+                pts.RemoveRange(0, crossIdx + 1);
+
+                // Insert exact crossing point at index 0
+                pts.Insert(0, crossPt);
+            }
+            else
+            {
+                Vector3 p0 = pts[0];
+                p0.x = 0f;
+                pts[0] = p0;
+            }
+        }
+        else
+        {
+            // If the curve stopped short of the centerline, extend cleanly to X = 0
+            float threshold = 0.001f;
+            bool stoppedShort = isStarboard ? (pts[0].x > threshold) : (pts[0].x < -threshold);
+            if (stoppedShort)
+            {
+                Vector3 extPt = pts[0];
+                extPt.x = 0f;
+                pts.Insert(0, extPt);
+            }
+            else
+            {
+                Vector3 p0 = pts[0];
+                p0.x = 0f;
+                pts[0] = p0;
+            }
         }
     }
 

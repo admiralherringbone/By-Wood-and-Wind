@@ -23,6 +23,8 @@ public class SheerCurves : MonoBehaviour
 
     [Header("Gizmo Settings")]
     public bool showLabels = true;
+    [Tooltip("Show or hide the node spheres for control points in the profile.")]
+    public bool showNodeSpheres = true;
     public Color profileColor = new Color(0.95f, 0.75f, 0.1f, 0.95f);
 
 
@@ -579,25 +581,28 @@ public class SheerCurves : MonoBehaviour
 #endif
 
         // Draw Profile Handle Spheres
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawSphere(stemP0, 0.14f);
-        Gizmos.DrawSphere(stemP1, 0.11f); // Stem Bottom Control Arm
-        Gizmos.DrawSphere(stemP2, 0.11f); // Stem Top Control Arm
-        Gizmos.DrawSphere(stemP3, 0.18f); // Stem Top (Bow Tip)
-        if (upperStemTop.y > stemP3.y + 0.001f) Gizmos.DrawSphere(upperStemTop, 0.16f); // Upper Stem Post Top
-
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(sternP0, 0.14f);
-        Gizmos.DrawSphere(sternP3, 0.16f); // Stern Post Top
-        if (enableCounter)
+        if (showNodeSpheres)
         {
-            Gizmos.color = Color.green;
-            Gizmos.DrawSphere(counterP1, 0.11f); // Counter Lower Control Arm
-            Gizmos.DrawSphere(counterP2, 0.11f); // Counter Upper Control Arm
-            Gizmos.DrawSphere(counterP3, 0.16f); // Counter Top
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawSphere(stemP0, 0.14f);
+            Gizmos.DrawSphere(stemP1, 0.11f); // Stem Bottom Control Arm
+            Gizmos.DrawSphere(stemP2, 0.11f); // Stem Top Control Arm
+            Gizmos.DrawSphere(stemP3, 0.18f); // Stem Top (Bow Tip)
+            if (upperStemTop.y > stemP3.y + 0.001f) Gizmos.DrawSphere(upperStemTop, 0.16f); // Upper Stem Post Top
+
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawSphere(sternP0, 0.14f);
+            Gizmos.DrawSphere(sternP3, 0.16f); // Stern Post Top
+            if (enableCounter)
+            {
+                Gizmos.color = Color.green;
+                Gizmos.DrawSphere(counterP1, 0.11f); // Counter Lower Control Arm
+                Gizmos.DrawSphere(counterP2, 0.11f); // Counter Upper Control Arm
+                Gizmos.DrawSphere(counterP3, 0.16f); // Counter Top
+            }
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(transomP1, 0.16f);
         }
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawSphere(transomP1, 0.16f);
 
 #if UNITY_EDITOR
         if (showLabels)
@@ -654,6 +659,8 @@ public class SheerCurvesEditor : Editor
     {
         SheerCurves curves = (SheerCurves)target;
         curves.UpdateCachedProfile();
+
+        if (!curves.showNodeSpheres) return;
 
         float halfLen = curves.lengthBetweenPerpendiculars / 2f;
         float bowPerpZ = halfLen;

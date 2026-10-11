@@ -49,35 +49,42 @@ public class FashionCurves : MonoBehaviour
     public Color innerLineColor = new Color(0.2f, 0.95f, 0.6f, 0.95f); // Vibrant Seafoam Green
 
     [Header("Gizmo Visualization Settings")]
+    [Tooltip("Show or hide the node spheres in the Scene view for clean inspection.")]
+    public bool showNodeSpheres = true;
     public bool showLabels = true;
     public Color fashionCurveColor = new Color(0.95f, 0.25f, 0.85f, 0.95f); // Vibrant Rose / Magenta
+    public Color counterTopColor = new Color(1.0f, 0.6f, 0.1f, 0.95f); // Vibrant Amber / Gold for Counter Top
 
     [Header("Initialization State")]
     public bool isInitialized = false;
 
     private readonly NurbsSectionEvaluator nurbsEvaluator = new NurbsSectionEvaluator();
 
-    // --- CACHED STARBOARD 3D CONTROL NODES (P1..P4) ---
+    // --- CACHED STARBOARD 3D CONTROL NODES (P1..P4 & Counter Top) ---
     [HideInInspector] public Vector3 stbdP1; // Floor Stern Tip (Bottom, u=0.25)
     [HideInInspector] public Vector3 stbdP2; // Transom Bilge Node (Middle, u=0.50)
+    [HideInInspector] public Vector3 stbdCounterTop; // Counter Top Node (Apex of Counter / Base of Transom)
     [HideInInspector] public Vector3 stbdP3; // Fashion Breadth (u=0.75)
     [HideInInspector] public Vector3 stbdP4; // Transom Rake Top Corner / Fashion TopLine (Top, u=1.00)
 
-    // --- CACHED PORT 3D CONTROL NODES (P1..P4) ---
+    // --- CACHED PORT 3D CONTROL NODES (P1..P4 & Counter Top) ---
     [HideInInspector] public Vector3 portP1;
     [HideInInspector] public Vector3 portP2;
+    [HideInInspector] public Vector3 portCounterTop;
     [HideInInspector] public Vector3 portP3;
     [HideInInspector] public Vector3 portP4;
 
-    // --- CACHED STARBOARD 3D INNER CONTROL NODES (P1..P4) ---
+    // --- CACHED STARBOARD 3D INNER CONTROL NODES (P1..P4 & Counter Top) ---
     [HideInInspector] public Vector3 innerStbdP1; // Floor Inner Transom Corner / Stern Tip
     [HideInInspector] public Vector3 innerStbdP2; // Bilge Inner Transom Corner
+    [HideInInspector] public Vector3 innerStbdCounterTop; // Counter Top Inner Transom Corner
     [HideInInspector] public Vector3 innerStbdP3; // Breadth Inner Transom Corner
     [HideInInspector] public Vector3 innerStbdP4; // TopLine Inner Transom Corner
 
-    // --- CACHED PORT 3D INNER CONTROL NODES (P1..P4) ---
+    // --- CACHED PORT 3D INNER CONTROL NODES (P1..P4 & Counter Top) ---
     [HideInInspector] public Vector3 innerPortP1;
     [HideInInspector] public Vector3 innerPortP2;
+    [HideInInspector] public Vector3 innerPortCounterTop;
     [HideInInspector] public Vector3 innerPortP3;
     [HideInInspector] public Vector3 innerPortP4;
 
@@ -214,9 +221,18 @@ public class FashionCurves : MonoBehaviour
 
             stbdP4 = new Vector3(Mathf.Abs(p4X), p4Y, p4Z);
 
+            // 5. Counter Top Node: Counter Top Landmark (counterP3 / transomP0)
+            // MUST ALWAYS BE 100% COMPLETELY ALIGNED WITH SHEERCURVES COUNTER TOP (sheerCurves.counterP3)
+            float cTopY = (sheerCurves != null) ? (sheerCurves.enableCounter ? sheerCurves.counterP3.y : sheerCurves.sternP3.y) : (p1Y + 2f);
+            float cTopZ = (sheerCurves != null) ? (sheerCurves.enableCounter ? sheerCurves.counterP3.z : sheerCurves.sternP3.z) : -10f;
+            float tCTop = Mathf.Clamp(GetOuterTAtY(cTopY), 0.01f, 0.99f);
+            Vector3 cTopPt = EvaluateFashionPointRaw(tCTop, 1f);
+            stbdCounterTop = new Vector3(Mathf.Abs(cTopPt.x), cTopY, cTopZ);
+
             // Mirror Port Nodes (-X)
             portP1 = MirrorX(stbdP1);
             portP2 = MirrorX(stbdP2);
+            portCounterTop = MirrorX(stbdCounterTop);
             portP3 = MirrorX(stbdP3);
             portP4 = MirrorX(stbdP4);
 
@@ -338,6 +354,76 @@ public class FashionCurves : MonoBehaviour
         return new Vector3(ptXY.x, ptXY.y, z);
     }
 
+    private float GetOuterTAtY(float targetY)
+    {
+        float ySpan = stbdP4.y - stbdP1.y;
+        if (ySpan < 0.0001f) return 0.5f;
+
+        float low = 0f;
+        float high = 1f;
+        float t = Mathf.Clamp01((targetY - stbdP1.y) / ySpan);
+
+        for (int i = 0; i < 20; i++)
+        {
+            Vector3 pt = EvaluateFashionPointRaw(t, 1f);
+            float err = pt.y - targetY;
+            if (Mathf.Abs(err) < 0.0001f) return t;
+
+            if (pt.y < targetY) low = Mathf.Max(low, t);
+            else high = Mathf.Min(high, t);
+
+            float delta = 0.001f;
+            Vector3 ptPlus = EvaluateFashionPointRaw(Mathf.Clamp01(t + delta), 1f);
+            float dydt = (ptPlus.y - pt.y) / delta;
+            if (Mathf.Abs(dydt) > 0.0001f)
+            {
+                float nextT = t - err / dydt;
+                if (nextT >= low && nextT <= high)
+                {
+                    t = nextT;
+                    continue;
+                }
+            }
+            t = (low + high) * 0.5f;
+        }
+        return t;
+    }
+
+    private float GetInnerTAtY(float targetY)
+    {
+        float ySpan = innerStbdP4.y - innerStbdP1.y;
+        if (ySpan < 0.0001f) return 0.5f;
+
+        float low = 0f;
+        float high = 1f;
+        float t = Mathf.Clamp01((targetY - innerStbdP1.y) / ySpan);
+
+        for (int i = 0; i < 20; i++)
+        {
+            Vector3 pt = EvaluateInnerFashionPointRaw(t, 1f);
+            float err = pt.y - targetY;
+            if (Mathf.Abs(err) < 0.0001f) return t;
+
+            if (pt.y < targetY) low = Mathf.Max(low, t);
+            else high = Mathf.Min(high, t);
+
+            float delta = 0.001f;
+            Vector3 ptPlus = EvaluateInnerFashionPointRaw(Mathf.Clamp01(t + delta), 1f);
+            float dydt = (ptPlus.y - pt.y) / delta;
+            if (Mathf.Abs(dydt) > 0.0001f)
+            {
+                float nextT = t - err / dydt;
+                if (nextT >= low && nextT <= high)
+                {
+                    t = nextT;
+                    continue;
+                }
+            }
+            t = (low + high) * 0.5f;
+        }
+        return t;
+    }
+
     /// <summary>
     /// Evaluates 3D point on Fashion Curve at target height Y for specified side (+1 Starboard, -1 Port).
     /// Uses precomputed curve samples with fast binary search for high performance.
@@ -442,19 +528,59 @@ public class FashionCurves : MonoBehaviour
 
     private void UpdateOuterFashionCurve()
     {
-        const int totalSteps = 60;
-        int totalPts = totalSteps + 1;
-        if (cachedStbdOuterPts == null || cachedStbdOuterPts.Length != totalPts)
-        {
-            cachedStbdOuterPts = new Vector3[totalPts];
-            cachedPortOuterPts = new Vector3[totalPts];
-        }
+        float cTopY = (sheerCurves != null) ? (sheerCurves.enableCounter ? sheerCurves.counterP3.y : sheerCurves.sternP3.y) : (stbdP1.y + 2f);
+        bool hasCounterKnuckle = (sheerCurves != null && sheerCurves.enableCounter && cTopY > stbdP1.y + 0.01f && cTopY < stbdP4.y - 0.01f);
 
-        for (int i = 0; i <= totalSteps; i++)
+        if (hasCounterKnuckle)
         {
-            float t = (float)i / totalSteps;
-            cachedStbdOuterPts[i] = EvaluateFashionPointRaw(t, 1f);
-            cachedPortOuterPts[i] = MirrorX(cachedStbdOuterPts[i]);
+            const int stepsLower = 35;
+            const int stepsUpper = 25;
+            const int totalPts = stepsLower + stepsUpper + 1;
+            if (cachedStbdOuterPts == null || cachedStbdOuterPts.Length != totalPts)
+            {
+                cachedStbdOuterPts = new Vector3[totalPts];
+                cachedPortOuterPts = new Vector3[totalPts];
+            }
+
+            float tCTop = Mathf.Clamp(GetOuterTAtY(cTopY), 0.01f, 0.99f);
+
+            // Lower portion: Floor (t=0) up to Counter Top (t=tCTop) with exact knuckle knot
+            for (int i = 0; i <= stepsLower; i++)
+            {
+                float frac = (float)i / stepsLower;
+                float t = frac * tCTop;
+                Vector3 pt = (i == stepsLower) ? stbdCounterTop : EvaluateFashionPointRaw(t, 1f);
+                cachedStbdOuterPts[i] = pt;
+                cachedPortOuterPts[i] = MirrorX(pt);
+            }
+
+            // Upper portion: Counter Top (t=tCTop) to TopLine (t=1.0)
+            for (int i = 1; i <= stepsUpper; i++)
+            {
+                float frac = (float)i / stepsUpper;
+                float t = Mathf.Lerp(tCTop, 1f, frac);
+                Vector3 pt = (i == stepsUpper) ? stbdP4 : EvaluateFashionPointRaw(t, 1f);
+                int idx = stepsLower + i;
+                cachedStbdOuterPts[idx] = pt;
+                cachedPortOuterPts[idx] = MirrorX(pt);
+            }
+        }
+        else
+        {
+            const int totalSteps = 60;
+            int totalPts = totalSteps + 1;
+            if (cachedStbdOuterPts == null || cachedStbdOuterPts.Length != totalPts)
+            {
+                cachedStbdOuterPts = new Vector3[totalPts];
+                cachedPortOuterPts = new Vector3[totalPts];
+            }
+
+            for (int i = 0; i <= totalSteps; i++)
+            {
+                float t = (float)i / totalSteps;
+                cachedStbdOuterPts[i] = EvaluateFashionPointRaw(t, 1f);
+                cachedPortOuterPts[i] = MirrorX(cachedStbdOuterPts[i]);
+            }
         }
     }
 
@@ -482,24 +608,67 @@ public class FashionCurves : MonoBehaviour
             innerStbdP4.x = stbdP4.x;
         }
 
+        float cTopY = (sheerCurves != null) ? (sheerCurves.enableCounter ? sheerCurves.counterP3.y : sheerCurves.sternP3.y) : (innerStbdP1.y + 2f);
+        bool hasCounterKnuckle = (sheerCurves != null && sheerCurves.enableCounter && cTopY > innerStbdP1.y + 0.01f && cTopY < innerStbdP4.y - 0.01f);
+
+        float tInnerCTop = hasCounterKnuckle ? Mathf.Clamp(GetInnerTAtY(cTopY), 0.01f, 0.99f) : 0.5f;
+        Vector3 innerCTopPt = EvaluateInnerFashionPointRaw(tInnerCTop, 1f);
+        innerStbdCounterTop = new Vector3(Mathf.Abs(innerCTopPt.x), cTopY, innerCTopPt.z);
+
         innerPortP1 = MirrorX(innerStbdP1);
         innerPortP2 = MirrorX(innerStbdP2);
+        innerPortCounterTop = MirrorX(innerStbdCounterTop);
         innerPortP3 = MirrorX(innerStbdP3);
         innerPortP4 = MirrorX(innerStbdP4);
 
-        const int totalSteps = 60;
-        int totalPts = totalSteps + 1;
-        if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+        if (hasCounterKnuckle)
         {
-            cachedStbdInnerPts = new Vector3[totalPts];
-            cachedPortInnerPts = new Vector3[totalPts];
-        }
+            const int stepsLower = 35;
+            const int stepsUpper = 25;
+            const int totalPts = stepsLower + stepsUpper + 1;
+            if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+            {
+                cachedStbdInnerPts = new Vector3[totalPts];
+                cachedPortInnerPts = new Vector3[totalPts];
+            }
 
-        for (int i = 0; i <= totalSteps; i++)
+            // Lower portion: Floor to Counter Top
+            for (int i = 0; i <= stepsLower; i++)
+            {
+                float frac = (float)i / stepsLower;
+                float t = frac * tInnerCTop;
+                Vector3 pt = (i == stepsLower) ? innerStbdCounterTop : EvaluateInnerFashionPointRaw(t, 1f);
+                cachedStbdInnerPts[i] = pt;
+                cachedPortInnerPts[i] = MirrorX(pt);
+            }
+
+            // Upper portion: Counter Top to TopLine
+            for (int i = 1; i <= stepsUpper; i++)
+            {
+                float frac = (float)i / stepsUpper;
+                float t = Mathf.Lerp(tInnerCTop, 1f, frac);
+                Vector3 pt = (i == stepsUpper) ? innerStbdP4 : EvaluateInnerFashionPointRaw(t, 1f);
+                int idx = stepsLower + i;
+                cachedStbdInnerPts[idx] = pt;
+                cachedPortInnerPts[idx] = MirrorX(pt);
+            }
+        }
+        else
         {
-            float t = (float)i / totalSteps;
-            cachedStbdInnerPts[i] = EvaluateInnerFashionPointRaw(t, 1f);
-            cachedPortInnerPts[i] = MirrorX(cachedStbdInnerPts[i]);
+            const int totalSteps = 60;
+            int totalPts = totalSteps + 1;
+            if (cachedStbdInnerPts == null || cachedStbdInnerPts.Length != totalPts)
+            {
+                cachedStbdInnerPts = new Vector3[totalPts];
+                cachedPortInnerPts = new Vector3[totalPts];
+            }
+
+            for (int i = 0; i <= totalSteps; i++)
+            {
+                float t = (float)i / totalSteps;
+                cachedStbdInnerPts[i] = EvaluateInnerFashionPointRaw(t, 1f);
+                cachedPortInnerPts[i] = MirrorX(cachedStbdInnerPts[i]);
+            }
         }
     }
 
@@ -779,31 +948,50 @@ public class FashionCurves : MonoBehaviour
         Color portColor = new Color(fashionCurveColor.r, fashionCurveColor.g * 0.6f, fashionCurveColor.b, fashionCurveColor.a);
         DrawFashionNurbsCurve(-1f, portColor);
 
-        // 3. Draw Transverse Crossbars connecting Starboard and Port at P1..P4
+        // 3. Draw Transverse Crossbars connecting Starboard and Port at P1..P4 and Counter Top
         Gizmos.color = new Color(fashionCurveColor.r, fashionCurveColor.g, fashionCurveColor.b, 0.6f);
         Gizmos.DrawLine(stbdP1, portP1);
         Gizmos.DrawLine(stbdP2, portP2);
+        if (sheerCurves != null && sheerCurves.enableCounter)
+        {
+            Gizmos.color = new Color(counterTopColor.r, counterTopColor.g, counterTopColor.b, 0.85f);
+            Gizmos.DrawLine(stbdCounterTop, portCounterTop);
+            Gizmos.color = new Color(fashionCurveColor.r, fashionCurveColor.g, fashionCurveColor.b, 0.6f);
+        }
         Gizmos.DrawLine(stbdP3, portP3);
         Gizmos.DrawLine(stbdP4, portP4);
 
-        // 4. Draw Structural Node Spheres (P1..P4 lie EXACTLY on the curve)
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawSphere(stbdP1, 0.12f); // Floor Stern Tip (P1, u=0.25)
-        Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
-        Gizmos.DrawSphere(stbdP2, 0.13f); // Transom Bilge Node (P2, u=0.50)
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(stbdP3, 0.14f); // Fashion Breadth (P3, u=0.75)
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawSphere(stbdP4, 0.14f); // Transom Rake Top Corner (P4, u=1.00)
+        // 4. Draw Structural Node Spheres (P1..P4 & Counter Top lie EXACTLY on the curve)
+        if (showNodeSpheres)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawSphere(stbdP1, 0.12f); // Floor Stern Tip (P1, u=0.25)
+            Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
+            Gizmos.DrawSphere(stbdP2, 0.13f); // Transom Bilge Node (P2, u=0.50)
+            if (sheerCurves != null && sheerCurves.enableCounter)
+            {
+                Gizmos.color = counterTopColor;
+                Gizmos.DrawSphere(stbdCounterTop, 0.14f); // Counter Top Landmark (Apex of Counter / Base of Transom)
+            }
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawSphere(stbdP3, 0.14f); // Fashion Breadth (P3, u=0.75)
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(stbdP4, 0.14f); // Transom Rake Top Corner (P4, u=1.00)
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawSphere(portP1, 0.12f);
-        Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
-        Gizmos.DrawSphere(portP2, 0.13f);
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(portP3, 0.14f);
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawSphere(portP4, 0.14f);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawSphere(portP1, 0.12f);
+            Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
+            Gizmos.DrawSphere(portP2, 0.13f);
+            if (sheerCurves != null && sheerCurves.enableCounter)
+            {
+                Gizmos.color = counterTopColor;
+                Gizmos.DrawSphere(portCounterTop, 0.14f);
+            }
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawSphere(portP3, 0.14f);
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(portP4, 0.14f);
+        }
 
         // 5. Draw Inner Fashion Timber Curve (Zero GC heap allocations)
         if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 1)
@@ -825,25 +1013,41 @@ public class FashionCurves : MonoBehaviour
             Gizmos.color = new Color(innerLineColor.r, innerLineColor.g, innerLineColor.b, 0.5f);
             Gizmos.DrawLine(innerStbdP1, innerPortP1);
             Gizmos.DrawLine(innerStbdP2, innerPortP2);
+            if (sheerCurves != null && sheerCurves.enableCounter)
+            {
+                Gizmos.color = new Color(counterTopColor.r, counterTopColor.g, counterTopColor.b, 0.65f);
+                Gizmos.DrawLine(innerStbdCounterTop, innerPortCounterTop);
+                Gizmos.color = new Color(innerLineColor.r, innerLineColor.g, innerLineColor.b, 0.5f);
+            }
             Gizmos.DrawLine(innerStbdP3, innerPortP3);
             Gizmos.DrawLine(innerStbdP4, innerPortP4);
 
             // Inner Transom Corner Spheres (matching corner colors)
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawSphere(innerStbdP1, 0.08f);
-            Gizmos.DrawSphere(innerPortP1, 0.08f);
+            if (showNodeSpheres)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(innerStbdP1, 0.08f);
+                Gizmos.DrawSphere(innerPortP1, 0.08f);
 
-            Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
-            Gizmos.DrawSphere(innerStbdP2, 0.09f);
-            Gizmos.DrawSphere(innerPortP2, 0.09f);
+                Gizmos.color = new Color(0.1f, 0.9f, 0.4f);
+                Gizmos.DrawSphere(innerStbdP2, 0.09f);
+                Gizmos.DrawSphere(innerPortP2, 0.09f);
 
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawSphere(innerStbdP3, 0.09f);
-            Gizmos.DrawSphere(innerPortP3, 0.09f);
+                if (sheerCurves != null && sheerCurves.enableCounter)
+                {
+                    Gizmos.color = counterTopColor;
+                    Gizmos.DrawSphere(innerStbdCounterTop, 0.09f);
+                    Gizmos.DrawSphere(innerPortCounterTop, 0.09f);
+                }
 
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawSphere(innerStbdP4, 0.09f);
-            Gizmos.DrawSphere(innerPortP4, 0.09f);
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawSphere(innerStbdP3, 0.09f);
+                Gizmos.DrawSphere(innerPortP3, 0.09f);
+
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawSphere(innerStbdP4, 0.09f);
+                Gizmos.DrawSphere(innerPortP4, 0.09f);
+            }
         }
 
 #if UNITY_EDITOR
@@ -851,6 +1055,12 @@ public class FashionCurves : MonoBehaviour
         {
             GUIStyle labelStyle = GetCachedLabelStyle();
             Handles.Label(stbdP4 + Vector3.up * 0.18f, "Fashion TopLine / Transom Rake Top (u=1.00)", labelStyle);
+            if (sheerCurves != null && sheerCurves.enableCounter)
+            {
+                GUIStyle counterLabelStyle = new GUIStyle(labelStyle);
+                counterLabelStyle.normal.textColor = counterTopColor;
+                Handles.Label(stbdCounterTop + Vector3.up * 0.18f, "Fashion Counter Top (counterP3)", counterLabelStyle);
+            }
             Handles.Label(stbdP3 + Vector3.up * 0.18f, "Fashion Breadth (u=0.75)", labelStyle);
             Handles.Label(stbdP2 + Vector3.up * 0.15f, "Fashion Bilge Node (u=0.50)", labelStyle);
             Handles.Label(stbdP1 + Vector3.up * 0.15f, "Fashion NURBS Base (u=0.25)", labelStyle);
@@ -859,6 +1069,12 @@ public class FashionCurves : MonoBehaviour
             {
                 GUIStyle innerLabelStyle = GetCachedInnerLabelStyle();
                 Handles.Label(innerStbdP4 + Vector3.up * 0.12f, "Inner Fashion TopLine", innerLabelStyle);
+                if (sheerCurves != null && sheerCurves.enableCounter)
+                {
+                    GUIStyle innerCounterStyle = new GUIStyle(innerLabelStyle);
+                    innerCounterStyle.normal.textColor = counterTopColor;
+                    Handles.Label(innerStbdCounterTop + Vector3.up * 0.12f, "Inner Fashion Counter Top", innerCounterStyle);
+                }
                 Handles.Label(innerStbdP3 + Vector3.up * 0.12f, "Inner Fashion Breadth", innerLabelStyle);
                 Handles.Label(innerStbdP2 + Vector3.up * 0.12f, "Inner Fashion Bilge", innerLabelStyle);
                 Handles.Label(innerStbdP1 + Vector3.up * 0.12f, "Inner Fashion Base", innerLabelStyle);
@@ -895,6 +1111,10 @@ public class FashionCurvesEditor : Editor
         EditorGUILayout.LabelField("Transom Fashion NURBS Nodes Readout", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("P1 Floor Stern Base (u=0.25):", $"X: {curves.stbdP1.x:F2}, Y: {curves.stbdP1.y:F2}, Z: {curves.stbdP1.z:F2}");
         EditorGUILayout.LabelField("P2 Transom Bilge Node (u=0.50):", $"X: {curves.stbdP2.x:F2}, Y: {curves.stbdP2.y:F2}, Z: {curves.stbdP2.z:F2}");
+        if (curves.sheerCurves != null && curves.sheerCurves.enableCounter)
+        {
+            EditorGUILayout.LabelField("Counter Top Node (counterP3):", $"X: {curves.stbdCounterTop.x:F2}, Y: {curves.stbdCounterTop.y:F2}, Z: {curves.stbdCounterTop.z:F2}");
+        }
         EditorGUILayout.LabelField("P3 Fashion Breadth (u=0.75):", $"X: {curves.stbdP3.x:F2}, Y: {curves.stbdP3.y:F2}, Z: {curves.stbdP3.z:F2}");
         EditorGUILayout.LabelField("P4 Transom Rake Top Corner (u=1.00):", $"X: {curves.stbdP4.x:F2}, Y: {curves.stbdP4.y:F2}, Z: {curves.stbdP4.z:F2}");
 
@@ -904,6 +1124,10 @@ public class FashionCurvesEditor : Editor
             EditorGUILayout.LabelField("Inner Fashion Curve Transom Nodes Readout", EditorStyles.boldLabel);
             EditorGUILayout.LabelField("Inner P1 Floor Transom Corner:", $"X: {curves.innerStbdP1.x:F2}, Y: {curves.innerStbdP1.y:F2}, Z: {curves.innerStbdP1.z:F2}");
             EditorGUILayout.LabelField("Inner P2 Bilge Transom Corner:", $"X: {curves.innerStbdP2.x:F2}, Y: {curves.innerStbdP2.y:F2}, Z: {curves.innerStbdP2.z:F2}");
+            if (curves.sheerCurves != null && curves.sheerCurves.enableCounter)
+            {
+                EditorGUILayout.LabelField("Inner Counter Top Corner:", $"X: {curves.innerStbdCounterTop.x:F2}, Y: {curves.innerStbdCounterTop.y:F2}, Z: {curves.innerStbdCounterTop.z:F2}");
+            }
             EditorGUILayout.LabelField("Inner P3 Breadth Transom Corner:", $"X: {curves.innerStbdP3.x:F2}, Y: {curves.innerStbdP3.y:F2}, Z: {curves.innerStbdP3.z:F2}");
             EditorGUILayout.LabelField("Inner P4 TopLine Transom Corner:", $"X: {curves.innerStbdP4.x:F2}, Y: {curves.innerStbdP4.y:F2}, Z: {curves.innerStbdP4.z:F2}");
         }
