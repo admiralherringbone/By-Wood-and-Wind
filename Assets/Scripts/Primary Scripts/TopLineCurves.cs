@@ -24,6 +24,9 @@ public class TopLineCurves : MonoBehaviour
     [Tooltip("Reference to the BreadthCurves script for Max Beam upper ceiling constraint.")]
     public BreadthCurves breadthCurves;
 
+    [Tooltip("Reference to the FashionCurves script to synchronize transom fashion timbers.")]
+    public FashionCurves fashionCurves;
+
     [Header("Interactive Scene Handles")]
     [Tooltip("Enable interactive 3D position handles in Scene view to sculpt control points along X, Y, and Z axes.")]
     public bool enableInteractiveHandles = true;
@@ -147,6 +150,8 @@ public class TopLineCurves : MonoBehaviour
         if (bodyCurves == null) bodyCurves = FindFirstObjectByType<BodyCurves>();
         if (backboneCurves == null) backboneCurves = GetComponentInParent<BackboneCurves>();
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
+        if (fashionCurves == null) fashionCurves = GetComponentInParent<FashionCurves>();
+        if (fashionCurves == null) fashionCurves = FindFirstObjectByType<FashionCurves>();
     }
 
     [ContextMenu("Reset Control Points to Default Hull")]
@@ -334,6 +339,8 @@ public class TopLineCurves : MonoBehaviour
         UpdateInnerParallelCurve();
 
         changeVersion++;
+
+        if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
         }
         finally
         {
@@ -523,6 +530,15 @@ public class TopLineCurves : MonoBehaviour
             if (cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 0)
             {
                 Vector3 tip = cachedStbdInnerPts[cachedStbdInnerPts.Length - 1];
+                float dz = cachedIsAftCubic ? (cachedAftP3.z - cachedAftP2.z) : (cachedAftP2.z - cachedAftP1.z);
+                if (Mathf.Abs(dz) >= 0.001f)
+                {
+                    float dy = cachedIsAftCubic ? (cachedAftP3.y - cachedAftP2.y) : (cachedAftP2.y - cachedAftP1.y);
+                    float dx = cachedIsAftCubic ? (cachedAftP3.x - cachedAftP2.x) : (cachedAftP2.x - cachedAftP1.x);
+                    float dt = z - sternTipZ;
+                    Vector3 extrapTip = new Vector3(tip.x + (dx / dz) * dt, tip.y + (dy / dz) * dt, z);
+                    return starboard ? extrapTip : MirrorX(extrapTip);
+                }
                 return starboard ? tip : MirrorX(tip);
             }
         }
@@ -611,13 +627,29 @@ public class TopLineCurves : MonoBehaviour
         {
             if (cachedIsAftCubic)
             {
-                if (z <= cachedAftP3.z) return cachedAftP3;
+                if (z <= cachedAftP3.z)
+                {
+                    float dz = cachedAftP3.z - cachedAftP2.z;
+                    if (Mathf.Abs(dz) < 0.001f) return cachedAftP3;
+                    float dy = cachedAftP3.y - cachedAftP2.y;
+                    float dx = cachedAftP3.x - cachedAftP2.x;
+                    float dt = z - cachedAftP3.z;
+                    return new Vector3(cachedAftP3.x + (dx / dz) * dt, cachedAftP3.y + (dy / dz) * dt, z);
+                }
                 float t = GetBezierTAtZ(cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3, z, false);
                 return CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3);
             }
             else
             {
-                if (z <= cachedAftP2.z) return cachedAftP2;
+                if (z <= cachedAftP2.z)
+                {
+                    float dz = cachedAftP2.z - cachedAftP1.z;
+                    if (Mathf.Abs(dz) < 0.001f) return cachedAftP2;
+                    float dy = cachedAftP2.y - cachedAftP1.y;
+                    float dx = cachedAftP2.x - cachedAftP1.x;
+                    float dt = z - cachedAftP2.z;
+                    return new Vector3(cachedAftP2.x + (dx / dz) * dt, cachedAftP2.y + (dy / dz) * dt, z);
+                }
                 float t = GetBezierTAtZ(cachedAftP0, cachedAftP1, cachedAftP2, Vector3.zero, z, false);
                 return CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
             }

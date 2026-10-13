@@ -20,6 +20,9 @@ public class BreadthCurves : MonoBehaviour
     [Tooltip("Reference to the new SheerCurves script for 2D profile curves (Stem Post, Stern Post, Counter, Transom Rake).")]
     public SheerCurves sheerCurves;
 
+    [Tooltip("Reference to the TopLineCurves script for matching topsides inner transom corner on projection lines.")]
+    public TopLineCurves topLineCurves;
+
     [Header("Interactive Scene Handles")]
     [Tooltip("Enable interactive 3D position handles in Scene view to sculpt control points along X, Y, and Z axes.")]
     public bool enableInteractiveHandles = true;
@@ -192,6 +195,8 @@ public class BreadthCurves : MonoBehaviour
         if (bodyCurves == null) bodyCurves = FindFirstObjectByType<BodyCurves>();
         if (backboneCurves == null) backboneCurves = GetComponentInParent<BackboneCurves>();
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
+        if (topLineCurves == null) topLineCurves = GetComponentInParent<TopLineCurves>();
+        if (topLineCurves == null) topLineCurves = FindFirstObjectByType<TopLineCurves>();
 
         cachedIsAftCubic = transomWidth <= 0.001f;
 
@@ -653,6 +658,30 @@ public class BreadthCurves : MonoBehaviour
 
         Vector3 pt = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                       : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
+
+        // For extrapolated projection line aft of transom corner (t >= 1.0), smoothly taper offset
+        // from Breadth Curves inner transom corner (waterline spacing) to TopLine Curves appropriate inner transom corner (topsides spacing)
+        if (t >= 1.0f && topLineCurves != null)
+        {
+            Vector3 innerBreadthTip = GetInnerBreadthSternTip(true);
+            Vector3 outerBreadthTip = cachedIsAftCubic ? cachedAftP3 : cachedAftP2;
+            Vector3 offsetStart = innerBreadthTip - outerBreadthTip;
+
+            Vector3 innerTopLineTip = topLineCurves.GetInnerTopLineSternTip(true);
+            float tTarget = GetAftBezierTAtExtrapolatedZ(innerTopLineTip.z);
+            Vector3 outerAtTarget = cachedIsAftCubic ? CalculateCubicBezierPoint(tTarget, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
+                                                    : CalculateQuadraticBezierPoint(tTarget, cachedAftP0, cachedAftP1, cachedAftP2);
+            Vector3 offsetEnd = innerTopLineTip - outerAtTarget;
+
+            float dt = tTarget - 1.0f;
+            float frac = (dt > 0.0001f) ? Mathf.Clamp01((t - 1.0f) / dt) : 1f;
+            Vector3 curOffset = Vector3.Lerp(offsetStart, offsetEnd, frac);
+            Vector3 innerProjPt = pt + curOffset;
+            if (innerProjPt.x < 0f) innerProjPt.x = 0f;
+
+            return starboard ? innerProjPt : MirrorX(innerProjPt);
+        }
+
         Vector3 deriv = cachedIsAftCubic ? CalculateCubicBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                          : CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
 
@@ -1013,9 +1042,12 @@ public class BreadthCurves : MonoBehaviour
             innerLastStbd = innerPrevStbd;
             Vector3 innerLastPort = innerPrevPort;
 
+            float innerTargetZ = (topLineCurves != null) ? topLineCurves.GetInnerTopLineSternTip(true).z : targetZ;
+            float tInnerTarget = GetAftBezierTAtExtrapolatedZ(innerTargetZ);
+
             for (int i = 1; i <= steps; i++)
             {
-                float t = Mathf.Lerp(1.0f, tTarget, i / (float)steps);
+                float t = Mathf.Lerp(1.0f, tInnerTarget, i / (float)steps);
                 Vector3 currInnerStbd = EvaluateInnerPointAtT(t, true);
                 Vector3 currInnerPort = MirrorX(currInnerStbd);
 

@@ -21,7 +21,7 @@ public class SectionModelCurves : MonoBehaviour
     public struct SectionPointNode
     {
         public string name;
-        public float uParam; // 0.0 = Keel, 0.25 = Floor, 0.50 = Bilge, 0.75 = Breadth, 1.0 = TopLine
+        public float uParam; // 0.0 = Keel, 0.25 = Floor, 0.50 = Bilge, 0.75 = Breadth, 1.0 = TopLine, 1.25 = Bulwark Rail
         public Vector3 point;
     }
 
@@ -52,6 +52,9 @@ public class SectionModelCurves : MonoBehaviour
 
     [Tooltip("Reference to BackboneCurves for stem and stern keel width offset.")]
     public BackboneCurves backboneCurves;
+
+    [Tooltip("Reference to UpperDeckCurves for upper deck bulwarks and cap rails.")]
+    public UpperDeckCurves upperDeckCurves;
 
     [Header("Transverse Cut Settings")]
     [Tooltip("Number of forward transverse frame cuts generated between Master Frame (BodyCurves) and Bow Stem.")]
@@ -136,6 +139,9 @@ public class SectionModelCurves : MonoBehaviour
 
         if (backboneCurves == null) backboneCurves = GetComponentInParent<BackboneCurves>();
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
+
+        if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
+        if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
     }
 
     [ContextMenu("Reset Section Model Curves")]
@@ -168,6 +174,7 @@ public class SectionModelCurves : MonoBehaviour
             if (floorCurves != null) floorCurves.UpdateCachedCurves();
             if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
             if (ribbandCurves != null) ribbandCurves.UpdateCachedCurves();
+            if (upperDeckCurves != null) upperDeckCurves.UpdateCachedCurves();
 
             changeVersion++;
         }
@@ -315,6 +322,20 @@ public class SectionModelCurves : MonoBehaviour
                     }
                 }
             }
+
+            if (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 inStbdRail, out Vector3 inPortRail))
+            {
+                Vector3 railPt = (sSign > 0f) ? stbdRail : portRail;
+                if (!isTransomRegion || railPt.y > minTransomY + 0.01f)
+                {
+                    nodes.Add(new SectionPointNode
+                    {
+                        name = "Upper Deck Bulwark Rail",
+                        uParam = 1.25f,
+                        point = new Vector3(sSign * Mathf.Abs(railPt.x), railPt.y, z)
+                    });
+                }
+            }
         }
 
         // 3. Sample Longitudinal Ribbands from RibbandCurves if enabled (discard if station Z is outside ribband span)
@@ -458,6 +479,23 @@ public class SectionModelCurves : MonoBehaviour
                         }
                     }
                 }
+
+                if ((topLineCurves == null || topLineCurves.showInnerLine) && (bodyCurves == null || bodyCurves.showInnerLine))
+                {
+                    if (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 inStbdRail, out Vector3 inPortRail))
+                    {
+                        Vector3 inRailPt = (sSign > 0f) ? inStbdRail : inPortRail;
+                        if (inRailPt.y > minInnerTransomY + 0.01f)
+                        {
+                            nodes.Add(new SectionPointNode
+                            {
+                                name = "Inner Upper Deck Bulwark Rail",
+                                uParam = 1.25f,
+                                point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
+                            });
+                        }
+                    }
+                }
             }
         }
         else
@@ -592,6 +630,20 @@ public class SectionModelCurves : MonoBehaviour
                             name = "Inner TopLine Curve",
                             uParam = 1.00f,
                             point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
+                        });
+                    }
+                }
+
+                if ((topLineCurves == null || topLineCurves.showInnerLine) && (bodyCurves == null || bodyCurves.showInnerLine))
+                {
+                    if (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 inStbdRail, out Vector3 inPortRail))
+                    {
+                        Vector3 inRailPt = (sSign > 0f) ? inStbdRail : inPortRail;
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Inner Upper Deck Bulwark Rail",
+                            uParam = 1.25f,
+                            point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
                         });
                     }
                 }
@@ -759,7 +811,8 @@ public class SectionModelCurves : MonoBehaviour
             List<Vector3> portOuterPts = GetOuterSectionPolylinePoints(portNodes);
 
             float bottomSpacing = (bodyCurves != null) ? bodyCurves.innerLineSpacing : 0.2f;
-            float topSpacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.1f;
+            bool hasBulwarkAtStation = (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out _, out _, out _, out _));
+            float topSpacing = (bodyCurves != null) ? (hasBulwarkAtStation ? bodyCurves.topInnerLineSpacing : bodyCurves.GetInnerLineSpacingAtY(stbdNodes.Count > 0 ? stbdNodes[stbdNodes.Count - 1].point.y : 0f)) : 0.1f;
 
             bool shouldComputeInner = showTransverseSections && (bodyCurves != null && bodyCurves.showInnerLine && bodyCurves.innerLineSpacing > 0.0001f);
             bool isTransomRegion = (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f);

@@ -21,6 +21,9 @@ public class SheerCurves : MonoBehaviour
     [Header("Linked Plans")]
     public BreadthCurves breadthCurves;
 
+    [Tooltip("Reference to UpperDeckCurves for bulwark profile extensions.")]
+    public UpperDeckCurves upperDeckCurves;
+
     [Header("Gizmo Settings")]
     public bool showLabels = true;
     [Tooltip("Show or hide the node spheres for control points in the profile.")]
@@ -96,6 +99,16 @@ public class SheerCurves : MonoBehaviour
 
     [HideInInspector] public Vector3 upperStemTop; // Top of Upper Stem Post Extension
 
+    // --- BULWARK PROFILE EXTENSIONS (from UpperDeckCurves) ---
+    [HideInInspector] public Vector3 stemBulwarkP1; // Tier 1 Bulwark Upper Stem Top
+    [HideInInspector] public Vector3 stemBulwarkP2; // Tier 2 Bulwark Upper Stem Top
+    [HideInInspector] public Vector3 transomBulwarkP1; // Tier 1 Bulwark Transom Top
+    [HideInInspector] public Vector3 transomBulwarkP2; // Tier 2 Bulwark Transom Top
+    [HideInInspector] public bool hasStemBulwark1 = false;
+    [HideInInspector] public bool hasStemBulwark2 = false;
+    [HideInInspector] public bool hasTransomBulwark1 = false;
+    [HideInInspector] public bool hasTransomBulwark2 = false;
+
     [HideInInspector] public bool isInitialized = false;
     [HideInInspector] public int changeVersion = 0;
 
@@ -139,6 +152,9 @@ public class SheerCurves : MonoBehaviour
         {
             if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
         if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
+
+        if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
+        if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
 
         // Enforce Y-Axis Height Restriction: Stem Top (stemP3) and Stern Post Top (sternP3) Y cannot be lower than Midship Apex Y (BreadthCurves.fwdP3.y)
         if (breadthCurves != null)
@@ -243,6 +259,21 @@ public class SheerCurves : MonoBehaviour
         float upperStemY = Mathf.Lerp(stemP3.y, maxUpperY, Mathf.Clamp01(upperStemRatio));
         upperStemTop = new Vector3(0f, upperStemY, stemP3.z);
 
+        // 7. UPPER DECK BULWARK PROFILE EXTENSIONS
+        hasStemBulwark1 = false;
+        hasStemBulwark2 = false;
+        hasTransomBulwark1 = false;
+        hasTransomBulwark2 = false;
+
+        if (upperDeckCurves != null)
+        {
+            hasStemBulwark1 = upperDeckCurves.GetBulwarkBowProfilePoint(0, out stemBulwarkP1);
+            hasTransomBulwark1 = upperDeckCurves.GetBulwarkSternProfilePoint(0, out transomBulwarkP1);
+
+            hasStemBulwark2 = upperDeckCurves.GetBulwarkBowProfilePoint(1, out stemBulwarkP2);
+            hasTransomBulwark2 = upperDeckCurves.GetBulwarkSternProfilePoint(1, out transomBulwarkP2);
+        }
+
 
         RebuildCachedProfileBuffers(30);
 
@@ -329,13 +360,14 @@ public class SheerCurves : MonoBehaviour
     {
         if (cachedOuterProfile.Count == 0) UpdateCachedProfile();
 
-        // 1. Transom Rake Section
+        // 1. Transom Rake Section (with linear upward rake continuation for upper decks)
         if (targetY >= transomP0.y)
         {
             float dy = transomP1.y - transomP0.y;
             if (Mathf.Abs(dy) < 0.0001f) return transomP0.z;
-            float t = Mathf.Clamp01((targetY - transomP0.y) / dy);
-            return Mathf.Lerp(transomP0.z, transomP1.z, t);
+            float dz = transomP1.z - transomP0.z;
+            float t = (targetY - transomP0.y) / dy;
+            return transomP0.z + t * dz;
         }
 
         // 2. Counter Rake Section (if enabled)
@@ -515,6 +547,18 @@ public class SheerCurves : MonoBehaviour
             Gizmos.DrawLine(stemP3, upperStemTop);
         }
 
+        // Draw Upper Deck Bulwark Stem Extensions (vertical continuation)
+        if (hasStemBulwark1)
+        {
+            Vector3 bowBase = (upperStemTop.y > stemP3.y + 0.001f) ? upperStemTop : stemP3;
+            Gizmos.color = profileColor;
+            Gizmos.DrawLine(bowBase, stemBulwarkP1);
+            if (hasStemBulwark2)
+            {
+                Gizmos.DrawLine(stemBulwarkP1, stemBulwarkP2);
+            }
+        }
+
         // 2. Draw Keel Line (Yellow)
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(keelStart, keelEnd);
@@ -532,6 +576,17 @@ public class SheerCurves : MonoBehaviour
         // 5. Draw Transom Rake (Magenta)
         Gizmos.color = Color.magenta;
         Gizmos.DrawLine(transomP0, transomP1);
+
+        // Draw Upper Deck Bulwark Transom Rake Extensions (following angled rake trajectory)
+        if (hasTransomBulwark1)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawLine(transomP1, transomBulwarkP1);
+            if (hasTransomBulwark2)
+            {
+                Gizmos.DrawLine(transomBulwarkP1, transomBulwarkP2);
+            }
+        }
 
 
 #if UNITY_EDITOR
@@ -602,6 +657,20 @@ public class SheerCurves : MonoBehaviour
             }
             Gizmos.color = Color.magenta;
             Gizmos.DrawSphere(transomP1, 0.16f);
+
+            // Bulwark Profile Spheres
+            if (hasStemBulwark1)
+            {
+                Gizmos.color = new Color(0.95f, 0.40f, 0.15f, 0.95f);
+                Gizmos.DrawSphere(stemBulwarkP1, 0.16f);
+                if (hasStemBulwark2) Gizmos.DrawSphere(stemBulwarkP2, 0.16f);
+            }
+            if (hasTransomBulwark1)
+            {
+                Gizmos.color = new Color(0.95f, 0.40f, 0.15f, 0.95f);
+                Gizmos.DrawSphere(transomBulwarkP1, 0.16f);
+                if (hasTransomBulwark2) Gizmos.DrawSphere(transomBulwarkP2, 0.16f);
+            }
         }
 
 #if UNITY_EDITOR
@@ -610,9 +679,14 @@ public class SheerCurves : MonoBehaviour
             GUIStyle style = GetCachedLabelStyle();
 
             Handles.Label(stemP3 + new Vector3(0, 0.2f, 0), "Stem Post Top (Bow Tip)", style);
+            if (hasStemBulwark1) Handles.Label(stemBulwarkP1 + new Vector3(0, 0.2f, 0), "Tier 1 Bulwark Stem Top", style);
+            if (hasStemBulwark2) Handles.Label(stemBulwarkP2 + new Vector3(0, 0.2f, 0), "Tier 2 Bulwark Stem Top", style);
+
             Handles.Label(sternP3 + new Vector3(0, 0.2f, 0), "Stern Post Top", style);
             if (enableCounter) Handles.Label(counterP3 + new Vector3(0, 0.2f, 0), "Counter Top", style);
             Handles.Label(transomP1 + new Vector3(0, 0.2f, 0), "Transom Rake Top", style);
+            if (hasTransomBulwark1) Handles.Label(transomBulwarkP1 + new Vector3(0, 0.2f, 0), "Tier 1 Bulwark Transom Top", style);
+            if (hasTransomBulwark2) Handles.Label(transomBulwarkP2 + new Vector3(0, 0.2f, 0), "Tier 2 Bulwark Transom Top", style);
         }
 #endif
     }

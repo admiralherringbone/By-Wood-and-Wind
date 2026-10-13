@@ -580,7 +580,7 @@ public class MainDeckCurves : MonoBehaviour
         {
             float bowSpan = bowTip.z - midZ;
             if (bowSpan < 0.001f) return midY;
-            float u = Mathf.Clamp01((z - midZ) / bowSpan);
+            float u = Mathf.Max(0f, (z - midZ) / bowSpan);
             float rise = Mathf.Pow(u, sheerCurvePower) * (bowTip.y - midY);
             return midY + rise;
         }
@@ -588,7 +588,7 @@ public class MainDeckCurves : MonoBehaviour
         {
             float sternSpan = midZ - sternCenter.z;
             if (sternSpan < 0.001f) return midY;
-            float u = Mathf.Clamp01((midZ - z) / sternSpan);
+            float u = Mathf.Max(0f, (midZ - z) / sternSpan);
             float rise = Mathf.Pow(u, sheerCurvePower) * (sternCenter.y - midY);
             return midY + rise;
         }
@@ -607,7 +607,7 @@ public class MainDeckCurves : MonoBehaviour
         {
             float bowSpan = bowBottomTip.z - midZ;
             if (bowSpan < 0.001f) return midY;
-            float u = Mathf.Clamp01((z - midZ) / bowSpan);
+            float u = Mathf.Max(0f, (z - midZ) / bowSpan);
             float rise = Mathf.Pow(u, sheerCurvePower) * (bowBottomTip.y - midY);
             return midY + rise;
         }
@@ -615,7 +615,7 @@ public class MainDeckCurves : MonoBehaviour
         {
             float sternSpan = midZ - sternBottomCenter.z;
             if (sternSpan < 0.001f) return midY;
-            float u = Mathf.Clamp01((midZ - z) / sternSpan);
+            float u = Mathf.Max(0f, (midZ - z) / sternSpan);
             float rise = Mathf.Pow(u, sheerCurvePower) * (sternBottomCenter.y - midY);
             return midY + rise;
         }
