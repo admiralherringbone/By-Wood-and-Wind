@@ -152,3 +152,14 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 2.3**: **Default Tier Instantiation** — Verified `InitializeDefaultTiers()` cleanly configures Tier 1 (Forecastle flush to inner stem, Quarterdeck flush to inner transom, open waist in between).
 - [x] **Step 2.4**: **Buffer Allocation & Zero GC** — Profiled and optimized `BuildSegmentDeckBeams`, `BuildSegmentBreastworks`, and `BuildTierBulwarks` to pool and reuse `Vector3[]` buffers (`cachedDeckBeams`, `cachedBottomDeckBeams`, `forwardBreastworkStanchions`, `aftBreastworkStanchions`, `cachedBulwarkStanchions`), eliminating frame-by-frame heap allocations during curve updates.
 
+---
+
+## 6. Execution Checklist (Phase 3: Boundary Conformance & Safeguards)
+
+- [x] **Step 3.1**: **Stem Flush Snapping** — Moving Forecastle forward handle within $0.05\text{m}$ of inner stem magnetically snaps flush; toggles `flushToStem = true`, zeroes `stemClearance`.
+- [x] **Step 3.2**: **Transom Flush Snapping** — Moving Quarterdeck aft handle within $0.05\text{m}$ of inner fashion timber / transom rake magnetically snaps flush; toggles `flushToTransom = true`, zeroes `sternClearance`.
+- [x] **Step 3.3**: **One-Click Snap Buttons** — Integrated `⚡ Snap Forecastle Flush to Stem` and `⚡ Snap Quarterdeck Flush to Transom` in Custom Inspector and Context Menu for instant boundary alignment.
+- [x] **Step 3.4**: **"No Floating Decks" (Tier 2 Safeguard)** — Enforced strict geometric clamp where Poop Deck forward boundary never exceeds supporting Quarterdeck break ($Z_{\text{fwd}}^{\text{Poop}} \le Z_{\text{fwd}}^{\text{QD}}$); moving Quarterdeck forward break aft automatically retracts Poop Deck footprint.
+- [x] **Step 3.5**: **Vertical Space Safeguard** — Monitored vertical clearance between `MainDeckCurves` and `TopLineCurves`; when clearance $< 0.68\text{m}$, Inspector displays warning HelpBox and disables deck preset creation buttons.
+
+

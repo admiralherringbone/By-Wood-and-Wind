@@ -496,10 +496,62 @@ public class UpperDeckCurves : MonoBehaviour
         return false;
     }
 
+    [ContextMenu("Snap Forecastle Flush to Stem")]
+    public void SnapForecastleFlushToStem()
+    {
+        EnsureInitialized();
+        float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 15f;
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            for (int s = 0; s < tiers[t].segments.Count; s++)
+            {
+                UpperDeckSegment seg = tiers[t].segments[s];
+                if (seg != null && seg.segmentName.IndexOf("Fore", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    seg.flushToStem = true;
+                    seg.stemClearance = 0f;
+                    float stemTipY = EvaluateCenterlineSheerYAtZ(tiers[t], seg, t, maxBowZ);
+                    seg.forwardZ = GetInnerStemZAtElevation(stemTipY);
+                }
+            }
+        }
+        UpdateCachedCurves();
+    }
+
+    [ContextMenu("Snap Quarterdeck Flush to Transom")]
+    public void SnapQuarterdeckFlushToTransom()
+    {
+        EnsureInitialized();
+        float minSternZ = (fashionCurves != null) ? fashionCurves.innerStbdP4.z : -15f;
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            for (int s = 0; s < tiers[t].segments.Count; s++)
+            {
+                UpperDeckSegment seg = tiers[t].segments[s];
+                if (seg != null && (seg.segmentName.IndexOf("Quarter", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    seg.segmentName.IndexOf("Poop", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    seg.flushToTransom = true;
+                    seg.sternClearance = 0f;
+                    float sternTipY = EvaluateCenterlineSheerYAtZ(tiers[t], seg, t, minSternZ);
+                    seg.aftZ = GetInnerSternZAtElevation(sternTipY);
+                }
+            }
+        }
+        UpdateCachedCurves();
+    }
+
     public void AddQuarterdeckPreset()
     {
         EnsureInitialized();
         if (tiers.Count == 0) return;
+
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot add Quarterdeck: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
 
         UpperDeckTier tier1 = tiers[0];
         float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
@@ -528,6 +580,13 @@ public class UpperDeckCurves : MonoBehaviour
         EnsureInitialized();
         if (tiers.Count == 0) return;
 
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot add Forecastle: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
+
         UpperDeckTier tier1 = tiers[0];
         float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
         float bowZ = (mainDeckCurves != null) ? mainDeckCurves.bowTip.z : 14f;
@@ -555,6 +614,13 @@ public class UpperDeckCurves : MonoBehaviour
         EnsureInitialized();
         if (tiers.Count == 0) return;
 
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot add Midship Gangway: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
+
         UpperDeckTier tier1 = tiers[0];
         float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
 
@@ -580,6 +646,13 @@ public class UpperDeckCurves : MonoBehaviour
     public void AddPoopDeckPreset()
     {
         EnsureInitialized();
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot add Poop Deck: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
+
         UpperDeckSegment supportingDeck;
         if (!CanAddTier2Deck(out supportingDeck))
         {
@@ -795,6 +868,7 @@ public class UpperDeckCurves : MonoBehaviour
                 float supFwd = supportingSegment.forwardZ;
                 float supAft = supportingSegment.aftZ;
 
+                // Transom / Aft boundary alignment
                 if (segment.flushToTransom)
                 {
                     segment.sternClearance = 0f;
@@ -811,11 +885,21 @@ public class UpperDeckCurves : MonoBehaviour
                     else
                     {
                         float clampMinZ = Mathf.Max(supAft, minAllowedAftZ + segment.sternClearance);
-                        segment.aftZ = Mathf.Clamp(segment.aftZ, clampMinZ, segment.forwardZ - 0.3f);
+                        segment.aftZ = Mathf.Clamp(segment.aftZ, clampMinZ, supFwd - 0.2f);
                     }
                 }
 
-                segment.forwardZ = Mathf.Clamp(segment.forwardZ, segment.aftZ + 0.3f, supFwd);
+                // Forward boundary cannot extend forward of supporting deck forward break
+                segment.forwardZ = Mathf.Min(segment.forwardZ, supFwd);
+                if (segment.forwardZ < segment.aftZ + 0.2f)
+                {
+                    segment.forwardZ = segment.aftZ + 0.2f;
+                    if (segment.forwardZ > supFwd)
+                    {
+                        segment.forwardZ = supFwd;
+                        segment.aftZ = Mathf.Max(supAft, segment.forwardZ - 0.2f);
+                    }
+                }
             }
         }
     }
@@ -2015,11 +2099,13 @@ public class UpperDeckCurvesEditor : Editor
 
         // Safeguard Checks
         float remainingSpace = targetScript.GetRemainingUpperSpace(10f, -10f);
-        if (remainingSpace < 0.68f)
+        bool hasSufficientClearance = remainingSpace >= 0.68f;
+        if (!hasSufficientClearance)
         {
             EditorGUILayout.HelpBox(
                 $"⚠️ Low Vertical Clearance: Only {remainingSpace:F2}m clearance between Main Deck and TopLine across the hull. " +
-                "Consider raising TopLineCurves or lowering MainDeckCurves to ensure comfortable headroom.",
+                "Upper deck creation is blocked until vertical clearance is restored (minimum 0.68m required). " +
+                "Consider raising TopLineCurves or lowering MainDeckCurves to restore headroom.",
                 MessageType.Warning);
         }
 
@@ -2032,44 +2118,13 @@ public class UpperDeckCurvesEditor : Editor
         if (GUILayout.Button("⚡ Snap Forecastle Flush to Stem"))
         {
             Undo.RecordObject(targetScript, "Snap Forecastle Flush to Stem");
-            float maxBowZ = (targetScript.topLineCurves != null) ? targetScript.topLineCurves.cachedFwdP0.z : 15f;
-            for (int t = 0; t < targetScript.tiers.Count; t++)
-            {
-                for (int s = 0; s < targetScript.tiers[t].segments.Count; s++)
-                {
-                    UpperDeckSegment seg = targetScript.tiers[t].segments[s];
-                    if (seg.segmentName.IndexOf("Fore", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        seg.flushToStem = true;
-                        seg.stemClearance = 0f;
-                        float stemTipY = targetScript.EvaluateCenterlineSheerYAtZ(targetScript.tiers[t], seg, t, maxBowZ);
-                        seg.forwardZ = targetScript.GetInnerStemZAtElevation(stemTipY);
-                    }
-                }
-            }
-            targetScript.UpdateCachedCurves();
+            targetScript.SnapForecastleFlushToStem();
             EditorUtility.SetDirty(targetScript);
         }
         if (GUILayout.Button("⚡ Snap Quarterdeck Flush to Transom"))
         {
             Undo.RecordObject(targetScript, "Snap Quarterdeck Flush to Transom");
-            float minSternZ = (targetScript.fashionCurves != null) ? targetScript.fashionCurves.innerStbdP4.z : -15f;
-            for (int t = 0; t < targetScript.tiers.Count; t++)
-            {
-                for (int s = 0; s < targetScript.tiers[t].segments.Count; s++)
-                {
-                    UpperDeckSegment seg = targetScript.tiers[t].segments[s];
-                    if (seg.segmentName.IndexOf("Quarter", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        seg.segmentName.IndexOf("Poop", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        seg.flushToTransom = true;
-                        seg.sternClearance = 0f;
-                        float sternTipY = targetScript.EvaluateCenterlineSheerYAtZ(targetScript.tiers[t], seg, t, minSternZ);
-                        seg.aftZ = targetScript.GetInnerSternZAtElevation(sternTipY);
-                    }
-                }
-            }
-            targetScript.UpdateCachedCurves();
+            targetScript.SnapQuarterdeckFlushToTransom();
             EditorUtility.SetDirty(targetScript);
         }
         EditorGUILayout.EndHorizontal();
@@ -2077,6 +2132,7 @@ public class UpperDeckCurvesEditor : Editor
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Quick Presets & Tier Actions", EditorStyles.boldLabel);
 
+        EditorGUI.BeginDisabledGroup(!hasSufficientClearance);
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("+ Add Forecastle (Bow)"))
         {
@@ -2111,6 +2167,7 @@ public class UpperDeckCurvesEditor : Editor
         }
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
+        EditorGUI.EndDisabledGroup();
 
         if (!canAddPoop)
         {
@@ -2161,25 +2218,38 @@ public class UpperDeckCurvesEditor : Editor
                 float maxAllowedFwdZ = targetScript.GetInnerStemZAtElevation(seg.fwdCenterTip.y);
                 float minAllowedAftZ = targetScript.GetInnerSternZAtElevation(seg.aftCenterTip.y);
 
+                UpperDeckSegment supSeg = (tier.tierLevel > 1) ? targetScript.GetSupportingSegment(seg) : null;
+                float maxFwdLimit = (supSeg != null) ? supSeg.forwardZ : maxAllowedFwdZ;
+                float minAftLimit = (supSeg != null) ? supSeg.aftZ : minAllowedAftZ;
+
                 // 1. Forward Z Slider Handle
                 EditorGUI.BeginChangeCheck();
                 Vector3 newFwd = Handles.Slider(seg.fwdCenterTip, Vector3.forward, 0.4f, Handles.ConeHandleCap, 0.05f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(targetScript, $"Move {seg.segmentName} Forward Limit");
-                    if (newFwd.z >= maxAllowedFwdZ - 0.15f)
+                    if (tier.tierLevel > 1)
                     {
-                        seg.flushToStem = true;
-                        seg.stemClearance = 0f;
-                        seg.forwardZ = maxAllowedFwdZ;
+                        // Tier 2 Poop Deck cannot float forward of supporting deck forward break
+                        newFwd.z = Mathf.Clamp(newFwd.z, seg.aftZ + 0.2f, maxFwdLimit);
+                        seg.forwardZ = newFwd.z;
                     }
                     else
                     {
-                        if (seg.flushToStem && newFwd.z < maxAllowedFwdZ - 0.20f)
+                        if (newFwd.z >= maxAllowedFwdZ - 0.05f)
                         {
-                            seg.flushToStem = false;
+                            seg.flushToStem = true;
+                            seg.stemClearance = 0f;
+                            seg.forwardZ = maxAllowedFwdZ;
                         }
-                        seg.forwardZ = newFwd.z;
+                        else
+                        {
+                            if (seg.flushToStem && newFwd.z < maxAllowedFwdZ - 0.10f)
+                            {
+                                seg.flushToStem = false;
+                            }
+                            seg.forwardZ = newFwd.z;
+                        }
                     }
                     changed = true;
                 }
@@ -2190,7 +2260,7 @@ public class UpperDeckCurvesEditor : Editor
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(targetScript, $"Move {seg.segmentName} Aft Limit");
-                    if (newAft.z <= minAllowedAftZ + 0.15f)
+                    if (newAft.z <= minAllowedAftZ + 0.05f)
                     {
                         seg.flushToTransom = true;
                         seg.sternClearance = 0f;
@@ -2198,11 +2268,18 @@ public class UpperDeckCurvesEditor : Editor
                     }
                     else
                     {
-                        if (seg.flushToTransom && newAft.z > minAllowedAftZ + 0.20f)
+                        if (seg.flushToTransom && newAft.z > minAllowedAftZ + 0.10f)
                         {
                             seg.flushToTransom = false;
                         }
-                        seg.aftZ = newAft.z;
+                        if (tier.tierLevel > 1)
+                        {
+                            seg.aftZ = Mathf.Clamp(newAft.z, minAftLimit, seg.forwardZ - 0.2f);
+                        }
+                        else
+                        {
+                            seg.aftZ = newAft.z;
+                        }
                     }
                     changed = true;
                 }
