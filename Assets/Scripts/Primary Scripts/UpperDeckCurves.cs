@@ -2204,26 +2204,6 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
-        // If maxActiveTier >= 2 (e.g. Poop Deck at stern), Forecastle on Tier 1 at the bow is also crowned by TopLineCurves at the bow!
-        if (maxActiveTier >= 2)
-        {
-            for (int t = 0; t < tiers.Count; t++)
-            {
-                UpperDeckTier tier = tiers[t];
-                if (tier == null || tier.tierLevel != 1 || tier.segments == null) continue;
-
-                for (int s = 0; s < tier.segments.Count; s++)
-                {
-                    UpperDeckSegment seg = tier.segments[s];
-                    if (seg != null && seg.isEnabled && seg.forwardZ > 0f) // Forecastle
-                    {
-                        if (z <= seg.forwardZ + 0.05f && z >= seg.aftZ - 0.05f)
-                            return true;
-                    }
-                }
-            }
-        }
-
         return false;
     }
 
