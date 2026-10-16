@@ -541,6 +541,103 @@ public class UpperDeckCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    [ContextMenu("Apply Frigate Layout Preset (2-Deck)")]
+    public void ApplyFrigatePreset()
+    {
+        EnsureInitialized();
+        if (mainDeckCurves != null) mainDeckCurves.EnsureInitialized();
+
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot apply Frigate layout: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
+
+        tiers.Clear();
+
+        float bowZ = (mainDeckCurves != null) ? mainDeckCurves.bowTip.z : 14f;
+        float sternZ = (mainDeckCurves != null) ? mainDeckCurves.sternCenter.z : -12f;
+        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
+
+        // Tier 1: Classic Frigate 2-Deck Layout
+        UpperDeckTier tier1 = new UpperDeckTier
+        {
+            tierName = "Tier 1 (Upper Decks)",
+            tierLevel = 1,
+            tierHeadroom = 2.05f,
+            snapToCeilingBoundary = false,
+            bulwarkHeight = 1.10f,
+            sheerScale = 0.8f,
+            midshipCamber = 0.20f,
+            proportionalCamberToBeam = true
+        };
+
+        // 1. Forecastle (Bow to waist break, flush against inner stem)
+        float fwdStemZ = GetInnerStemZAtElevation(6.0f);
+        UpperDeckSegment forecastle = new UpperDeckSegment
+        {
+            segmentName = "Forecastle",
+            isEnabled = true,
+            flushToStem = true,
+            forwardZ = fwdStemZ,
+            aftZ = Mathf.Lerp(midZ, fwdStemZ, 0.45f), // ~8m
+            stemClearance = 0f,
+            showForwardBreastwork = false,
+            showAftBreastwork = true,
+            breastworkStanchionCount = 6,
+            deckThickness = 0.18f,
+            deckColor = new Color(0.95f, 0.70f, 0.30f, 0.95f)
+        };
+        tier1.segments.Add(forecastle);
+
+        // 2. Quarterdeck (Waist break to Stern, flush against inner transom)
+        float aftSternZ = GetInnerSternZAtElevation(6.0f);
+        UpperDeckSegment quarterdeck = new UpperDeckSegment
+        {
+            segmentName = "Quarterdeck",
+            isEnabled = true,
+            flushToTransom = true,
+            forwardZ = Mathf.Lerp(sternZ, midZ, 0.75f), // ~ -2m
+            aftZ = aftSternZ,
+            sternClearance = 0f,
+            showForwardBreastwork = true,
+            showAftBreastwork = false,
+            breastworkStanchionCount = 6,
+            deckThickness = 0.18f,
+            deckColor = new Color(0.90f, 0.60f, 0.20f, 0.95f)
+        };
+        tier1.segments.Add(quarterdeck);
+
+        tiers.Add(tier1);
+        UpdateCachedCurves();
+    }
+
+    [ContextMenu("Apply Ship-of-the-Line Layout Preset (Multi-Tier)")]
+    public void ApplyShipOfTheLinePreset()
+    {
+        EnsureInitialized();
+        if (mainDeckCurves != null) mainDeckCurves.EnsureInitialized();
+
+        float remaining = GetRemainingUpperSpace(10f, -10f);
+        if (remaining < 0.68f)
+        {
+            Debug.LogWarning($"[UpperDeckCurves] Cannot apply Ship-of-the-Line layout: Insufficient vertical clearance ({remaining:F2}m < 0.68m) between MainDeckCurves and TopLineCurves.");
+            return;
+        }
+
+        // 1. Configure standard Tier 1 Frigate hull base
+        ApplyFrigatePreset();
+
+        // 2. Add Midship Gangway bridging the waist between Forecastle and Quarterdeck
+        AddMidshipCatwalkPreset();
+
+        // 3. Add Tier 2 Poop Deck atop Quarterdeck
+        AddPoopDeckPreset();
+
+        UpdateCachedCurves();
+    }
+
     [ContextMenu("Add Quarterdeck Preset")]
     public void AddQuarterdeckPreset()
     {
@@ -2278,6 +2375,31 @@ public class UpperDeckCurvesEditor : Editor
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Hull Layout Presets", EditorStyles.boldLabel);
+
+        EditorGUI.BeginDisabledGroup(!hasSufficientClearance);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("⚓ Frigate (2-Deck Layout)", GUILayout.Height(28)))
+        {
+            if (EditorUtility.DisplayDialog("Apply Frigate Preset?", "Configure standard 2-deck layout (Forecastle, Open Waist, Quarterdeck)?", "Apply", "Cancel"))
+            {
+                Undo.RecordObject(targetScript, "Apply Frigate Layout Preset");
+                targetScript.ApplyFrigatePreset();
+                EditorUtility.SetDirty(targetScript);
+            }
+        }
+        if (GUILayout.Button("⚓ Ship-of-the-Line (Multi-Tier)", GUILayout.Height(28)))
+        {
+            if (EditorUtility.DisplayDialog("Apply Ship-of-the-Line Preset?", "Configure multi-tier layout (Forecastle, Midship Gangway, Quarterdeck, Poop Deck)?", "Apply", "Cancel"))
+            {
+                Undo.RecordObject(targetScript, "Apply Ship-of-the-Line Layout Preset");
+                targetScript.ApplyShipOfTheLinePreset();
+                EditorUtility.SetDirty(targetScript);
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("Quick Presets & Tier Actions", EditorStyles.boldLabel);
 
         EditorGUI.BeginDisabledGroup(!hasSufficientClearance);
@@ -2371,8 +2493,10 @@ public class UpperDeckCurvesEditor : Editor
                 float minAftLimit = (supSeg != null) ? supSeg.aftZ : minAllowedAftZ;
 
                 // 1. Forward Z Slider Handle
+                float fwdHandleSize = HandleUtility.GetHandleSize(seg.fwdCenterTip) * 0.15f;
+                Handles.color = seg.flushToStem ? new Color(0.2f, 0.95f, 0.4f, 0.95f) : seg.deckColor;
                 EditorGUI.BeginChangeCheck();
-                Vector3 newFwd = Handles.Slider(seg.fwdCenterTip, Vector3.forward, 0.4f, Handles.ConeHandleCap, 0.05f);
+                Vector3 newFwd = Handles.Slider(seg.fwdCenterTip, Vector3.forward, fwdHandleSize, Handles.ConeHandleCap, 0.05f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(targetScript, $"Move {seg.segmentName} Forward Limit");
@@ -2403,8 +2527,10 @@ public class UpperDeckCurvesEditor : Editor
                 }
 
                 // 2. Aft Z Slider Handle
+                float aftHandleSize = HandleUtility.GetHandleSize(seg.aftCenterTip) * 0.15f;
+                Handles.color = seg.flushToTransom ? new Color(0.2f, 0.95f, 0.4f, 0.95f) : seg.deckColor;
                 EditorGUI.BeginChangeCheck();
-                Vector3 newAft = Handles.Slider(seg.aftCenterTip, Vector3.forward, 0.4f, Handles.ConeHandleCap, 0.05f);
+                Vector3 newAft = Handles.Slider(seg.aftCenterTip, Vector3.forward, aftHandleSize, Handles.ConeHandleCap, 0.05f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(targetScript, $"Move {seg.segmentName} Aft Limit");
@@ -2433,8 +2559,10 @@ public class UpperDeckCurvesEditor : Editor
                 }
 
                 // 3. Elevation Slider Handle at Midship
+                float midHandleSize = HandleUtility.GetHandleSize(seg.midshipCenter) * 0.12f;
+                Handles.color = Color.yellow;
                 EditorGUI.BeginChangeCheck();
-                Vector3 newMid = Handles.Slider(seg.midshipCenter, Vector3.up, 0.4f, Handles.DotHandleCap, 0.05f);
+                Vector3 newMid = Handles.Slider(seg.midshipCenter, Vector3.up, midHandleSize, Handles.DotHandleCap, 0.05f);
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(targetScript, $"Move {seg.segmentName} Elevation");

@@ -181,5 +181,14 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 5.3**: **Waist Gangway Dynamic Gap Bridging** — Enhanced `AddMidshipCatwalkPreset()` to dynamically locate existing Forecastle and Quarterdeck segments in Tier 1 and bridge the exact longitudinal gap between Forecastle `aftZ` and Quarterdeck `forwardZ`, leaving walking passage open without obstructing breastworks.
 - [x] **Step 5.4**: **Framing & Deck Level Clearance** — Added `[ContextMenu]` attributes for `AddForecastlePreset`, `AddQuarterdeckPreset`, `AddMidshipCatwalkPreset`, and `AddPoopDeckPreset` to ensure instant accessibility and testing of all upper deck levels.
 
+---
+
+## 9. Execution Checklist (Phase 6: Presets, QoL & Git Deployment)
+
+- [x] **Step 6.1**: **Frigate Layout Preset** — Implemented `ApplyFrigatePreset()` and `[ContextMenu("Apply Frigate Layout Preset (2-Deck)")]`, configuring the standard 2-deck layout (Forecastle flush to inner stem, open waist, Quarterdeck flush to inner transom, grounded breastworks).
+- [x] **Step 6.2**: **Ship-of-the-Line Preset** — Implemented `ApplyShipOfTheLinePreset()` and `[ContextMenu("Apply Ship-of-the-Line Layout Preset (Multi-Tier)")]`, configuring the full multi-tier layout (Forecastle, Midship Gangway, Quarterdeck, and Tier 2 Poop Deck).
+- [x] **Step 6.3**: **Scene View Interaction Polish** — Upgraded `OnSceneGUI` handle rendering with dynamic zoom scaling via `HandleUtility.GetHandleSize(pos)`, color feedback (green for flush boundary snaps, deck color for boundaries, yellow for elevation), and continuous `Undo.RecordObject` tracking.
+- [x] **Step 6.4**: **Git Version Control & Deployment** — Staged, committed, and pushed all validated scripts, architecture documents, and implementation plans cleanly to GitHub repository `origin/main`.
+
 
 
