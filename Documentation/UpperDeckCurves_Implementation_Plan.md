@@ -172,5 +172,14 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 4.4**: **Breastwork Stanchions** — Vertical framing stanchions distribute evenly across the bulkhead opening connecting top and bottom arcs according to `breastworkStanchionCount` ($2\text{--}16$).
 - [x] **Step 4.5**: **Bulwark Rail Conformance** — Bulwarks conform directly to `TopLineCurves` as their true cap rail; vertical bulwark stanchions rise cleanly from deck waterways up to `TopLineCurves`.
 
+---
+
+## 8. Execution Checklist (Phase 5: Downstream Lofting & Cross-Script Integration)
+
+- [x] **Step 5.1**: **`SectionModelCurves` Bulwark Rail Conformance** — Replaced outdated $u = 1.25$ bulwark rail node parameters with $u = 1.00$, cleanly terminating transverse hull frame polylines at TopLine / bulwark cap rail with automatic node deduplication.
+- [x] **Step 5.2**: **Deck Clamp & Shelf Landing Notches** — Implemented `GetDeckEdgePointsAtZ(z, ...)` in `UpperDeckCurves.cs` and integrated deck shelf notch markers (`showDeckClamps`, `deckClampColor`) in `SectionModelCurves.cs`, rendering beam seats directly along the inner frame face without puncturing outer hull planking.
+- [x] **Step 5.3**: **Waist Gangway Dynamic Gap Bridging** — Enhanced `AddMidshipCatwalkPreset()` to dynamically locate existing Forecastle and Quarterdeck segments in Tier 1 and bridge the exact longitudinal gap between Forecastle `aftZ` and Quarterdeck `forwardZ`, leaving walking passage open without obstructing breastworks.
+- [x] **Step 5.4**: **Framing & Deck Level Clearance** — Added `[ContextMenu]` attributes for `AddForecastlePreset`, `AddQuarterdeckPreset`, `AddMidshipCatwalkPreset`, and `AddPoopDeckPreset` to ensure instant accessibility and testing of all upper deck levels.
+
 
 

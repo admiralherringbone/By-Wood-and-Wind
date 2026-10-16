@@ -21,7 +21,7 @@ public class SectionModelCurves : MonoBehaviour
     public struct SectionPointNode
     {
         public string name;
-        public float uParam; // 0.0 = Keel, 0.25 = Floor, 0.50 = Bilge, 0.75 = Breadth, 1.0 = TopLine, 1.25 = Bulwark Rail
+        public float uParam; // 0.0 = Keel, 0.25 = Floor, 0.50 = Bilge, 0.75 = Breadth, 1.0 = TopLine / Bulwark Rail
         public Vector3 point;
     }
 
@@ -83,6 +83,12 @@ public class SectionModelCurves : MonoBehaviour
     public Color sectionColor = new Color(0.1f, 0.85f, 0.95f, 0.9f);
     public Color starboardColor = new Color(0.2f, 0.95f, 0.4f, 0.95f);
     public Color portColor = new Color(0.95f, 0.25f, 0.4f, 0.95f);
+
+    [Header("Deck Clamp / Shelf Notches")]
+    [Tooltip("Display upper deck shelf and clamp landing markers on transverse frame cuts.")]
+    public bool showDeckClamps = true;
+    [Tooltip("Color of deck clamp and shelf markers.")]
+    public Color deckClampColor = new Color(0.95f, 0.65f, 0.20f, 0.90f);
 
     [Header("Master Frame Settings")]
     [Tooltip("Construct section frames purely from the 5 Master Key Curves (Keel, Floor, Bilge, Breadth, TopLine) to guarantee lump-free hull cuts.")]
@@ -331,7 +337,7 @@ public class SectionModelCurves : MonoBehaviour
                     nodes.Add(new SectionPointNode
                     {
                         name = "Upper Deck Bulwark Rail",
-                        uParam = 1.25f,
+                        uParam = 1.00f,
                         point = new Vector3(sSign * Mathf.Abs(railPt.x), railPt.y, z)
                     });
                 }
@@ -490,7 +496,7 @@ public class SectionModelCurves : MonoBehaviour
                             nodes.Add(new SectionPointNode
                             {
                                 name = "Inner Upper Deck Bulwark Rail",
-                                uParam = 1.25f,
+                                uParam = 1.00f,
                                 point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
                             });
                         }
@@ -642,7 +648,7 @@ public class SectionModelCurves : MonoBehaviour
                         nodes.Add(new SectionPointNode
                         {
                             name = "Inner Upper Deck Bulwark Rail",
-                            uParam = 1.25f,
+                            uParam = 1.00f,
                             point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
                         });
                     }
@@ -919,6 +925,36 @@ public class SectionModelCurves : MonoBehaviour
                         Gizmos.DrawLine(portOuterPts[portOuterPts.Count - 1], portInnerPts[portInnerPts.Count - 1]);
                     }
                 }
+
+                // Draw Upper Deck Clamp and Shelf Landing Notches on Frame Cuts
+                if (showDeckClamps && upperDeckCurves != null && upperDeckCurves.GetDeckEdgePointsAtZ(z, out Vector3 stbdEdge, out Vector3 portEdge, out Vector3 stbdBotEdge, out Vector3 portBotEdge))
+                {
+                    Gizmos.color = deckClampColor;
+                    // Draw deck edge waterway to shelf connection along frame inner face
+                    Gizmos.DrawLine(stbdEdge, stbdBotEdge);
+                    Gizmos.DrawLine(portEdge, portBotEdge);
+
+                    // Draw shelf clamp timber protruding inward from frame face to support deck beam
+                    float clampInwardDepth = 0.15f;
+                    Vector3 stbdShelfIn = stbdBotEdge + Vector3.left * clampInwardDepth;
+                    Vector3 portShelfIn = portBotEdge + Vector3.right * clampInwardDepth;
+
+                    Gizmos.DrawLine(stbdBotEdge, stbdShelfIn);
+                    Gizmos.DrawLine(portBotEdge, portShelfIn);
+                    Gizmos.DrawLine(stbdShelfIn, stbdShelfIn + Vector3.up * Mathf.Max(0.02f, stbdEdge.y - stbdBotEdge.y));
+                    Gizmos.DrawLine(portShelfIn, portShelfIn + Vector3.up * Mathf.Max(0.02f, portEdge.y - portBotEdge.y));
+
+                    Gizmos.DrawSphere(stbdBotEdge, 0.03f);
+                    Gizmos.DrawSphere(portBotEdge, 0.03f);
+
+#if UNITY_EDITOR
+                    if (showLabels)
+                    {
+                        GUIStyle labelStyle = GetCachedLabelStyle();
+                        Handles.Label(stbdShelfIn + Vector3.up * 0.05f, "Deck Clamp", labelStyle);
+                    }
+#endif
+                }
             }
 
             // Draw Node Spheres at Ribband Intersections
@@ -1175,6 +1211,11 @@ public class SectionModelCurvesEditor : Editor
         if (model.ribbandCurves != null)
         {
             EditorGUILayout.LabelField("Tracked Ribbands per Section:", $"{model.ribbandCurves.generatedRibbands.Count}");
+        }
+
+        if (model.upperDeckCurves != null && model.showDeckClamps)
+        {
+            EditorGUILayout.LabelField("Upper Deck Clamps:", "Active & Linked");
         }
 
         EditorGUILayout.Space(10);

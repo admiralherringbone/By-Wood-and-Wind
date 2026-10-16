@@ -541,6 +541,7 @@ public class UpperDeckCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    [ContextMenu("Add Quarterdeck Preset")]
     public void AddQuarterdeckPreset()
     {
         EnsureInitialized();
@@ -575,6 +576,7 @@ public class UpperDeckCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    [ContextMenu("Add Forecastle Preset")]
     public void AddForecastlePreset()
     {
         EnsureInitialized();
@@ -609,6 +611,7 @@ public class UpperDeckCurves : MonoBehaviour
         UpdateCachedCurves();
     }
 
+    [ContextMenu("Add Midship Gangway Preset")]
     public void AddMidshipCatwalkPreset()
     {
         EnsureInitialized();
@@ -622,27 +625,58 @@ public class UpperDeckCurves : MonoBehaviour
         }
 
         UpperDeckTier tier1 = tiers[0];
-        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
 
-        UpperDeckSegment bridge = new UpperDeckSegment
+        // Locate existing Forecastle and Quarterdeck in Tier 1 to bridge the waist gap
+        UpperDeckSegment fc = tier1.segments.Find(s => s != null && s.isEnabled && s.segmentName.IndexOf("Forecastle", System.StringComparison.OrdinalIgnoreCase) >= 0);
+        UpperDeckSegment qd = tier1.segments.Find(s => s != null && s.isEnabled && s.segmentName.IndexOf("Quarterdeck", System.StringComparison.OrdinalIgnoreCase) >= 0);
+
+        float fwdZ;
+        float aftZ;
+
+        if (fc != null && qd != null && fc.aftZ > qd.forwardZ + 0.1f)
         {
-            segmentName = "Midship Gangway",
-            isEnabled = true,
-            flushToStem = false,
-            flushToTransom = false,
-            forwardZ = midZ + 2.0f,
-            aftZ = midZ - 2.0f,
-            stemClearance = 0f,
-            sternClearance = 0f,
-            showForwardBreastwork = true,
-            showAftBreastwork = true,
-            deckThickness = 0.16f,
-            deckColor = new Color(0.85f, 0.75f, 0.35f, 0.95f)
-        };
-        tier1.segments.Add(bridge);
+            // Bridge the exact longitudinal gap between Forecastle aft break and Quarterdeck forward break
+            fwdZ = fc.aftZ;
+            aftZ = qd.forwardZ;
+        }
+        else
+        {
+            float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
+            fwdZ = midZ + 2.0f;
+            aftZ = midZ - 2.0f;
+        }
+
+        // Check if a Midship Gangway already exists; if so, update its extent
+        UpperDeckSegment existingBridge = tier1.segments.Find(s => s != null && (s.segmentName.IndexOf("Gangway", System.StringComparison.OrdinalIgnoreCase) >= 0 || s.segmentName.IndexOf("Catwalk", System.StringComparison.OrdinalIgnoreCase) >= 0));
+        if (existingBridge != null)
+        {
+            existingBridge.forwardZ = fwdZ;
+            existingBridge.aftZ = aftZ;
+            existingBridge.isEnabled = true;
+        }
+        else
+        {
+            UpperDeckSegment bridge = new UpperDeckSegment
+            {
+                segmentName = "Midship Gangway",
+                isEnabled = true,
+                flushToStem = false,
+                flushToTransom = false,
+                forwardZ = fwdZ,
+                aftZ = aftZ,
+                stemClearance = 0f,
+                sternClearance = 0f,
+                showForwardBreastwork = false,
+                showAftBreastwork = false,
+                deckThickness = 0.16f,
+                deckColor = new Color(0.85f, 0.75f, 0.35f, 0.95f)
+            };
+            tier1.segments.Add(bridge);
+        }
         UpdateCachedCurves();
     }
 
+    [ContextMenu("Add Poop Deck Preset")]
     public void AddPoopDeckPreset()
     {
         EnsureInitialized();
@@ -1560,6 +1594,81 @@ public class UpperDeckCurves : MonoBehaviour
         float y = centerY - camber * (normX * normX);
 
         return new Vector3(clampedX, y, z);
+    }
+
+    /// <summary>
+    /// Evaluates the 3D Upper Deck Edge points (waterway on inner frame and bottom ceiling edge) at station Z.
+    /// Returns true if an active upper deck segment spans station Z.
+    /// If multiple tiers span station Z, evaluates the highest active deck tier.
+    /// </summary>
+    public bool GetDeckEdgePointsAtZ(float z, out Vector3 stbdEdge, out Vector3 portEdge, out Vector3 stbdBottomEdge, out Vector3 portBottomEdge)
+    {
+        stbdEdge = Vector3.zero;
+        portEdge = Vector3.zero;
+        stbdBottomEdge = Vector3.zero;
+        portBottomEdge = Vector3.zero;
+
+        EnsureInitialized();
+        if (tiers == null || tiers.Count == 0) return false;
+
+        // Search from highest tier downwards for active deck at station Z
+        for (int t = tiers.Count - 1; t >= 0; t--)
+        {
+            if (GetDeckEdgePointsAtZ(t, z, out stbdEdge, out portEdge, out stbdBottomEdge, out portBottomEdge))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Evaluates the 3D Upper Deck Edge points (waterway on inner frame and bottom ceiling edge) at station Z for a specific tier.
+    /// Returns true if an active segment on this tier spans station Z.
+    /// </summary>
+    public bool GetDeckEdgePointsAtZ(int tierIndex, float z, out Vector3 stbdEdge, out Vector3 portEdge, out Vector3 stbdBottomEdge, out Vector3 portBottomEdge)
+    {
+        stbdEdge = Vector3.zero;
+        portEdge = Vector3.zero;
+        stbdBottomEdge = Vector3.zero;
+        portBottomEdge = Vector3.zero;
+
+        EnsureInitialized();
+        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
+        UpperDeckTier tier = tiers[tierIndex];
+        if (tier == null || tier.segments == null) return false;
+
+        float bulwarkSternZ = GetBulwarkTransomLimitZ(tierIndex);
+        float bulwarkBowZ = GetBulwarkStemLimitZ(tierIndex);
+
+        for (int s = 0; s < tier.segments.Count; s++)
+        {
+            UpperDeckSegment seg = tier.segments[s];
+            if (seg == null || !seg.isEnabled) continue;
+
+            float fwdLimit = seg.flushToStem ? Mathf.Max(seg.forwardZ, bulwarkBowZ) : seg.forwardZ;
+            float aftLimit = seg.flushToTransom ? Mathf.Min(seg.aftZ, bulwarkSternZ) : seg.aftZ;
+
+            if (z <= fwdLimit + 0.001f && z >= aftLimit - 0.001f)
+            {
+                float centerY = EvaluateCenterlineSheerYAtZ(tier, seg, tierIndex, z);
+                float camber = EvaluateCamberAtZ(tier, seg, z);
+                float edgeY = centerY - camber;
+                float halfWidth = GetInnerHullHalfBreadthAt(edgeY, z);
+
+                stbdEdge = new Vector3(halfWidth, edgeY, z);
+                portEdge = new Vector3(-halfWidth, edgeY, z);
+
+                float bottomCenterY = centerY - seg.deckThickness;
+                float bottomEdgeY = bottomCenterY - camber;
+                float bottomHalfWidth = GetInnerHullHalfBreadthAt(bottomEdgeY, z);
+
+                stbdBottomEdge = new Vector3(bottomHalfWidth, bottomEdgeY, z);
+                portBottomEdge = new Vector3(-bottomHalfWidth, bottomEdgeY, z);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // --- BULWARK CAP RAIL GEOMETRY & QUERY API ---
