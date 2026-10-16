@@ -1206,6 +1206,20 @@ public class UpperDeckCurves : MonoBehaviour
                 {
                     yBottom = mainDeckCurves.GetDeckSurfacePoint(x, fwdZ).y;
                 }
+                else if (tierIndex > 0)
+                {
+                    UpperDeckSegment supporting = GetSupportingSegment(segment);
+                    if (supporting != null && tiers != null && tiers.Count > 0)
+                    {
+                        UpperDeckTier supTier = tiers[0];
+                        float supCenterY = EvaluateCenterlineSheerYAtZ(supTier, supporting, 0, fwdZ);
+                        float supCamber = EvaluateCamberAtZ(supTier, supporting, fwdZ);
+                        float supEdgeY = supCenterY - supCamber;
+                        float supHalfWidth = GetInnerHullHalfBreadthAt(supEdgeY, fwdZ);
+                        float supNormX = (supHalfWidth > 0.001f) ? Mathf.Clamp(x / supHalfWidth, -1f, 1f) : 0f;
+                        yBottom = supCenterY - supCamber * (supNormX * supNormX);
+                    }
+                }
                 segment.forwardBreastworkBottomArc[s] = new Vector3(x, yBottom, fwdZ);
             }
 
@@ -1267,6 +1281,20 @@ public class UpperDeckCurves : MonoBehaviour
                 if (tierIndex == 0 && mainDeckCurves != null)
                 {
                     yBottom = mainDeckCurves.GetDeckSurfacePoint(x, aftZ).y;
+                }
+                else if (tierIndex > 0)
+                {
+                    UpperDeckSegment supporting = GetSupportingSegment(segment);
+                    if (supporting != null && tiers != null && tiers.Count > 0)
+                    {
+                        UpperDeckTier supTier = tiers[0];
+                        float supCenterY = EvaluateCenterlineSheerYAtZ(supTier, supporting, 0, aftZ);
+                        float supCamber = EvaluateCamberAtZ(supTier, supporting, aftZ);
+                        float supEdgeY = supCenterY - supCamber;
+                        float supHalfWidth = GetInnerHullHalfBreadthAt(supEdgeY, aftZ);
+                        float supNormX = (supHalfWidth > 0.001f) ? Mathf.Clamp(x / supHalfWidth, -1f, 1f) : 0f;
+                        yBottom = supCenterY - supCamber * (supNormX * supNormX);
+                    }
                 }
                 segment.aftBreastworkBottomArc[s] = new Vector3(x, yBottom, aftZ);
             }
@@ -1988,6 +2016,17 @@ public class UpperDeckCurves : MonoBehaviour
                     for (int i = 0; i < beam.Length - 1; i++)
                     {
                         Gizmos.DrawLine(beam[i], beam[i + 1]);
+                    }
+
+                    // Vertical edge caps joining top and bottom beam outer tips along the hull
+                    if (seg.showThicknessEdgeCaps && b < seg.cachedDeckBeams.Count)
+                    {
+                        Vector3[] topBeam = seg.cachedDeckBeams[b];
+                        if (topBeam != null && topBeam.Length == beam.Length && topBeam.Length > 0)
+                        {
+                            Gizmos.DrawLine(topBeam[0], beam[0]); // Port edge cap
+                            Gizmos.DrawLine(topBeam[topBeam.Length - 1], beam[beam.Length - 1]); // Starboard edge cap
+                        }
                     }
                 }
             }

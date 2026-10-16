@@ -162,4 +162,15 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 3.4**: **"No Floating Decks" (Tier 2 Safeguard)** — Enforced strict geometric clamp where Poop Deck forward boundary never exceeds supporting Quarterdeck break ($Z_{\text{fwd}}^{\text{Poop}} \le Z_{\text{fwd}}^{\text{QD}}$); moving Quarterdeck forward break aft automatically retracts Poop Deck footprint.
 - [x] **Step 3.5**: **Vertical Space Safeguard** — Monitored vertical clearance between `MainDeckCurves` and `TopLineCurves`; when clearance $< 0.68\text{m}$, Inspector displays warning HelpBox and disables deck preset creation buttons.
 
+---
+
+## 7. Execution Checklist (Phase 4: Geometry & Visual Fidelity Tuning)
+
+- [x] **Step 4.1**: **Proportional Camber** — Parabolic camber crown smoothly tapers in proportion to local hull beam ($\text{camber}(z) = \text{baseCamber} \times \frac{\text{localBeam}(z)}{\text{midBeam}}$), preventing excessive lateral dips at narrow bow and stern tips.
+- [x] **Step 4.2**: **Dual Solid Planking** — Top walking deck and lower ceiling surfaces render cleanly separated by `deckThickness` ($0.10\text{m}\text{--}0.30\text{m}$); vertical thickness edge caps join both surfaces at forward/aft margins and outboard beam tips along the hull frame.
+- [x] **Step 4.3**: **Waist Breastwork Bulkheads** — Transverse bulkheads at Forecastle aft break and Quarterdeck forward break ground down directly into `MainDeckCurves` surface, matching deck camber on both top and bottom arcs; Tier 2 bulkheads ground into supporting deck camber.
+- [x] **Step 4.4**: **Breastwork Stanchions** — Vertical framing stanchions distribute evenly across the bulkhead opening connecting top and bottom arcs according to `breastworkStanchionCount` ($2\text{--}16$).
+- [x] **Step 4.5**: **Bulwark Rail Conformance** — Bulwarks conform directly to `TopLineCurves` as their true cap rail; vertical bulwark stanchions rise cleanly from deck waterways up to `TopLineCurves`.
+
+
 
