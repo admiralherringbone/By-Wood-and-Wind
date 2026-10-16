@@ -59,7 +59,7 @@ public class NurbsSectionEvaluator : ISectionCurveEvaluator
             case 1: return (P2 - P0).sqrMagnitude > 0.0001f ? (P2 - P0).normalized : Vector3.right;
             case 2: return (P3 - P1).sqrMagnitude > 0.0001f ? (P3 - P1).normalized : Vector3.right;
             case 3: return Vector3.up;
-            case 4: return (P4 - P2).sqrMagnitude > 0.0001f ? (P4 - P2).normalized : Vector3.up;
+            case 4: return (P4 - P3).sqrMagnitude > 0.0001f ? (P4 - P3).normalized : Vector3.up;
             default: return Vector3.up;
         }
     }

@@ -623,13 +623,6 @@ public class BodyCurves : MonoBehaviour
     {
         if (fashionCurves == null) FindReferences();
 
-        // 1. Transom cut region
-        if (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f)
-        {
-            Vector3 cutPt = fashionCurves.GetFashionPointAtZ(z, 1f);
-            if (y <= cutPt.y + 0.005f) return Mathf.Abs(cutPt.x);
-        }
-
         SectionNodes nodes = GetSectionNodesAtZ(z, 1f);
         float hw = Mathf.Abs(nodes.p0.x);
 
@@ -722,13 +715,6 @@ public class BodyCurves : MonoBehaviour
     public float GetInnerHalfBreadthAtY(float y, float z)
     {
         if (fashionCurves == null) FindReferences();
-
-        // 1. Transom cut region
-        if (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f)
-        {
-            Vector3 inCutPt = fashionCurves.GetInnerFashionPointAtZ(z, 1f);
-            if (y <= inCutPt.y + 0.005f) return Mathf.Abs(inCutPt.x);
-        }
 
         SectionNodes nodes = GetSectionNodesAtZ(z, 1f);
         float hw = Mathf.Abs(nodes.p0.x);
