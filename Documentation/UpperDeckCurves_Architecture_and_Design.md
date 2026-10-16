@@ -197,6 +197,15 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 - **Binary Search Polyline Interpolation**:
   `GetBulwarkRailPointsAtZ()` utilizes a binary search across `cachedBulwarkRailPts` to locate the enclosing interval `[i0, i1]`, ensuring exact piecewise-linear interpolation regardless of non-uniform knot spacing.
 
+### 6. Exact BodyCurves Spline Alignment for Outer & Inner Rails
+- **The Discrepancy Eliminated**:
+  Previously, upper deck bulwark rails sampled `GetInnerHullHalfBreadthAt()` (which used a 2-point linear interpolation between inner Breadth and inner TopLine), mistakenly positioning outer rails on the inner frame face and offsetting inner rails an extra distance into empty space.
+- **Exact Outer Hull Evaluation**:
+  `BodyCurves.GetOuterHalfBreadthAtY(y, z)` solves the station's cubic Bezier segment between Breadth ($P_3$) and TopLine ($P_4$) via 14-iteration bisection to locate the exact parameter $u$ matching elevation $y$. Outer rails evaluate `GetOuterHullHalfBreadthAt(railY, z)`, locking them 100% to the outer frame lofting curve of `BodyCurves`.
+- **Exact Inner Hull Evaluation**:
+  `BodyCurves.GetInnerHalfBreadthAtY(y, z)` evaluates the 2D inward frame normal $\hat{n}_{2D} = (-t_y, t_x)$ and frame spacing at elevation $y$. Inner rails evaluate `GetInnerHullHalfBreadthAt(railY, z)`, locking them 100% to the inner frame curve.
+- **Deck Waterways**:
+  Deck planking edges (`cachedStbdEdgePts`) evaluate `GetInnerHullHalfBreadthAt(edgeY, z)` so walking decks sit flush against the inner face of the hull framing.
 
 ---
 
@@ -205,6 +214,8 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 The architecture described above is fully implemented and active in:
 - **`Assets/Scripts/Primary Scripts/UpperDeckCurves.cs`**
 - **`Assets/Scripts/Primary Scripts/TopLineCurves.cs`**
+- **`Assets/Scripts/Primary Scripts/BodyCurves.cs`**
+- **`Assets/Scripts/Primary Scripts/SectionModelCurves.cs`**
 - **`Assets/Scenes/Matched curves.unity`** (Configured with UpperDeckCurves component)
 
 It seamlessly integrates with:

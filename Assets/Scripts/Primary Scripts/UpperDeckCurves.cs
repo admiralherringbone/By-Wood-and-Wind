@@ -1664,11 +1664,45 @@ public class UpperDeckCurves : MonoBehaviour
     }
 
     /// <summary>
-    /// Evaluates the inner hull half-breadth X at height Y and station Z across the full transverse profile:
-    /// Keel/Keelson -> Floor -> Bilge -> Breadth -> TopLine, with smooth topsides extrapolation above TopLine.
+    /// Evaluates the exact outer hull half-breadth X at height Y and station Z,
+    /// directly matching the authoritative 3D lofted outer surface of BodyCurves.
+    /// </summary>
+    public float GetOuterHullHalfBreadthAt(float y, float z)
+    {
+        if (bodyCurves != null)
+        {
+            return bodyCurves.GetOuterHalfBreadthAtY(y, z);
+        }
+
+        // Fallback using breadthCurves and topLineCurves
+        bool hasBreadth = (breadthCurves != null);
+        Vector3 brPt = hasBreadth ? breadthCurves.GetBreadthPointAtZ(z) : Vector3.zero;
+        bool hasTopLine = (topLineCurves != null);
+        Vector3 tlPt = hasTopLine ? topLineCurves.GetTopLinePointAtZ(z) : Vector3.zero;
+
+        if (hasBreadth && hasTopLine && y <= tlPt.y)
+        {
+            float span = Mathf.Max(0.001f, tlPt.y - brPt.y);
+            float u = Mathf.Clamp01((y - brPt.y) / span);
+            return Mathf.Lerp(Mathf.Abs(brPt.x), Mathf.Abs(tlPt.x), u);
+        }
+
+        if (hasTopLine) return Mathf.Abs(tlPt.x);
+        if (hasBreadth) return Mathf.Abs(brPt.x);
+        return 2.0f;
+    }
+
+    /// <summary>
+    /// Evaluates the exact inner hull half-breadth X at height Y and station Z,
+    /// directly matching the authoritative 3D lofted inner surface of BodyCurves.
     /// </summary>
     public float GetInnerHullHalfBreadthAt(float y, float z)
     {
+        if (bodyCurves != null)
+        {
+            return bodyCurves.GetInnerHalfBreadthAtY(y, z);
+        }
+
         // 1. Transom Cut Region
         if (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f)
         {
@@ -2051,8 +2085,10 @@ public class UpperDeckCurves : MonoBehaviour
                         Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : Vector3.zero;
                         highestRailY = tlPt.y;
                         railX = tlPt.x;
-                        float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
-                        inRailX = Mathf.Max(0.01f, railX - spacing);
+                        Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine)
+                            ? topLineCurves.GetInnerTopLinePointAtZ(z, true)
+                            : (bodyCurves != null ? bodyCurves.GetInnerNodePosition(4, z, 1f) : tlPt);
+                        inRailX = inTlPt.x;
                     }
                 }
             }
@@ -2067,8 +2103,8 @@ public class UpperDeckCurves : MonoBehaviour
                 float camber = mainDeckCurves.EvaluateDeckCamberAtZ(z);
                 float edgeY = floorY - camber;
                 float railY = edgeY + waistBulwarkHeight;
-                float x = GetInnerHullHalfBreadthAt(railY, z);
-                float inX = Mathf.Max(0.01f, x - waistBulwarkThickness);
+                float x = GetOuterHullHalfBreadthAt(railY, z);
+                float inX = GetInnerHullHalfBreadthAt(railY, z);
 
                 stbdRail = new Vector3(x, railY, z);
                 portRail = new Vector3(-x, railY, z);
@@ -2492,8 +2528,8 @@ public class UpperDeckCurves : MonoBehaviour
             float edgeY = floorY - camber;
 
             float railY = edgeY + waistBulwarkHeight;
-            float railX = GetInnerHullHalfBreadthAt(railY, z);
-            float inRailX = Mathf.Max(0.01f, railX - waistBulwarkThickness);
+            float railX = GetOuterHullHalfBreadthAt(railY, z);
+            float inRailX = GetInnerHullHalfBreadthAt(railY, z);
 
             cachedWaistRailPts[i] = new Vector3(railX, railY, z);
             cachedInnerWaistRailPts[i] = new Vector3(inRailX, railY, z);
@@ -2504,7 +2540,7 @@ public class UpperDeckCurves : MonoBehaviour
         float midCamber = mainDeckCurves.EvaluateDeckCamberAtZ(waistMidZ);
         float midEdgeY = midFloorY - midCamber;
         float midRailY = midEdgeY + waistBulwarkHeight;
-        float midRailX = GetInnerHullHalfBreadthAt(midRailY, waistMidZ);
+        float midRailX = GetOuterHullHalfBreadthAt(midRailY, waistMidZ);
         waistMidshipHandlePt = new Vector3(midRailX, midRailY, waistMidZ);
 
         int count = Mathf.Max(2, waistStanchionCount);
@@ -2519,10 +2555,10 @@ public class UpperDeckCurves : MonoBehaviour
             float edgeX = GetInnerHullHalfBreadthAt(edgeY, zSt);
 
             float railY = edgeY + waistBulwarkHeight;
-            float railX = GetInnerHullHalfBreadthAt(railY, zSt);
+            float inRailX = GetInnerHullHalfBreadthAt(railY, zSt);
 
             Vector3 botPt = new Vector3(edgeX, edgeY, zSt);
-            Vector3 topPt = new Vector3(railX, railY, zSt);
+            Vector3 topPt = new Vector3(inRailX, railY, zSt);
 
             cachedWaistStanchions.Add(new Vector3[] { botPt, topPt });
         }
@@ -2662,9 +2698,8 @@ public class UpperDeckCurves : MonoBehaviour
                     float deckEdgeY = centerY - camber;
 
                     float railY = deckEdgeY + tier.bulwarkHeight;
-                    float railX = GetInnerHullHalfBreadthAt(railY, z);
-                    float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
-                    float inRailX = Mathf.Max(0.01f, railX - spacing);
+                    float railX = GetOuterHullHalfBreadthAt(railY, z);
+                    float inRailX = GetInnerHullHalfBreadthAt(railY, z);
 
                     tier.cachedBulwarkRailPts[i] = new Vector3(railX, railY, z);
                     tier.cachedInnerBulwarkRailPts[i] = new Vector3(inRailX, railY, z);
@@ -2702,13 +2737,15 @@ public class UpperDeckCurves : MonoBehaviour
 
                         if (isSupremeTier)
                         {
-                            topPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + tier.bulwarkHeight, zStanchion);
+                            topPt = (topLineCurves != null && topLineCurves.showInnerLine)
+                                ? topLineCurves.GetInnerTopLinePointAtZ(zStanchion, true)
+                                : ((topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + tier.bulwarkHeight, zStanchion));
                         }
                         else
                         {
                             float railY = deckEdgeY + tier.bulwarkHeight;
-                            float railX = GetInnerHullHalfBreadthAt(railY, zStanchion);
-                            topPt = new Vector3(railX, railY, zStanchion);
+                            float inRailX = GetInnerHullHalfBreadthAt(railY, zStanchion);
+                            topPt = new Vector3(inRailX, railY, zStanchion);
                         }
 
                         if (topPt.y - bottomPt.y < 0.15f) continue;
