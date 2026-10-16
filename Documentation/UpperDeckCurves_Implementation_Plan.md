@@ -143,3 +143,12 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 1.5**: Verify compilation in Unity and check Scene view.
 - [x] **Step 1.6**: Commit Phase 1 cleanup to Git.
 
+---
+
+## 5. Execution Checklist (Phase 2: Scene & Datum Baseline Verification)
+
+- [x] **Step 2.1**: **Scene Hierarchy Check** — Verified GameObject `UpperDeckCurves` (`fileID: 2091202171`) in `Matched curves.unity` is active (`m_IsActive: 1`) and downstream components (`SectionModelCurves`) are linked to it.
+- [x] **Step 2.2**: **Datum References** — Verified all 9 datum references (`mainDeckCurves`, `topLineCurves`, `sheerCurves`, `breadthCurves`, `bilgeCurves`, `floorCurves`, `fashionCurves`, `bodyCurves`, `backboneCurves`) are populated in `Matched curves.unity` and `FindReferences()` has fallback resolution.
+- [x] **Step 2.3**: **Default Tier Instantiation** — Verified `InitializeDefaultTiers()` cleanly configures Tier 1 (Forecastle flush to inner stem, Quarterdeck flush to inner transom, open waist in between).
+- [x] **Step 2.4**: **Buffer Allocation & Zero GC** — Profiled and optimized `BuildSegmentDeckBeams`, `BuildSegmentBreastworks`, and `BuildTierBulwarks` to pool and reuse `Vector3[]` buffers (`cachedDeckBeams`, `cachedBottomDeckBeams`, `forwardBreastworkStanchions`, `aftBreastworkStanchions`, `cachedBulwarkStanchions`), eliminating frame-by-frame heap allocations during curve updates.
+

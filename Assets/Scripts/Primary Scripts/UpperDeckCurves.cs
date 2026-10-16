@@ -960,13 +960,14 @@ public class UpperDeckCurves : MonoBehaviour
 
     private void BuildSegmentDeckBeams(UpperDeckTier tier, UpperDeckSegment segment, int tierIndex)
     {
-        segment.cachedDeckBeams.Clear();
-        segment.cachedBottomDeckBeams.Clear();
+        if (segment.cachedDeckBeams == null) segment.cachedDeckBeams = new List<Vector3[]>();
+        if (segment.cachedBottomDeckBeams == null) segment.cachedBottomDeckBeams = new List<Vector3[]>();
 
         int beams = Mathf.Clamp(segment.deckBeamCount, 2, 40);
         float aftZ = segment.aftZ;
         float fwdZ = segment.forwardZ;
         const int beamSteps = 24;
+        int beamIdx = 0;
 
         for (int b = 0; b < beams; b++)
         {
@@ -980,8 +981,21 @@ public class UpperDeckCurves : MonoBehaviour
 
             if (halfWidth >= 0.005f)
             {
-                // Top Camber Beam Arc
-                Vector3[] topArc = new Vector3[beamSteps + 1];
+                // Top Camber Beam Arc (Reusing array if available)
+                Vector3[] topArc;
+                if (beamIdx < segment.cachedDeckBeams.Count && segment.cachedDeckBeams[beamIdx] != null && segment.cachedDeckBeams[beamIdx].Length == beamSteps + 1)
+                {
+                    topArc = segment.cachedDeckBeams[beamIdx];
+                }
+                else
+                {
+                    topArc = new Vector3[beamSteps + 1];
+                    if (beamIdx < segment.cachedDeckBeams.Count)
+                        segment.cachedDeckBeams[beamIdx] = topArc;
+                    else
+                        segment.cachedDeckBeams.Add(topArc);
+                }
+
                 for (int s = 0; s <= beamSteps; s++)
                 {
                     float normX = Mathf.Lerp(-1f, 1f, (float)s / beamSteps);
@@ -989,14 +1003,26 @@ public class UpperDeckCurves : MonoBehaviour
                     float y = centerY - camber * (normX * normX);
                     topArc[s] = new Vector3(x, y, z);
                 }
-                segment.cachedDeckBeams.Add(topArc);
 
-                // Bottom Camber Beam Arc
+                // Bottom Camber Beam Arc (Reusing array if available)
                 float bottomCenterY = centerY - segment.deckThickness;
                 float bottomEdgeY = bottomCenterY - camber;
                 float bottomHalfWidth = GetInnerHullHalfBreadthAt(bottomEdgeY, z);
 
-                Vector3[] bottomArc = new Vector3[beamSteps + 1];
+                Vector3[] bottomArc;
+                if (beamIdx < segment.cachedBottomDeckBeams.Count && segment.cachedBottomDeckBeams[beamIdx] != null && segment.cachedBottomDeckBeams[beamIdx].Length == beamSteps + 1)
+                {
+                    bottomArc = segment.cachedBottomDeckBeams[beamIdx];
+                }
+                else
+                {
+                    bottomArc = new Vector3[beamSteps + 1];
+                    if (beamIdx < segment.cachedBottomDeckBeams.Count)
+                        segment.cachedBottomDeckBeams[beamIdx] = bottomArc;
+                    else
+                        segment.cachedBottomDeckBeams.Add(bottomArc);
+                }
+
                 for (int s = 0; s <= beamSteps; s++)
                 {
                     float normX = Mathf.Lerp(-1f, 1f, (float)s / beamSteps);
@@ -1004,9 +1030,15 @@ public class UpperDeckCurves : MonoBehaviour
                     float y = bottomCenterY - camber * (normX * normX);
                     bottomArc[s] = new Vector3(x, y, z);
                 }
-                segment.cachedBottomDeckBeams.Add(bottomArc);
+
+                beamIdx++;
             }
         }
+
+        while (segment.cachedDeckBeams.Count > beamIdx)
+            segment.cachedDeckBeams.RemoveAt(segment.cachedDeckBeams.Count - 1);
+        while (segment.cachedBottomDeckBeams.Count > beamIdx)
+            segment.cachedBottomDeckBeams.RemoveAt(segment.cachedBottomDeckBeams.Count - 1);
     }
 
     private void BuildSegmentEndMargins(UpperDeckTier tier, UpperDeckSegment segment, int tierIndex)
@@ -1068,7 +1100,9 @@ public class UpperDeckCurves : MonoBehaviour
         // 1. Forward Breastwork (Facing forward into the waist or bow)
         if (segment.showForwardBreastwork)
         {
-            segment.forwardBreastworkStanchions.Clear();
+            if (segment.forwardBreastworkStanchions == null)
+                segment.forwardBreastworkStanchions = new List<Vector3[]>();
+
             float fwdZ = segment.forwardZ;
             float fwdCenterY = EvaluateCenterlineSheerYAtZ(tier, segment, tierIndex, fwdZ);
             float fwdCamber = EvaluateCamberAtZ(tier, segment, fwdZ);
@@ -1092,19 +1126,45 @@ public class UpperDeckCurves : MonoBehaviour
             }
 
             int stanchions = Mathf.Clamp(segment.breastworkStanchionCount, 2, 16);
+            int fwdIdx = 0;
             for (int st = 0; st < stanchions; st++)
             {
                 int sampleIdx = Mathf.RoundToInt((float)st / (stanchions - 1) * steps);
                 Vector3 pTop = segment.forwardBreastworkTopArc[sampleIdx];
                 Vector3 pBot = segment.forwardBreastworkBottomArc[sampleIdx];
-                segment.forwardBreastworkStanchions.Add(new Vector3[] { pBot, pTop });
+
+                Vector3[] pair;
+                if (fwdIdx < segment.forwardBreastworkStanchions.Count && segment.forwardBreastworkStanchions[fwdIdx] != null && segment.forwardBreastworkStanchions[fwdIdx].Length == 2)
+                {
+                    pair = segment.forwardBreastworkStanchions[fwdIdx];
+                    pair[0] = pBot;
+                    pair[1] = pTop;
+                }
+                else
+                {
+                    pair = new Vector3[] { pBot, pTop };
+                    if (fwdIdx < segment.forwardBreastworkStanchions.Count)
+                        segment.forwardBreastworkStanchions[fwdIdx] = pair;
+                    else
+                        segment.forwardBreastworkStanchions.Add(pair);
+                }
+                fwdIdx++;
             }
+            while (segment.forwardBreastworkStanchions.Count > fwdIdx)
+                segment.forwardBreastworkStanchions.RemoveAt(segment.forwardBreastworkStanchions.Count - 1);
+        }
+        else
+        {
+            if (segment.forwardBreastworkStanchions != null)
+                segment.forwardBreastworkStanchions.Clear();
         }
 
         // 2. Aft Breastwork (Facing aft into the waist or stern)
         if (segment.showAftBreastwork)
         {
-            segment.aftBreastworkStanchions.Clear();
+            if (segment.aftBreastworkStanchions == null)
+                segment.aftBreastworkStanchions = new List<Vector3[]>();
+
             float aftZ = segment.aftZ;
             float aftCenterY = EvaluateCenterlineSheerYAtZ(tier, segment, tierIndex, aftZ);
             float aftCamber = EvaluateCamberAtZ(tier, segment, aftZ);
@@ -1128,13 +1188,37 @@ public class UpperDeckCurves : MonoBehaviour
             }
 
             int stanchions = Mathf.Clamp(segment.breastworkStanchionCount, 2, 16);
+            int aftIdx = 0;
             for (int st = 0; st < stanchions; st++)
             {
                 int sampleIdx = Mathf.RoundToInt((float)st / (stanchions - 1) * steps);
                 Vector3 pTop = segment.aftBreastworkTopArc[sampleIdx];
                 Vector3 pBot = segment.aftBreastworkBottomArc[sampleIdx];
-                segment.aftBreastworkStanchions.Add(new Vector3[] { pBot, pTop });
+
+                Vector3[] pair;
+                if (aftIdx < segment.aftBreastworkStanchions.Count && segment.aftBreastworkStanchions[aftIdx] != null && segment.aftBreastworkStanchions[aftIdx].Length == 2)
+                {
+                    pair = segment.aftBreastworkStanchions[aftIdx];
+                    pair[0] = pBot;
+                    pair[1] = pTop;
+                }
+                else
+                {
+                    pair = new Vector3[] { pBot, pTop };
+                    if (aftIdx < segment.aftBreastworkStanchions.Count)
+                        segment.aftBreastworkStanchions[aftIdx] = pair;
+                    else
+                        segment.aftBreastworkStanchions.Add(pair);
+                }
+                aftIdx++;
             }
+            while (segment.aftBreastworkStanchions.Count > aftIdx)
+                segment.aftBreastworkStanchions.RemoveAt(segment.aftBreastworkStanchions.Count - 1);
+        }
+        else
+        {
+            if (segment.aftBreastworkStanchions != null)
+                segment.aftBreastworkStanchions.Clear();
         }
     }
 
@@ -1589,6 +1673,7 @@ public class UpperDeckCurves : MonoBehaviour
             }
 
             // Build vertical stanchions along active segments (from deck waterway up to TopLine Cap Rail)
+            int stanchionIdx = 0;
             if (tier.segments != null)
             {
                 for (int s = 0; s < tier.segments.Count; s++)
@@ -1618,10 +1703,27 @@ public class UpperDeckCurves : MonoBehaviour
 
                         if (topPt.y - bottomPt.y < 0.15f) continue;
 
-                        tier.cachedBulwarkStanchions.Add(new Vector3[] { bottomPt, topPt });
+                        Vector3[] pair;
+                        if (stanchionIdx < tier.cachedBulwarkStanchions.Count && tier.cachedBulwarkStanchions[stanchionIdx] != null && tier.cachedBulwarkStanchions[stanchionIdx].Length == 2)
+                        {
+                            pair = tier.cachedBulwarkStanchions[stanchionIdx];
+                            pair[0] = bottomPt;
+                            pair[1] = topPt;
+                        }
+                        else
+                        {
+                            pair = new Vector3[] { bottomPt, topPt };
+                            if (stanchionIdx < tier.cachedBulwarkStanchions.Count)
+                                tier.cachedBulwarkStanchions[stanchionIdx] = pair;
+                            else
+                                tier.cachedBulwarkStanchions.Add(pair);
+                        }
+                        stanchionIdx++;
                     }
                 }
             }
+            while (tier.cachedBulwarkStanchions.Count > stanchionIdx)
+                tier.cachedBulwarkStanchions.RemoveAt(tier.cachedBulwarkStanchions.Count - 1);
         }
     }
 
