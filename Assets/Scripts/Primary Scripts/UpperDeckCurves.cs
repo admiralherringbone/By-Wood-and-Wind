@@ -1676,7 +1676,7 @@ public class UpperDeckCurves : MonoBehaviour
 
         // Fallback using breadthCurves and topLineCurves
         bool hasBreadth = (breadthCurves != null);
-        Vector3 brPt = hasBreadth ? breadthCurves.GetBreadthPointAtZ(z) : Vector3.zero;
+        Vector3 brPt = hasBreadth ? breadthCurves.GetTheoreticalBreadthPointAtZ(z) : Vector3.zero;
         bool hasTopLine = (topLineCurves != null);
         Vector3 tlPt = hasTopLine ? topLineCurves.GetTopLinePointAtZ(z) : Vector3.zero;
 
@@ -1713,8 +1713,8 @@ public class UpperDeckCurves : MonoBehaviour
             float inTlX = (topLineCurves != null) ? Mathf.Abs(topLineCurves.GetInnerTopLinePointAtZ(z, true).x) : 2.2f;
             float inTlY = (topLineCurves != null) ? topLineCurves.GetInnerTopLinePointAtZ(z, true).y : 3.5f;
 
-            float inBrX = (breadthCurves != null) ? Mathf.Abs(breadthCurves.GetInnerBreadthPointAtZ(z, true).x) : 2.5f;
-            float inBrY = (breadthCurves != null) ? breadthCurves.GetInnerBreadthPointAtZ(z, true).y : 2.5f;
+            float inBrX = (breadthCurves != null) ? Mathf.Abs(breadthCurves.GetTheoreticalInnerBreadthXAtZ(z)) : 2.5f;
+            float inBrY = (breadthCurves != null) ? breadthCurves.GetTheoreticalBreadthPointAtZ(z).y : 2.5f;
 
             if (y <= cutY + 0.005f) return cutX;
             if (y >= inTlY - 0.005f)

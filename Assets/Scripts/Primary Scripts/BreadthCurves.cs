@@ -598,6 +598,26 @@ public class BreadthCurves : MonoBehaviour
         return GetAftProjectionPointAtZ(z).x;
     }
 
+    public virtual Vector3 GetTheoreticalBreadthPointAtZ(float z)
+    {
+        float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (z >= sternTipZ)
+        {
+            return GetBreadthPointAtZ(z);
+        }
+        return GetAftProjectionPointAtZ(z);
+    }
+
+    public virtual float GetTheoreticalBreadthYAtZ(float z)
+    {
+        float sternTipZ = cachedIsAftCubic ? cachedAftP3.z : cachedAftP2.z;
+        if (z >= sternTipZ)
+        {
+            return GetBreadthYAtZ(z);
+        }
+        return GetAftProjectionPointAtZ(z).y;
+    }
+
     /// <summary>
     /// Solves for Bezier parameter t (t >= 1.0) along the aft curve for an extrapolated station Z.
     /// </summary>

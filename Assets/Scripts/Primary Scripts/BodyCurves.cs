@@ -269,8 +269,9 @@ public class BodyCurves : MonoBehaviour
         float hobY = (breadthCurves != null) ? breadthCurves.fwdP3.y : (floorY + 2f);
         if (breadthCurves != null && Mathf.Abs(z - breadthCurves.fwdP3.z) > 0.01f)
         {
-            hobX = breadthCurves.GetBreadthXAtZ(z);
-            hobY = breadthCurves.GetBreadthYAtZ(z);
+            Vector3 hobPt = breadthCurves.GetTheoreticalBreadthPointAtZ(z);
+            hobX = hobPt.x;
+            hobY = hobPt.y;
         }
         hobX = Mathf.Max(hobX, hw + 0.1f);
         hobY = Mathf.Max(hobY, floorY);
@@ -376,12 +377,13 @@ public class BodyCurves : MonoBehaviour
             }
             else if (z <= sheerCurves.sternP0.z)
             {
+                // Keel & stern post convergence for underwater / lower hull only
                 if (z <= sheerCurves.sternP3.z)
                 {
                     floorX = hw;
                     bilgeX = hw;
-                    hobX = hw;
-                    topLineX = hw;
+                    // Note: hobX and topLineX do NOT collapse here. The Upper Mould continues aft
+                    // across the counter and transom overhang, guided by Breadth projection and TopLine.
                 }
             }
         }
@@ -631,11 +633,22 @@ public class BodyCurves : MonoBehaviour
         SectionNodes nodes = GetSectionNodesAtZ(z, 1f);
         float hw = Mathf.Abs(nodes.p0.x);
 
-        // 2. Profile convergence at stem and stern extremes
+        // 2. Profile convergence at stem and stern extremes (elevation-aware)
         if (sheerCurves != null)
         {
-            if (z >= sheerCurves.stemP3.z || z <= sheerCurves.sternP3.z)
+            float stemZAtY = sheerCurves.GetStemProfileZAtY(y);
+            if (z >= stemZAtY - 0.001f)
             {
+                return hw;
+            }
+
+            float sternZAtY = sheerCurves.GetSternProfileZAtY(y);
+            if (z <= sternZAtY + 0.001f)
+            {
+                if (fashionCurves != null && y >= fashionCurves.stbdP1.y)
+                {
+                    return Mathf.Abs(fashionCurves.GetFashionPointAtY(y, 1f).x);
+                }
                 return hw;
             }
         }
@@ -720,11 +733,22 @@ public class BodyCurves : MonoBehaviour
         SectionNodes nodes = GetSectionNodesAtZ(z, 1f);
         float hw = Mathf.Abs(nodes.p0.x);
 
-        // 2. Profile convergence at stem and stern extremes
+        // 2. Profile convergence at stem and stern extremes (elevation-aware)
         if (sheerCurves != null)
         {
-            if (z >= sheerCurves.stemP3.z || z <= sheerCurves.sternP3.z)
+            float stemZAtY = sheerCurves.GetStemProfileZAtY(y);
+            if (z >= stemZAtY - 0.001f)
             {
+                return Mathf.Max(0.01f, hw - topInnerLineSpacing);
+            }
+
+            float sternZAtY = sheerCurves.GetSternProfileZAtY(y);
+            if (z <= sternZAtY + 0.001f)
+            {
+                if (fashionCurves != null && y >= fashionCurves.stbdP1.y)
+                {
+                    return Mathf.Abs(fashionCurves.GetInnerFashionPointAtY(y, 1f).x);
+                }
                 return Mathf.Max(0.01f, hw - topInnerLineSpacing);
             }
         }

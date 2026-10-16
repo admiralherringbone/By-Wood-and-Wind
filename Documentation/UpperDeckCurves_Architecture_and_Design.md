@@ -207,6 +207,14 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 - **Deck Waterways**:
   Deck planking edges (`cachedStbdEdgePts`) evaluate `GetInnerHullHalfBreadthAt(edgeY, z)` so walking decks sit flush against the inner face of the hull framing.
 
+### 7. Elevation-Aware Stern Overhang & Theoretical Breadth Projection
+- **The Classical Upper Mould Overhang**:
+  Aft of the stern post ($Z \approx -11.94\text{m}$) and wing transom, the lower hull (floor and bilge) terminates. The ship extends aft across the counter and transom rake overhang (down to $Z \approx -13.40\text{m}$) consisting purely of the **Upper Mould** (Height of Breadth up to TopLine / Upper Decks).
+- **Elevation-Aware Stern Boundary**:
+  `BodyCurves.GetOuterHalfBreadthAtY` and `GetInnerHalfBreadthAtY` evaluate `sheerCurves.GetSternProfileZAtY(y)` to determine the aft termination of the hull at elevation $y$. Stations at or aft of the raked transom boundary return the exact fashion timber half-breadth from `FashionCurves.GetFashionPointAtY(y, 1f)` and `GetInnerFashionPointAtY(y, 1f)`.
+- **Continuous Theoretical Breadth Sampling**:
+  In `BodyCurves.GetSectionNodesAtZ`, `hobX` and `hobY` sample `breadthCurves.GetTheoreticalBreadthPointAtZ(z)` along the fair aft projection line. At stations aft of the stern post ($z \le \text{sternP3.z}$), only `floorX` and `bilgeX` collapse into the deadwood ($hw$), while `hobX` and `topLineX` maintain their fair beam, preventing upper deck waterways and rails from pinching.
+
 ---
 
 ## 8. Current Implementation Status & Integration
