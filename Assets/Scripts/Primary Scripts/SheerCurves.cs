@@ -96,6 +96,7 @@ public class SheerCurves : MonoBehaviour
     [HideInInspector] public Vector3 transomP1; // Top of Transom Rake
 
     [HideInInspector] public Vector3 upperStemTop; // Top of Upper Stem Post Extension
+    [HideInInspector] public float targetUpperStemTopY = -1f; // Dynamic override from UpperDeckCurves
 
 
 
@@ -244,7 +245,8 @@ public class SheerCurves : MonoBehaviour
 
         // 6. UPPER STEM POST EXTENSION
         float maxUpperY = Mathf.Max(stemP3.y, transomP1.y);
-        float upperStemY = Mathf.Lerp(stemP3.y, maxUpperY, Mathf.Clamp01(upperStemRatio));
+        if (targetUpperStemTopY > 0f) maxUpperY = Mathf.Max(maxUpperY, targetUpperStemTopY);
+        float upperStemY = (targetUpperStemTopY > 0f) ? targetUpperStemTopY : Mathf.Lerp(stemP3.y, maxUpperY, Mathf.Clamp01(upperStemRatio));
         upperStemTop = new Vector3(0f, upperStemY, stemP3.z);
 
 
@@ -831,10 +833,17 @@ public class SheerCurvesEditor : Editor
             }
 
             // Update Upper Stem Post Extension Ratio
-            float upperSpan = curves.transomP1.y - curves.stemP3.y;
-            if (upperSpan > 0.001f)
+            if (curves.targetUpperStemTopY > 0f)
             {
-                curves.upperStemRatio = Mathf.Clamp01((newUpperStemTop.y - curves.stemP3.y) / upperSpan);
+                curves.targetUpperStemTopY = newUpperStemTop.y;
+            }
+            else
+            {
+                float upperSpan = curves.transomP1.y - curves.stemP3.y;
+                if (upperSpan > 0.001f)
+                {
+                    curves.upperStemRatio = Mathf.Clamp01((newUpperStemTop.y - curves.stemP3.y) / upperSpan);
+                }
             }
 
             // Update Stern Post (Stern Post Top cannot move further forward than Stern Post Bottom sternP0.z & cannot go lower than Midship Apex Y)

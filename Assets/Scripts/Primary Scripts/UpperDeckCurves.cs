@@ -201,6 +201,10 @@ public class UpperDeckCurves : MonoBehaviour
     [Tooltip("Automatically synchronize TopLine elevation and Transom Rake Height to crown the highest active upper deck tier (e.g. Poop Deck).")]
     public bool syncTopLineToHighestDeck = true;
 
+    [SerializeField, HideInInspector] private float baseTopLineMidshipY = -1f;
+    [SerializeField, HideInInspector] private float baseTransomRakeHeight = -1f;
+    [SerializeField, HideInInspector] private float baseUpperStemRatio = -1f;
+
     [Header("Main Deck Waist Bulwark (Open Waist)")]
     [Tooltip("Render a physical bulwark and cap rail along the Main Deck open waist between upper deck breaks.")]
     public bool showWaistBulwark = true;
@@ -2166,20 +2170,108 @@ public class UpperDeckCurves : MonoBehaviour
     }
 
     /// <summary>
-    /// Dynamically synchronizes TopLineCurves transom height and SheerCurves transomRakeHeight
-    /// to crown the highest active upper deck tier (e.g. Poop Deck at Tier 2).
+    /// Dynamically synchronizes TopLineCurves midship elevation (and BodyCurves P4), transom rake height,
+    /// and bow upper stem height to crown the highest active upper deck tier (e.g. Poop Deck at Tier 2).
     /// </summary>
     public void SynchronizeTopLineElevation()
     {
         if (!syncTopLineToHighestDeck || sheerCurves == null) return;
 
-        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
-        float defaultRakeHeight = 2.5f;
+        // 1. Identify highest active tier
+        int highestActiveTierIdx = -1;
+        UpperDeckTier highestActiveTier = null;
 
+        if (tiers != null)
+        {
+            for (int t = 0; t < tiers.Count; t++)
+            {
+                UpperDeckTier tier = tiers[t];
+                if (tier == null || tier.segments == null) continue;
+                for (int s = 0; s < tier.segments.Count; s++)
+                {
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg != null && seg.isEnabled)
+                    {
+                        if (t > highestActiveTierIdx)
+                        {
+                            highestActiveTierIdx = t;
+                            highestActiveTier = tier;
+                        }
+                    }
+                }
+            }
+        }
+
+        bool hasActiveUpperDeck = (highestActiveTierIdx >= 0 && highestActiveTier != null);
+
+        // 2. Fallback / restoration if no upper decks are active
+        if (!hasActiveUpperDeck)
+        {
+            bool fallbackChanged = false;
+            if (baseTopLineMidshipY > 0f && topLineCurves != null && Mathf.Abs(topLineCurves.fwdP3.y - baseTopLineMidshipY) > 0.005f)
+            {
+                topLineCurves.fwdP3.y = baseTopLineMidshipY;
+                topLineCurves.fwdP2.y = baseTopLineMidshipY;
+                topLineCurves.aftP1.y = baseTopLineMidshipY;
+                fallbackChanged = true;
+            }
+            if (baseTransomRakeHeight > 0f && Mathf.Abs(sheerCurves.transomRakeHeight - baseTransomRakeHeight) > 0.005f)
+            {
+                sheerCurves.transomRakeHeight = baseTransomRakeHeight;
+                fallbackChanged = true;
+            }
+            if (sheerCurves.targetUpperStemTopY > 0f)
+            {
+                sheerCurves.targetUpperStemTopY = -1f;
+                fallbackChanged = true;
+            }
+            if (fallbackChanged)
+            {
+                sheerCurves.UpdateCachedProfile();
+                if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
+                if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
+                if (bodyCurves != null) bodyCurves.UpdateCachedCurves();
+            }
+            return;
+        }
+
+        // 3. Cache baseline values on first elevation
+        if (baseTopLineMidshipY <= 0f && topLineCurves != null)
+            baseTopLineMidshipY = topLineCurves.fwdP3.y;
+        if (baseTransomRakeHeight <= 0f && sheerCurves != null)
+            baseTransomRakeHeight = sheerCurves.transomRakeHeight;
+        if (baseUpperStemRatio < 0f && sheerCurves != null)
+            baseUpperStemRatio = sheerCurves.upperStemRatio;
+
+        // 4. Calculate target Midship Apex Y (supreme deck bulwark height at midships)
+        float targetMidshipY = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.y : 3.5f;
+        for (int t = 0; t <= highestActiveTierIdx; t++)
+        {
+            UpperDeckTier tier = tiers[t];
+            if (tier == null) continue;
+            float headroom = tier.tierHeadroom;
+            if (tier.segments != null)
+            {
+                for (int s = 0; s < tier.segments.Count; s++)
+                {
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg != null && seg.isEnabled && seg.overrideTierHeight)
+                    {
+                        headroom = Mathf.Max(headroom, seg.customHeadroom);
+                    }
+                }
+            }
+            targetMidshipY += headroom;
+        }
+        targetMidshipY += highestActiveTier.bulwarkHeight;
+
+        // 5. Calculate target Stern Transom Y
+        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
+        float defaultRakeHeight = (baseTransomRakeHeight > 0f) ? baseTransomRakeHeight : 2.5f;
         float highestSternCapRailY = float.MinValue;
         bool foundSternDeck = false;
 
-        for (int t = 0; t < tiers.Count; t++)
+        for (int t = 0; t <= highestActiveTierIdx; t++)
         {
             UpperDeckTier tier = tiers[t];
             if (tier == null || tier.segments == null) continue;
@@ -2202,16 +2294,77 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
-        float targetRakeHeight = defaultRakeHeight;
-        if (foundSternDeck)
+        float sternZ = (sheerCurves != null) ? sheerCurves.sternP3.z : -15f;
+        float mainSheerRiseStern = (mainDeckCurves != null)
+            ? Mathf.Max(0f, mainDeckCurves.EvaluateCenterlineSheerYAtZ(sternZ) - mainDeckCurves.midshipCenter.y)
+            : 1.5f;
+        float sternSheerY = targetMidshipY + mainSheerRiseStern * highestActiveTier.sheerScale;
+        float targetSternY = foundSternDeck ? Mathf.Max(highestSternCapRailY, sternSheerY) : sternSheerY;
+        targetSternY = Mathf.Max(targetSternY, targetMidshipY);
+
+        float counterY = sheerCurves.transomP0.y;
+        float targetRakeHeight = Mathf.Max(defaultRakeHeight, targetSternY - counterY);
+
+        // 6. Calculate target Bow Stem Y
+        float highestBowCapRailY = float.MinValue;
+        bool foundBowDeck = false;
+
+        for (int t = 0; t <= highestActiveTierIdx; t++)
         {
-            float counterY = sheerCurves.transomP0.y;
-            targetRakeHeight = Mathf.Max(defaultRakeHeight, highestSternCapRailY - counterY);
+            UpperDeckTier tier = tiers[t];
+            if (tier == null || tier.segments == null) continue;
+
+            for (int s = 0; s < tier.segments.Count; s++)
+            {
+                UpperDeckSegment seg = tier.segments[s];
+                if (seg == null || !seg.isEnabled) continue;
+
+                if (seg.flushToStem || seg.forwardZ > midZ + 2f)
+                {
+                    float deckY = EvaluateCenterlineSheerYAtZ(tier, seg, t, seg.forwardZ);
+                    float capRailY = deckY + tier.bulwarkHeight;
+                    if (capRailY > highestBowCapRailY)
+                    {
+                        highestBowCapRailY = capRailY;
+                        foundBowDeck = true;
+                    }
+                }
+            }
         }
+
+        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : 15f;
+        float mainSheerRiseBow = (mainDeckCurves != null)
+            ? Mathf.Max(0f, mainDeckCurves.EvaluateCenterlineSheerYAtZ(bowZ) - mainDeckCurves.midshipCenter.y)
+            : 1.8f;
+        float bowSheerY = targetMidshipY + mainSheerRiseBow * highestActiveTier.sheerScale;
+        float targetBowY = foundBowDeck ? Mathf.Max(highestBowCapRailY, bowSheerY) : bowSheerY;
+        targetBowY = Mathf.Max(targetBowY, targetMidshipY);
+
+        // 7. Apply updates and propagate changes across curve hierarchy
+        bool changed = false;
 
         if (Mathf.Abs(sheerCurves.transomRakeHeight - targetRakeHeight) > 0.005f)
         {
             sheerCurves.transomRakeHeight = targetRakeHeight;
+            changed = true;
+        }
+
+        if (Mathf.Abs(sheerCurves.targetUpperStemTopY - targetBowY) > 0.005f)
+        {
+            sheerCurves.targetUpperStemTopY = targetBowY;
+            changed = true;
+        }
+
+        if (topLineCurves != null && Mathf.Abs(topLineCurves.fwdP3.y - targetMidshipY) > 0.005f)
+        {
+            topLineCurves.fwdP3.y = targetMidshipY;
+            topLineCurves.fwdP2.y = targetMidshipY;
+            topLineCurves.aftP1.y = targetMidshipY;
+            changed = true;
+        }
+
+        if (changed)
+        {
             sheerCurves.UpdateCachedProfile();
             if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
             if (fashionCurves != null) fashionCurves.UpdateCachedCurves();

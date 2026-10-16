@@ -316,30 +316,38 @@ public class SectionModelCurves : MonoBehaviour
                 Vector3 tlAft = topLineCurves.cachedIsAftCubic ? topLineCurves.aftP3 : topLineCurves.aftP2;
                 if (IsStationWithinCurveSpan(z, topLineCurves.fwdP0, tlAft))
                 {
-                    Vector3 tlPt = topLineCurves.GetTopLinePointAtZ(z);
-                    if (!isTransomRegion || tlPt.y > minTransomY + 0.01f)
+                    bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(z);
+                    if (isPhysical)
                     {
-                        nodes.Add(new SectionPointNode
+                        Vector3 tlPt = topLineCurves.GetTopLinePointAtZ(z);
+                        if (!isTransomRegion || tlPt.y > minTransomY + 0.01f)
                         {
-                            name = "TopLine Curve",
-                            uParam = 1.00f,
-                            point = new Vector3(sSign * Mathf.Abs(tlPt.x), tlPt.y, z)
-                        });
+                            nodes.Add(new SectionPointNode
+                            {
+                                name = "TopLine Curve",
+                                uParam = 1.00f,
+                                point = new Vector3(sSign * Mathf.Abs(tlPt.x), tlPt.y, z)
+                            });
+                        }
                     }
                 }
             }
 
             if (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 inStbdRail, out Vector3 inPortRail))
             {
-                Vector3 railPt = (sSign > 0f) ? stbdRail : portRail;
-                if (!isTransomRegion || railPt.y > minTransomY + 0.01f)
+                bool isPhysicalTopLine = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(z);
+                if (!isPhysicalTopLine)
                 {
-                    nodes.Add(new SectionPointNode
+                    Vector3 railPt = (sSign > 0f) ? stbdRail : portRail;
+                    if (!isTransomRegion || railPt.y > minTransomY + 0.01f)
                     {
-                        name = "Upper Deck Bulwark Rail",
-                        uParam = 1.00f,
-                        point = new Vector3(sSign * Mathf.Abs(railPt.x), railPt.y, z)
-                    });
+                        nodes.Add(new SectionPointNode
+                        {
+                            name = "Upper Deck Bulwark Rail",
+                            uParam = 1.00f,
+                            point = new Vector3(sSign * Mathf.Abs(railPt.x), railPt.y, z)
+                        });
+                    }
                 }
             }
         }
@@ -473,15 +481,19 @@ public class SectionModelCurves : MonoBehaviour
                     Vector3 tlFwd = topLineCurves.GetInnerTopLineBowTip(true);
                     if (IsStationWithinCurveSpan(z, tlFwd, tlAft))
                     {
-                        Vector3 inTopLine = topLineCurves.GetInnerTopLinePointAtZ(z, sSign > 0f);
-                        if (inTopLine.y > minInnerTransomY + 0.01f)
+                        bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(z);
+                        if (isPhysical)
                         {
-                            nodes.Add(new SectionPointNode
+                            Vector3 inTopLine = topLineCurves.GetInnerTopLinePointAtZ(z, sSign > 0f);
+                            if (inTopLine.y > minInnerTransomY + 0.01f)
                             {
-                                name = "Inner TopLine Curve",
-                                uParam = 1.00f,
-                                point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
-                            });
+                                nodes.Add(new SectionPointNode
+                                {
+                                    name = "Inner TopLine Curve",
+                                    uParam = 1.00f,
+                                    point = new Vector3(sSign * Mathf.Abs(inTopLine.x), inTopLine.y, z)
+                                });
+                            }
                         }
                     }
                 }
@@ -490,15 +502,19 @@ public class SectionModelCurves : MonoBehaviour
                 {
                     if (upperDeckCurves != null && upperDeckCurves.HasBulwarkAtZ(z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 inStbdRail, out Vector3 inPortRail))
                     {
-                        Vector3 inRailPt = (sSign > 0f) ? inStbdRail : inPortRail;
-                        if (inRailPt.y > minInnerTransomY + 0.01f)
+                        bool isPhysicalTopLine = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(z);
+                        if (!isPhysicalTopLine)
                         {
-                            nodes.Add(new SectionPointNode
+                            Vector3 inRailPt = (sSign > 0f) ? inStbdRail : inPortRail;
+                            if (inRailPt.y > minInnerTransomY + 0.01f)
                             {
-                                name = "Inner Upper Deck Bulwark Rail",
-                                uParam = 1.00f,
-                                point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
-                            });
+                                nodes.Add(new SectionPointNode
+                                {
+                                    name = "Inner Upper Deck Bulwark Rail",
+                                    uParam = 1.00f,
+                                    point = new Vector3(sSign * Mathf.Abs(inRailPt.x), inRailPt.y, z)
+                                });
+                            }
                         }
                     }
                 }

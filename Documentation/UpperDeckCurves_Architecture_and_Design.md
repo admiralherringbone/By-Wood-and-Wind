@@ -159,18 +159,25 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 
 ### 1. TopLineCurves as the Supreme Dynamic Boundary
 - **Supreme Rail**: `TopLineCurves` is always the uppermost sheer rail of the vessel running from stem to stern.
-- **Dynamic Elevation (`SynchronizeTopLineElevation`)**: When higher-tier superstructures are present (such as a Poop Deck at Tier 2), `UpperDeckCurves` automatically evaluates the maximum required cap rail height at the transom ($Y_{\text{deckAft}} + \text{bulwarkHeight}$) and raises `SheerCurves.transomRakeHeight` accordingly. This automatically updates `SheerCurves.transomP1`, `TopLineCurves.aftP2`, `FashionCurves` transom fashion timbers, and `BodyCurves` station tops in unified harmony.
-- When higher-tier superstructures are disabled or removed, the transom rake height smoothly returns to the lower deck datum.
+- **Dynamic Elevation (`SynchronizeTopLineElevation`)**: When higher-tier superstructures are present (such as a Poop Deck at Tier 2 or Quarterdeck at Tier 1), `UpperDeckCurves` evaluates the supreme required cap rail height across the entire vessel and synchronizes all key datums in unison:
+  1. **Midship Apex (`TopLineCurves.fwdP3.y`)**: Evaluated as the cumulative deck floor elevation up to the highest active tier plus supreme bulwark height ($Y_{\text{mainDeckMid}} + \sum \text{headroom}_t + \text{bulwark}_{\text{supreme}}$). Both apex tangent handles (`fwdP2.y`, `aftP1.y`) lock to `fwdP3.y` ensuring C1 tangent continuity.
+  2. **BodyCurves Master Section Top ($P_4$)**: Because `BodyCurves` midship section point $P_4$ samples directly from `TopLineCurves.GetTopLinePointAtZ(targetApexZ)` (which is `fwdP3`), raising `fwdP3.y` immediately elevates $P_4$. Master frame sections across the ship re-loft smoothly from Keel ($P_0$) all the way up to supreme TopLine ($P_4$).
+  3. **Stern Transom (`SheerCurves.transomRakeHeight`)**: Evaluates the highest stern cap rail across all active tiers at the transom (or sheers up from midship apex), updating `sheerCurves.transomP1.y` and `topLineCurves.aftP2.y`.
+  4. **Bow Stem (`SheerCurves.targetUpperStemTopY`)**: Evaluates the highest bow cap rail across all active tiers at the stem (or sheers up from midship apex), updating `sheerCurves.upperStemTop.y` and `topLineCurves.fwdP0.y` so that the sheer line rises naturally without clamp suppression.
+- When upper decks are disabled or removed, all parameters smoothly revert to their baseline Main Deck datums (`baseTopLineMidshipY`, `baseTransomRakeHeight`, `baseUpperStemRatio`).
 
 ### 2. Solid vs. Dashed Draughting Convention
 - In historical sheer draughts, continuous boundary curves are drawn **solid** where physical structure exists and **dashed** where open to the air:
   - **Over Active Upper Decks (Forecastle, Poop Deck)**: `TopLineCurves` is drawn as a **solid line** representing the physical bulwark cap rail.
   - **Over Open Spans (Open Waist, lower deck gaps)**: `TopLineCurves` is drawn as a **dashed line** representing the continuing sheer profile through open air.
 - Evaluated via `upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid)`: TopLine curves and inner offsets render solid where physical structure exists, and dashed (`Vector3.Lerp(p0, p1, 0.5f)`) where open to the air.
+- In `SectionModelCurves`, transverse frame cuts at stations across open air (where `IsHighestPhysicalDeckAtZ` is false) cleanly terminate at the physical bulwark rail (e.g. Main Deck waist bulwark at $4.60\text{m}$) rather than extending into thin air.
 
 ### 3. Master Frame Invariant on `BodyCurves`
 - On `BodyCurves`, only **two curve-modifying control points** exist in the upper hull: $P_3$ (Breadth / Maximum Beam) and $P_4$ (TopLine / Rail).
-- All intermediate upper decks (Tier 1 Quarterdeck under a Poop Deck) and bulwark rails are **non-modifying sampling points** evaluated along the transverse frame arc between $P_3$ and $P_4$. This preserves the smooth, fair lofting of the master hull frames without introducing artificial inflection kinks.
+- With `TopLineCurves.fwdP3.y` raised to the highest upper deck, $P_4$ crowns the supreme deck level (e.g. $8.60\text{m}$ for Poop Deck).
+- All intermediate decks (Tier 1 Quarterdeck floor at $5.55\text{m}$, Quarterdeck bulwark at $6.65\text{m}$, Main Deck waist bulwark at $4.60\text{m}$, Main Deck floor at $3.50\text{m}$) sit cleanly **between $P_3$ ($\sim 3.0\text{m}$) and $P_4$ ($8.60\text{m}$)**.
+- Every intermediate deck and bulwark is a non-modifying sampling point evaluated along the fair frame arc, preserving harmonic hull lofting without introducing artificial kinks.
 
 ### 4. Independent Main Deck Waist Bulwark
 - When upper decks create an open waist between them (e.g., between Forecastle and Quarterdeck), the crew on the Main Deck requires an independent bulwark for safety.

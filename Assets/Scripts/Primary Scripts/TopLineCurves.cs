@@ -266,7 +266,7 @@ public class TopLineCurves : MonoBehaviour
         fwdP3.x = maxBeam;
 
         // Enforce Y-Axis Restriction: Midship Apex Y height (fwdP3.y) cannot be higher than Bow Tip Y (fwdP0.y) or Stern Tip Y (aftP2.y)
-        float maxAllowedApexY = Mathf.Min(fwdP0.y, aftP2.y);
+        float maxAllowedApexY = Mathf.Min(fwdP0.y, aftP2.y) + 0.001f;
         fwdP3.y = Mathf.Min(fwdP3.y, maxAllowedApexY);
 
         // Proportionally scale control arm Z handles based on normalized span ratios
