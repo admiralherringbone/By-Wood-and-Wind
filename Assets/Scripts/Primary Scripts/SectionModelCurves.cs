@@ -53,6 +53,9 @@ public class SectionModelCurves : MonoBehaviour
     [Tooltip("Reference to BackboneCurves for stem and stern keel width offset.")]
     public BackboneCurves backboneCurves;
 
+    [Tooltip("Reference to MainDeckCurves for main deck profile and edge evaluation.")]
+    public MainDeckCurves mainDeckCurves;
+
     [Tooltip("Reference to UpperDeckCurves for upper deck bulwarks and cap rails.")]
     public UpperDeckCurves upperDeckCurves;
 
@@ -146,6 +149,9 @@ public class SectionModelCurves : MonoBehaviour
         if (backboneCurves == null) backboneCurves = GetComponentInParent<BackboneCurves>();
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
 
+        if (mainDeckCurves == null) mainDeckCurves = GetComponentInParent<MainDeckCurves>();
+        if (mainDeckCurves == null) mainDeckCurves = FindFirstObjectByType<MainDeckCurves>();
+
         if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
         if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
     }
@@ -180,6 +186,7 @@ public class SectionModelCurves : MonoBehaviour
             if (floorCurves != null) floorCurves.UpdateCachedCurves();
             if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
             if (ribbandCurves != null) ribbandCurves.UpdateCachedCurves();
+            if (mainDeckCurves != null) mainDeckCurves.UpdateCachedCurves();
             if (upperDeckCurves != null) upperDeckCurves.UpdateCachedCurves();
 
             changeVersion++;
@@ -766,10 +773,38 @@ public class SectionModelCurves : MonoBehaviour
 
             Color stbdCol = info.isMasterFrame ? Color.yellow : starboardColor;
             Color portCol = info.isMasterFrame ? Color.yellow : portColor;
+            Color dashStbdCol = new Color(stbdCol.r, stbdCol.g, stbdCol.b, 0.40f);
+            Color dashPortCol = new Color(portCol.r, portCol.g, portCol.b, 0.40f);
+
+            bool hasPhysical = false;
+            float physicalY = 0f;
+            Vector3 stbdCap = Vector3.zero;
+            Vector3 portCap = Vector3.zero;
+            Vector3 inStbdCap = Vector3.zero;
+            Vector3 inPortCap = Vector3.zero;
+
+            if (upperDeckCurves != null)
+            {
+                hasPhysical = upperDeckCurves.GetPhysicalHullCapAtZ(z, out physicalY, out stbdCap, out portCap, out inStbdCap, out inPortCap);
+            }
+            else if (mainDeckCurves != null)
+            {
+                Vector3 mEdge = mainDeckCurves.GetDeckEdgePointAtZ(z, true);
+                physicalY = mEdge.y;
+                float outX = (bodyCurves != null) ? bodyCurves.GetOuterHalfBreadthAtY(physicalY, z) : Mathf.Abs(mEdge.x);
+                stbdCap = new Vector3(outX, physicalY, z);
+                portCap = new Vector3(-outX, physicalY, z);
+                inStbdCap = new Vector3(Mathf.Abs(mEdge.x), physicalY, z);
+                inPortCap = new Vector3(-Mathf.Abs(mEdge.x), physicalY, z);
+                hasPhysical = true;
+            }
 
             // Compute full outer section polylines BEFORE discarding points
             List<Vector3> stbdOuterPts = GetOuterSectionPolylinePoints(stbdNodes);
             List<Vector3> portOuterPts = GetOuterSectionPolylinePoints(portNodes);
+
+            float topY = (stbdOuterPts.Count > 0) ? stbdOuterPts[stbdOuterPts.Count - 1].y : 0f;
+            bool isCutBelowTop = hasPhysical && (topY > physicalY + 0.05f);
 
             float bottomSpacing = (bodyCurves != null) ? bodyCurves.innerLineSpacing : 0.2f;
             float topSpacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.1f;
@@ -828,8 +863,19 @@ public class SectionModelCurves : MonoBehaviour
             // Draw Transverse Section Curves (X/Y cuts)
             if (showTransverseSections)
             {
-                DrawPolyline(stbdOuterPts, stbdCol);
-                DrawPolyline(portOuterPts, portCol);
+                if (isCutBelowTop)
+                {
+                    DrawSectionPolylineWithDashedExtension(stbdOuterPts, physicalY, stbdCol, dashStbdCol);
+                    DrawSectionPolylineWithDashedExtension(portOuterPts, physicalY, portCol, dashPortCol);
+
+                    if (stbdInnerPts != null) TruncatePointsAboveY(stbdInnerPts, physicalY);
+                    if (portInnerPts != null) TruncatePointsAboveY(portInnerPts, physicalY);
+                }
+                else
+                {
+                    DrawPolyline(stbdOuterPts, stbdCol);
+                    DrawPolyline(portOuterPts, portCol);
+                }
 
                 // Outer-to-Outer Bottom Connection across Keel width (ONLY ahead of transom cut)
                 if (!isTransomRegion && stbdOuterPts.Count > 0 && portOuterPts.Count > 0)
@@ -868,15 +914,31 @@ public class SectionModelCurves : MonoBehaviour
                     }
 
                     // Outer-to-Inner Top Cap Lines
-                    if (stbdOuterPts.Count > 0 && stbdInnerPts.Count > 0)
+                    if (isCutBelowTop)
                     {
-                        Gizmos.color = bodyCurves.innerLineColor;
-                        Gizmos.DrawLine(stbdOuterPts[stbdOuterPts.Count - 1], stbdInnerPts[stbdInnerPts.Count - 1]);
+                        if (stbdInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(stbdCap, inStbdCap);
+                        }
+                        if (portInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(portCap, inPortCap);
+                        }
                     }
-                    if (portOuterPts.Count > 0 && portInnerPts.Count > 0)
+                    else
                     {
-                        Gizmos.color = bodyCurves.innerLineColor;
-                        Gizmos.DrawLine(portOuterPts[portOuterPts.Count - 1], portInnerPts[portInnerPts.Count - 1]);
+                        if (stbdOuterPts.Count > 0 && stbdInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(stbdOuterPts[stbdOuterPts.Count - 1], stbdInnerPts[stbdInnerPts.Count - 1]);
+                        }
+                        if (portOuterPts.Count > 0 && portInnerPts.Count > 0)
+                        {
+                            Gizmos.color = bodyCurves.innerLineColor;
+                            Gizmos.DrawLine(portOuterPts[portOuterPts.Count - 1], portInnerPts[portInnerPts.Count - 1]);
+                        }
                     }
                 }
 
@@ -914,15 +976,17 @@ public class SectionModelCurves : MonoBehaviour
             // Draw Node Spheres at Ribband Intersections
             if (showSectionNodes)
             {
-                Gizmos.color = stbdCol;
                 for (int n = 0; n < stbdNodes.Count; n++)
                 {
+                    bool isAbove = isCutBelowTop && (stbdNodes[n].point.y > physicalY + 0.05f);
+                    Gizmos.color = isAbove ? dashStbdCol : stbdCol;
                     Gizmos.DrawSphere(stbdNodes[n].point, nodeRadius);
                 }
 
-                Gizmos.color = portCol;
                 for (int n = 0; n < portNodes.Count; n++)
                 {
+                    bool isAbove = isCutBelowTop && (portNodes[n].point.y > physicalY + 0.05f);
+                    Gizmos.color = isAbove ? dashPortCol : portCol;
                     Gizmos.DrawSphere(portNodes[n].point, nodeRadius);
                 }
             }
@@ -1105,6 +1169,85 @@ public class SectionModelCurves : MonoBehaviour
         for (int i = 0; i < pts.Count - 1; i++)
         {
             Gizmos.DrawLine(pts[i], pts[i + 1]);
+        }
+    }
+
+    /// <summary>
+    /// Draws a transverse section polyline with solid lines below physicalY and dashed lines above physicalY.
+    /// Accurately splits any segment crossing physicalY so the cap rail transition is mathematically flush.
+    /// </summary>
+    private void DrawSectionPolylineWithDashedExtension(List<Vector3> pts, float physicalY, Color solidColor, Color dashColor)
+    {
+        if (pts == null || pts.Count < 2) return;
+
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            Vector3 pA = pts[i];
+            Vector3 pB = pts[i + 1];
+
+            if (pB.y <= physicalY + 0.001f)
+            {
+                // Entirely within physical hull structure
+                Gizmos.color = solidColor;
+                Gizmos.DrawLine(pA, pB);
+            }
+            else if (pA.y >= physicalY - 0.001f)
+            {
+                // Entirely in open air reaching to TopLine Curves: dashed
+                Gizmos.color = dashColor;
+                Vector3 halfPt = Vector3.Lerp(pA, pB, 0.5f);
+                Gizmos.DrawLine(pA, halfPt);
+            }
+            else
+            {
+                // Segment straddles physical rail boundary: split at exact crossing
+                float dy = pB.y - pA.y;
+                float t = (Mathf.Abs(dy) > 0.0001f) ? Mathf.Clamp01((physicalY - pA.y) / dy) : 0f;
+                Vector3 pSplit = Vector3.Lerp(pA, pB, t);
+
+                // Lower portion solid
+                Gizmos.color = solidColor;
+                Gizmos.DrawLine(pA, pSplit);
+
+                // Upper portion dashed
+                Gizmos.color = dashColor;
+                Vector3 halfPt = Vector3.Lerp(pSplit, pB, 0.5f);
+                Gizmos.DrawLine(pSplit, halfPt);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Truncates an inner frame polyline at maxY so timber frames terminate at the physical cap rail.
+    /// </summary>
+    private void TruncatePointsAboveY(List<Vector3> pts, float maxY)
+    {
+        if (pts == null || pts.Count < 2) return;
+
+        int splitIdx = -1;
+        for (int i = 0; i < pts.Count - 1; i++)
+        {
+            if (pts[i].y <= maxY && pts[i + 1].y > maxY)
+            {
+                splitIdx = i;
+                break;
+            }
+        }
+
+        if (splitIdx >= 0)
+        {
+            Vector3 pA = pts[splitIdx];
+            Vector3 pB = pts[splitIdx + 1];
+            float dy = pB.y - pA.y;
+            float t = (Mathf.Abs(dy) > 0.0001f) ? Mathf.Clamp01((maxY - pA.y) / dy) : 0f;
+            Vector3 pSplit = Vector3.Lerp(pA, pB, t);
+
+            pts.RemoveRange(splitIdx + 1, pts.Count - (splitIdx + 1));
+            pts.Add(pSplit);
+        }
+        else if (pts[0].y > maxY)
+        {
+            pts.Clear();
         }
     }
 

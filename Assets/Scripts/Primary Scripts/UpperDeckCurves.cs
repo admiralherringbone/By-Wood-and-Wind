@@ -2037,58 +2037,68 @@ public class UpperDeckCurves : MonoBehaviour
         return true;
     }
 
-    public bool HasBulwarkAtZ(float z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 innerStbdRail, out Vector3 innerPortRail)
+    /// <summary>
+    /// Evaluates the highest physical hull termination structure (upper deck bulwark rail, deck edge, 
+    /// waist bulwark, or main deck sheer edge) at station Z across all active tiers.
+    /// Returns true if a physical structure is found, and outputs its height and 3D boundary coordinates.
+    /// </summary>
+    public bool GetPhysicalHullCapAtZ(float z, out float physicalY, out Vector3 stbdRail, out Vector3 portRail, out Vector3 innerStbdRail, out Vector3 innerPortRail)
     {
         stbdRail = Vector3.zero;
         portRail = Vector3.zero;
         innerStbdRail = Vector3.zero;
         innerPortRail = Vector3.zero;
-
-        if (tiers == null || tiers.Count == 0) return false;
+        physicalY = float.MinValue;
 
         bool found = false;
-        float highestRailY = float.MinValue;
         float railX = 0f;
         float inRailX = 0f;
 
-        for (int t = 0; t < tiers.Count; t++)
+        if (tiers != null && tiers.Count > 0)
         {
-            UpperDeckTier tier = tiers[t];
-            if (tier == null || tier.segments == null) continue;
-
-            float bulwarkSternZ = GetBulwarkTransomLimitZ(t);
-            float bulwarkBowZ = GetBulwarkStemLimitZ(t);
-
-            for (int s = 0; s < tier.segments.Count; s++)
+            for (int t = 0; t < tiers.Count; t++)
             {
-                UpperDeckSegment seg = tier.segments[s];
-                if (seg == null || !seg.isEnabled) continue;
+                UpperDeckTier tier = tiers[t];
+                if (tier == null || tier.segments == null) continue;
 
-                float fwdLimit = seg.flushToStem ? Mathf.Max(seg.forwardZ, bulwarkBowZ) : seg.forwardZ;
-                float aftLimit = seg.flushToTransom ? Mathf.Min(seg.aftZ, bulwarkSternZ) : seg.aftZ;
+                float bulwarkSternZ = GetBulwarkTransomLimitZ(t);
+                float bulwarkBowZ = GetBulwarkStemLimitZ(t);
 
-                if (z <= fwdLimit + 0.001f && z >= aftLimit - 0.001f)
+                for (int s = 0; s < tier.segments.Count; s++)
                 {
-                    if (GetBulwarkRailPointsAtZ(t, z, out Vector3 curOuter, out Vector3 curInner))
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg == null || !seg.isEnabled) continue;
+
+                    float fwdLimit = seg.flushToStem ? Mathf.Max(seg.forwardZ, bulwarkBowZ) : seg.forwardZ;
+                    float aftLimit = seg.flushToTransom ? Mathf.Min(seg.aftZ, bulwarkSternZ) : seg.aftZ;
+
+                    if (z <= fwdLimit + 0.001f && z >= aftLimit - 0.001f)
                     {
-                        if (curOuter.y > highestRailY)
+                        if (tier.showBulwark && GetBulwarkRailPointsAtZ(t, z, out Vector3 curOuter, out Vector3 curInner))
                         {
-                            found = true;
-                            highestRailY = curOuter.y;
-                            railX = curOuter.x;
-                            inRailX = curInner.x;
+                            if (curOuter.y > physicalY)
+                            {
+                                found = true;
+                                physicalY = curOuter.y;
+                                railX = curOuter.x;
+                                inRailX = curInner.x;
+                            }
                         }
-                    }
-                    else
-                    {
-                        found = true;
-                        Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : Vector3.zero;
-                        highestRailY = tlPt.y;
-                        railX = tlPt.x;
-                        Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine)
-                            ? topLineCurves.GetInnerTopLinePointAtZ(z, true)
-                            : (bodyCurves != null ? bodyCurves.GetInnerNodePosition(4, z, 1f) : tlPt);
-                        inRailX = inTlPt.x;
+                        else
+                        {
+                            float centerY = EvaluateCenterlineSheerYAtZ(tier, seg, t, z);
+                            float camber = EvaluateCamberAtZ(tier, seg, z);
+                            float edgeY = centerY - camber;
+                            float edgeX = GetOuterHullHalfBreadthAt(edgeY, z);
+                            float inEdgeX = GetInnerHullHalfBreadthAt(edgeY, z);
+                            if (edgeY > physicalY)
+                            {
+                                found = true;
+                                physicalY = edgeY;
+                                railX = edgeX;
+                                inRailX = inEdgeX;
+                            }
+                        }
                     }
                 }
             }
@@ -2106,6 +2116,7 @@ public class UpperDeckCurves : MonoBehaviour
                 float x = GetOuterHullHalfBreadthAt(railY, z);
                 float inX = GetInnerHullHalfBreadthAt(railY, z);
 
+                physicalY = railY;
                 stbdRail = new Vector3(x, railY, z);
                 portRail = new Vector3(-x, railY, z);
                 innerStbdRail = new Vector3(inX, railY, z);
@@ -2114,16 +2125,37 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
+        // Fallback to Main Deck sheer edge if no upper deck and no waist bulwark
+        if (!found && mainDeckCurves != null)
+        {
+            Vector3 mEdge = mainDeckCurves.GetDeckEdgePointAtZ(z, true);
+            float edgeY = mEdge.y;
+            float x = GetOuterHullHalfBreadthAt(edgeY, z);
+            float inX = Mathf.Abs(mEdge.x);
+
+            physicalY = edgeY;
+            stbdRail = new Vector3(x, edgeY, z);
+            portRail = new Vector3(-x, edgeY, z);
+            innerStbdRail = new Vector3(inX, edgeY, z);
+            innerPortRail = new Vector3(-inX, edgeY, z);
+            return true;
+        }
+
         if (found)
         {
-            stbdRail = new Vector3(railX, highestRailY, z);
-            portRail = new Vector3(-railX, highestRailY, z);
-            innerStbdRail = new Vector3(inRailX, highestRailY, z);
-            innerPortRail = new Vector3(-inRailX, highestRailY, z);
+            stbdRail = new Vector3(railX, physicalY, z);
+            portRail = new Vector3(-railX, physicalY, z);
+            innerStbdRail = new Vector3(inRailX, physicalY, z);
+            innerPortRail = new Vector3(-inRailX, physicalY, z);
             return true;
         }
 
         return false;
+    }
+
+    public bool HasBulwarkAtZ(float z, out Vector3 stbdRail, out Vector3 portRail, out Vector3 innerStbdRail, out Vector3 innerPortRail)
+    {
+        return GetPhysicalHullCapAtZ(z, out _, out stbdRail, out portRail, out innerStbdRail, out innerPortRail);
     }
 
     public int GetMaxActiveTierLevel()
