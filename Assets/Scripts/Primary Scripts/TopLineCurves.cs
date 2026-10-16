@@ -27,6 +27,9 @@ public class TopLineCurves : MonoBehaviour
     [Tooltip("Reference to the FashionCurves script to synchronize transom fashion timbers.")]
     public FashionCurves fashionCurves;
 
+    [Tooltip("Reference to the UpperDeckCurves script to synchronize physical bulwark spans.")]
+    public UpperDeckCurves upperDeckCurves;
+
     [Header("Interactive Scene Handles")]
     [Tooltip("Enable interactive 3D position handles in Scene view to sculpt control points along X, Y, and Z axes.")]
     public bool enableInteractiveHandles = true;
@@ -152,6 +155,8 @@ public class TopLineCurves : MonoBehaviour
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
         if (fashionCurves == null) fashionCurves = GetComponentInParent<FashionCurves>();
         if (fashionCurves == null) fashionCurves = FindFirstObjectByType<FashionCurves>();
+        if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
+        if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
     }
 
     [ContextMenu("Reset Control Points to Default Hull")]
@@ -841,17 +846,46 @@ public class TopLineCurves : MonoBehaviour
         // Draw Inner Top Line Curves (Parallel Inset from BodyCurves TopLine Point)
         if (showInnerLine && cachedStbdInnerPts != null && cachedStbdInnerPts.Length > 1)
         {
-            Gizmos.color = innerLineColor;
+            Color portInnerColor = new Color(innerLineColor.r, innerLineColor.g * 0.6f, innerLineColor.b, innerLineColor.a);
+            Color dashStbdColor = new Color(innerLineColor.r, innerLineColor.g, innerLineColor.b, 0.35f);
+            Color dashPortColor = new Color(portInnerColor.r, portInnerColor.g, portInnerColor.b, 0.35f);
+
             for (int i = 0; i < cachedStbdInnerPts.Length - 1; i++)
             {
-                Gizmos.DrawLine(cachedStbdInnerPts[i], cachedStbdInnerPts[i + 1]);
+                Vector3 p0 = cachedStbdInnerPts[i];
+                Vector3 p1 = cachedStbdInnerPts[i + 1];
+                float zMid = (p0.z + p1.z) * 0.5f;
+                bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid);
+
+                if (isPhysical)
+                {
+                    Gizmos.color = innerLineColor;
+                    Gizmos.DrawLine(p0, p1);
+                }
+                else
+                {
+                    Gizmos.color = dashStbdColor;
+                    Gizmos.DrawLine(p0, Vector3.Lerp(p0, p1, 0.5f));
+                }
             }
 
-            Color portInnerColor = new Color(innerLineColor.r, innerLineColor.g * 0.6f, innerLineColor.b, innerLineColor.a);
-            Gizmos.color = portInnerColor;
             for (int i = 0; i < cachedPortInnerPts.Length - 1; i++)
             {
-                Gizmos.DrawLine(cachedPortInnerPts[i], cachedPortInnerPts[i + 1]);
+                Vector3 p0 = cachedPortInnerPts[i];
+                Vector3 p1 = cachedPortInnerPts[i + 1];
+                float zMid = (p0.z + p1.z) * 0.5f;
+                bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid);
+
+                if (isPhysical)
+                {
+                    Gizmos.color = portInnerColor;
+                    Gizmos.DrawLine(p0, p1);
+                }
+                else
+                {
+                    Gizmos.color = dashPortColor;
+                    Gizmos.DrawLine(p0, Vector3.Lerp(p0, p1, 0.5f));
+                }
             }
 
             // Draw Inner Transom Connection Line
@@ -916,26 +950,56 @@ public class TopLineCurves : MonoBehaviour
 
     private void DrawCubicBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 40)
     {
-        Gizmos.color = color;
         Vector3 prevPt = p0;
+        Color dashColor = new Color(color.r, color.g, color.b, 0.40f);
+
         for (int i = 1; i <= segments; i++)
         {
             float t = (float)i / segments;
             Vector3 currPt = CalculateCubicBezierPoint(t, p0, p1, p2, p3);
-            Gizmos.DrawLine(prevPt, currPt);
+            float zMid = (prevPt.z + currPt.z) * 0.5f;
+            bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid);
+
+            if (isPhysical)
+            {
+                Gizmos.color = color;
+                Gizmos.DrawLine(prevPt, currPt);
+            }
+            else
+            {
+                // Dashed line over open air (e.g. waist)
+                Gizmos.color = dashColor;
+                Vector3 halfPt = Vector3.Lerp(prevPt, currPt, 0.5f);
+                Gizmos.DrawLine(prevPt, halfPt);
+            }
             prevPt = currPt;
         }
     }
 
     private void DrawQuadraticBezierCurve(Vector3 p0, Vector3 p1, Vector3 p2, Color color, int segments = 40)
     {
-        Gizmos.color = color;
         Vector3 prevPt = p0;
+        Color dashColor = new Color(color.r, color.g, color.b, 0.40f);
+
         for (int i = 1; i <= segments; i++)
         {
             float t = (float)i / segments;
             Vector3 currPt = CalculateQuadraticBezierPoint(t, p0, p1, p2);
-            Gizmos.DrawLine(prevPt, currPt);
+            float zMid = (prevPt.z + currPt.z) * 0.5f;
+            bool isPhysical = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid);
+
+            if (isPhysical)
+            {
+                Gizmos.color = color;
+                Gizmos.DrawLine(prevPt, currPt);
+            }
+            else
+            {
+                // Dashed line over open air (e.g. waist)
+                Gizmos.color = dashColor;
+                Vector3 halfPt = Vector3.Lerp(prevPt, currPt, 0.5f);
+                Gizmos.DrawLine(prevPt, halfPt);
+            }
             prevPt = currPt;
         }
     }

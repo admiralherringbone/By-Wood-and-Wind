@@ -151,10 +151,41 @@ The system provides immediate visual feedback and interactive editing:
 
 ---
 
-## 7. Current Implementation Status & Integration
+---
 
-The architecture described above is fully implemented in:
-- **`Assets/Scripts/Primary Scripts/UpperDeckCurves.cs`** (2,400 lines)
+## 7. Classical Naval Draughting Architecture (TopLine Dynamic Crown & Solid/Dashed Representation)
+
+Following classical 18th-century naval draughting principles, upper decks and bulwarks follow strict mathematical and graphical conventions:
+
+### 1. TopLineCurves as the Supreme Dynamic Boundary
+- **Supreme Rail**: `TopLineCurves` is always the uppermost sheer rail of the vessel running from stem to stern.
+- **Dynamic Elevation (`SynchronizeTopLineElevation`)**: When higher-tier superstructures are present (such as a Poop Deck at Tier 2), `UpperDeckCurves` automatically evaluates the maximum required cap rail height at the transom ($Y_{\text{deckAft}} + \text{bulwarkHeight}$) and raises `SheerCurves.transomRakeHeight` accordingly. This automatically updates `SheerCurves.transomP1`, `TopLineCurves.aftP2`, `FashionCurves` transom fashion timbers, and `BodyCurves` station tops in unified harmony.
+- When higher-tier superstructures are disabled or removed, the transom rake height smoothly returns to the lower deck datum.
+
+### 2. Solid vs. Dashed Draughting Convention
+- In historical sheer draughts, continuous boundary curves are drawn **solid** where physical structure exists and **dashed** where open to the air:
+  - **Over Active Upper Decks (Forecastle, Poop Deck)**: `TopLineCurves` is drawn as a **solid line** representing the physical bulwark cap rail.
+  - **Over Open Spans (Open Waist, lower deck gaps)**: `TopLineCurves` is drawn as a **dashed line** representing the continuing sheer profile through open air.
+- Evaluated via `upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid)`: TopLine curves and inner offsets render solid where physical structure exists, and dashed (`Vector3.Lerp(p0, p1, 0.5f)`) where open to the air.
+
+### 3. Master Frame Invariant on `BodyCurves`
+- On `BodyCurves`, only **two curve-modifying control points** exist in the upper hull: $P_3$ (Breadth / Maximum Beam) and $P_4$ (TopLine / Rail).
+- All intermediate upper decks (Tier 1 Quarterdeck under a Poop Deck) and bulwark rails are **non-modifying sampling points** evaluated along the transverse frame arc between $P_3$ and $P_4$. This preserves the smooth, fair lofting of the master hull frames without introducing artificial inflection kinks.
+
+### 4. Independent Main Deck Waist Bulwark
+- When upper decks create an open waist between them (e.g., between Forecastle and Quarterdeck), the crew on the Main Deck requires an independent bulwark for safety.
+- **`waistBulwarkHeight`**: Fully independent height adjustment ($0.40\text{m}\text{--}2.50\text{m}$, default $1.10\text{m}$), completely decoupled from Forecastle or Quarterdeck sheer and headroom.
+- **Visuals & Framing**: Renders solid cap rail, inner rail, and vertical framing stanchions (`waistStanchionCount`) across the waist span.
+- **Interactive Scene Handle**: An interactive 3D slider handle at midship allows immediate clicking and dragging of waist bulwark height directly in the Scene View.
+- **Downstream Conformance**: Integrated into `HasBulwarkAtZ()`, ensuring `SectionModelCurves` transverse frame cuts across the waist automatically conform to the waist bulwark rail.
+
+---
+
+## 8. Current Implementation Status & Integration
+
+The architecture described above is fully implemented and active in:
+- **`Assets/Scripts/Primary Scripts/UpperDeckCurves.cs`**
+- **`Assets/Scripts/Primary Scripts/TopLineCurves.cs`**
 - **`Assets/Scenes/Matched curves.unity`** (Configured with UpperDeckCurves component)
 
 It seamlessly integrates with:
@@ -162,4 +193,6 @@ It seamlessly integrates with:
 - `TopLineCurves.cs` (Ceiling datum & bulwarks)
 - `FashionCurves.cs` (Stern transom boundary)
 - `SheerCurves.cs` (Stem profile & transom rake)
+- `BodyCurves.cs` (Master frame lofting between Breadth and TopLine)
+- `SectionModelCurves.cs` (Framing cuts, strakes, and deck clamp shelf notches)
 - `BreadthCurves.cs`, `BilgeCurves.cs`, `FloorCurves.cs`, `BackboneCurves.cs` (Transverse hull breadths)

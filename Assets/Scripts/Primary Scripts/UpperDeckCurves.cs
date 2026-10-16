@@ -197,6 +197,26 @@ public class UpperDeckCurves : MonoBehaviour
     public BodyCurves bodyCurves;
     public BackboneCurves backboneCurves;
 
+    [Header("Master TopLine Synchronization")]
+    [Tooltip("Automatically synchronize TopLine elevation and Transom Rake Height to crown the highest active upper deck tier (e.g. Poop Deck).")]
+    public bool syncTopLineToHighestDeck = true;
+
+    [Header("Main Deck Waist Bulwark (Open Waist)")]
+    [Tooltip("Render a physical bulwark and cap rail along the Main Deck open waist between upper deck breaks.")]
+    public bool showWaistBulwark = true;
+    [Range(0.4f, 2.5f)] public float waistBulwarkHeight = 1.10f;
+    [Range(0.05f, 0.40f)] public float waistBulwarkThickness = 0.15f;
+    [Range(2, 24)] public int waistStanchionCount = 8;
+    public Color waistBulwarkColor = new Color(0.92f, 0.55f, 0.20f, 0.95f);
+    public Color waistStanchionColor = new Color(0.85f, 0.70f, 0.30f, 0.75f);
+
+    [HideInInspector] public Vector3 waistMidshipHandlePt;
+
+    // Zero-GC Cached buffers for Main Deck Waist Bulwark
+    [System.NonSerialized] public Vector3[] cachedWaistRailPts;
+    [System.NonSerialized] public Vector3[] cachedInnerWaistRailPts;
+    [System.NonSerialized] public List<Vector3[]> cachedWaistStanchions = new List<Vector3[]>();
+
     [Header("Interactive Scene Handles")]
     [Tooltip("Enable interactive 3D position handles in Scene view to move deck endpoints and boundaries.")]
     public bool enableInteractiveHandles = true;
@@ -860,6 +880,12 @@ public class UpperDeckCurves : MonoBehaviour
             if (mainDeckCurves == null || topLineCurves == null) return;
             mainDeckCurves.EnsureInitialized();
 
+            // 0. Synchronize TopLine elevation to crown the highest active upper deck tier (e.g. Poop Deck)
+            if (syncTopLineToHighestDeck)
+            {
+                SynchronizeTopLineElevation();
+            }
+
             float midZ = mainDeckCurves.midshipCenter.z;
             float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 15f;
             float minSternZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(12f) : ((fashionCurves != null) ? fashionCurves.innerStbdP4.z : -15f);
@@ -925,6 +951,9 @@ public class UpperDeckCurves : MonoBehaviour
 
             // 6. Build Longitudinal Bulwark Cap Rail curves and vertical stanchions
             BuildTierBulwarks();
+
+            // 7. Build Main Deck Waist Bulwark across open waist
+            BuildWaistBulwark();
 
             if (sheerCurves != null) sheerCurves.UpdateCachedProfile();
             if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
@@ -1940,6 +1969,26 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
+        // Fallback to Main Deck Waist Bulwark across the open waist
+        if (!found && showWaistBulwark && GetWaistExtents(out float waistFwdZ, out float waistAftZ))
+        {
+            if (z <= waistFwdZ + 0.001f && z >= waistAftZ - 0.001f && mainDeckCurves != null)
+            {
+                float floorY = mainDeckCurves.GetDeckSurfacePoint(0, z).y;
+                float camber = mainDeckCurves.EvaluateDeckCamberAtZ(z);
+                float edgeY = floorY - camber;
+                float railY = edgeY + waistBulwarkHeight;
+                float x = GetInnerHullHalfBreadthAt(railY, z);
+                float inX = Mathf.Max(0.01f, x - waistBulwarkThickness);
+
+                stbdRail = new Vector3(x, railY, z);
+                portRail = new Vector3(-x, railY, z);
+                innerStbdRail = new Vector3(inX, railY, z);
+                innerPortRail = new Vector3(-inX, railY, z);
+                return true;
+            }
+        }
+
         if (found)
         {
             stbdRail = new Vector3(railX, highestRailY, z);
@@ -1952,10 +2001,349 @@ public class UpperDeckCurves : MonoBehaviour
         return false;
     }
 
+    public int GetMaxActiveTierLevel()
+    {
+        int maxActive = 1;
+        if (tiers == null) return maxActive;
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            if (tiers[t] == null || tiers[t].segments == null) continue;
+            for (int s = 0; s < tiers[t].segments.Count; s++)
+            {
+                if (tiers[t].segments[s] != null && tiers[t].segments[s].isEnabled)
+                {
+                    if (tiers[t].tierLevel > maxActive)
+                        maxActive = tiers[t].tierLevel;
+                }
+            }
+        }
+        return maxActive;
+    }
 
+    public UpperDeckSegment GetSegmentAtZ(UpperDeckTier tier, float z)
+    {
+        if (tier == null || tier.segments == null) return null;
+        for (int s = 0; s < tier.segments.Count; s++)
+        {
+            UpperDeckSegment seg = tier.segments[s];
+            if (seg != null && seg.isEnabled)
+            {
+                if (z <= seg.forwardZ + 0.05f && z >= seg.aftZ - 0.05f)
+                    return seg;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether a physical upper deck bulwark exists at longitudinal station Z on the highest active tier.
+    /// Called by TopLineCurves to render solid lines over active deck bulwarks and dashed lines over open air spans.
+    /// </summary>
+    public bool IsHighestPhysicalDeckAtZ(float z)
+    {
+        if (tiers == null || tiers.Count == 0) return true;
+
+        int maxActiveTier = GetMaxActiveTierLevel();
+        bool hasAnySegment = false;
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            if (tiers[t] != null && tiers[t].segments != null)
+            {
+                for (int s = 0; s < tiers[t].segments.Count; s++)
+                {
+                    if (tiers[t].segments[s] != null && tiers[t].segments[s].isEnabled)
+                    {
+                        hasAnySegment = true;
+                        break;
+                    }
+                }
+            }
+            if (hasAnySegment) break;
+        }
+        if (!hasAnySegment) return true; // No upper decks -> TopLine is Main Deck bulwark (solid)
+
+        // Check if any segment on the supreme tier covers z
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            UpperDeckTier tier = tiers[t];
+            if (tier == null || tier.tierLevel < maxActiveTier || tier.segments == null) continue;
+
+            for (int s = 0; s < tier.segments.Count; s++)
+            {
+                UpperDeckSegment seg = tier.segments[s];
+                if (seg != null && seg.isEnabled)
+                {
+                    if (z <= seg.forwardZ + 0.05f && z >= seg.aftZ - 0.05f)
+                        return true;
+                }
+            }
+        }
+
+        // If maxActiveTier >= 2 (e.g. Poop Deck at stern), Forecastle on Tier 1 at the bow is also crowned by TopLineCurves at the bow!
+        if (maxActiveTier >= 2)
+        {
+            for (int t = 0; t < tiers.Count; t++)
+            {
+                UpperDeckTier tier = tiers[t];
+                if (tier == null || tier.tierLevel != 1 || tier.segments == null) continue;
+
+                for (int s = 0; s < tier.segments.Count; s++)
+                {
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg != null && seg.isEnabled && seg.forwardZ > 0f) // Forecastle
+                    {
+                        if (z <= seg.forwardZ + 0.05f && z >= seg.aftZ - 0.05f)
+                            return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Computes the forward and aft extents of the Main Deck open waist between upper deck breaks.
+    /// Returns true if an open waist exists, or false if upper decks cover the full length.
+    /// </summary>
+    public bool GetWaistExtents(out float waistFwdZ, out float waistAftZ)
+    {
+        waistFwdZ = 0f;
+        waistAftZ = 0f;
+        if (tiers == null || tiers.Count == 0) return false;
+
+        UpperDeckTier tier1 = null;
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            if (tiers[t].tierLevel == 1) { tier1 = tiers[t]; break; }
+        }
+        if (tier1 == null || tier1.segments == null || tier1.segments.Count == 0) return false;
+
+        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
+        float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f;
+        float minSternZ = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
+
+        UpperDeckSegment fwdSeg = null;
+        UpperDeckSegment aftSeg = null;
+
+        for (int s = 0; s < tier1.segments.Count; s++)
+        {
+            UpperDeckSegment seg = tier1.segments[s];
+            if (seg == null || !seg.isEnabled) continue;
+
+            if (seg.forwardZ > midZ)
+            {
+                if (fwdSeg == null || seg.aftZ < fwdSeg.aftZ)
+                    fwdSeg = seg;
+            }
+            if (seg.aftZ < midZ)
+            {
+                if (aftSeg == null || seg.forwardZ > aftSeg.forwardZ)
+                    aftSeg = seg;
+            }
+        }
+
+        if (fwdSeg != null && aftSeg != null)
+        {
+            waistFwdZ = fwdSeg.aftZ;
+            waistAftZ = aftSeg.forwardZ;
+            return waistFwdZ > waistAftZ + 0.1f;
+        }
+        else if (fwdSeg != null && aftSeg == null)
+        {
+            waistFwdZ = fwdSeg.aftZ;
+            waistAftZ = minSternZ;
+            return waistFwdZ > waistAftZ + 0.1f;
+        }
+        else if (fwdSeg == null && aftSeg != null)
+        {
+            waistFwdZ = maxBowZ;
+            waistAftZ = aftSeg.forwardZ;
+            return waistFwdZ > waistAftZ + 0.1f;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Dynamically synchronizes TopLineCurves transom height and SheerCurves transomRakeHeight
+    /// to crown the highest active upper deck tier (e.g. Poop Deck at Tier 2).
+    /// </summary>
+    public void SynchronizeTopLineElevation()
+    {
+        if (!syncTopLineToHighestDeck || sheerCurves == null) return;
+
+        float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
+        float defaultRakeHeight = 2.5f;
+
+        float highestSternCapRailY = float.MinValue;
+        bool foundSternDeck = false;
+
+        for (int t = 0; t < tiers.Count; t++)
+        {
+            UpperDeckTier tier = tiers[t];
+            if (tier == null || tier.segments == null) continue;
+
+            for (int s = 0; s < tier.segments.Count; s++)
+            {
+                UpperDeckSegment seg = tier.segments[s];
+                if (seg == null || !seg.isEnabled) continue;
+
+                if (seg.flushToTransom || seg.aftZ < midZ - 2f)
+                {
+                    float deckY = EvaluateCenterlineSheerYAtZ(tier, seg, t, seg.aftZ);
+                    float capRailY = deckY + tier.bulwarkHeight;
+                    if (capRailY > highestSternCapRailY)
+                    {
+                        highestSternCapRailY = capRailY;
+                        foundSternDeck = true;
+                    }
+                }
+            }
+        }
+
+        float targetRakeHeight = defaultRakeHeight;
+        if (foundSternDeck)
+        {
+            float counterY = sheerCurves.transomP0.y;
+            targetRakeHeight = Mathf.Max(defaultRakeHeight, highestSternCapRailY - counterY);
+        }
+
+        if (Mathf.Abs(sheerCurves.transomRakeHeight - targetRakeHeight) > 0.005f)
+        {
+            sheerCurves.transomRakeHeight = targetRakeHeight;
+            sheerCurves.UpdateCachedProfile();
+            if (topLineCurves != null) topLineCurves.UpdateCachedCurves();
+            if (fashionCurves != null) fashionCurves.UpdateCachedCurves();
+            if (bodyCurves != null) bodyCurves.UpdateCachedCurves();
+        }
+    }
+
+    /// <summary>
+    /// Builds 3D geometric polylines and vertical framing for the Main Deck open waist bulwark.
+    /// </summary>
+    public void BuildWaistBulwark()
+    {
+        if (!showWaistBulwark || !GetWaistExtents(out float waistFwdZ, out float waistAftZ) || mainDeckCurves == null)
+        {
+            cachedWaistRailPts = null;
+            cachedInnerWaistRailPts = null;
+            if (cachedWaistStanchions != null) cachedWaistStanchions.Clear();
+            waistMidshipHandlePt = Vector3.zero;
+            return;
+        }
+
+        mainDeckCurves.EnsureInitialized();
+        const int steps = 32;
+        int totalPts = steps + 1;
+        if (cachedWaistRailPts == null || cachedWaistRailPts.Length != totalPts)
+        {
+            cachedWaistRailPts = new Vector3[totalPts];
+            cachedInnerWaistRailPts = new Vector3[totalPts];
+        }
+        if (cachedWaistStanchions == null) cachedWaistStanchions = new List<Vector3[]>();
+        cachedWaistStanchions.Clear();
+
+        for (int i = 0; i <= steps; i++)
+        {
+            float frac = (float)i / steps;
+            float z = Mathf.Lerp(waistFwdZ, waistAftZ, frac);
+
+            float floorY = mainDeckCurves.GetDeckSurfacePoint(0, z).y;
+            float camber = mainDeckCurves.EvaluateDeckCamberAtZ(z);
+            float edgeY = floorY - camber;
+
+            float railY = edgeY + waistBulwarkHeight;
+            float railX = GetInnerHullHalfBreadthAt(railY, z);
+            float inRailX = Mathf.Max(0.01f, railX - waistBulwarkThickness);
+
+            cachedWaistRailPts[i] = new Vector3(railX, railY, z);
+            cachedInnerWaistRailPts[i] = new Vector3(inRailX, railY, z);
+        }
+
+        float waistMidZ = (waistFwdZ + waistAftZ) * 0.5f;
+        float midFloorY = mainDeckCurves.GetDeckSurfacePoint(0, waistMidZ).y;
+        float midCamber = mainDeckCurves.EvaluateDeckCamberAtZ(waistMidZ);
+        float midEdgeY = midFloorY - midCamber;
+        float midRailY = midEdgeY + waistBulwarkHeight;
+        float midRailX = GetInnerHullHalfBreadthAt(midRailY, waistMidZ);
+        waistMidshipHandlePt = new Vector3(midRailX, midRailY, waistMidZ);
+
+        int count = Mathf.Max(2, waistStanchionCount);
+        for (int j = 0; j <= count; j++)
+        {
+            float frac = (float)j / count;
+            float zSt = Mathf.Lerp(waistFwdZ, waistAftZ, frac);
+
+            float floorY = mainDeckCurves.GetDeckSurfacePoint(0, zSt).y;
+            float camber = mainDeckCurves.EvaluateDeckCamberAtZ(zSt);
+            float edgeY = floorY - camber;
+            float edgeX = GetInnerHullHalfBreadthAt(edgeY, zSt);
+
+            float railY = edgeY + waistBulwarkHeight;
+            float railX = GetInnerHullHalfBreadthAt(railY, zSt);
+
+            Vector3 botPt = new Vector3(edgeX, edgeY, zSt);
+            Vector3 topPt = new Vector3(railX, railY, zSt);
+
+            cachedWaistStanchions.Add(new Vector3[] { botPt, topPt });
+        }
+    }
+
+    public void DrawWaistBulwark()
+    {
+        if (!showWaistBulwark || cachedWaistRailPts == null || cachedWaistRailPts.Length < 2) return;
+
+        Gizmos.color = waistBulwarkColor;
+        for (int i = 0; i < cachedWaistRailPts.Length - 1; i++)
+        {
+            Vector3 p0 = cachedWaistRailPts[i];
+            Vector3 p1 = cachedWaistRailPts[i + 1];
+            Gizmos.DrawLine(p0, p1);
+            Gizmos.DrawLine(MirrorX(p0), MirrorX(p1));
+        }
+
+        if (cachedInnerWaistRailPts != null)
+        {
+            Gizmos.color = new Color(waistBulwarkColor.r, waistBulwarkColor.g * 0.8f, waistBulwarkColor.b, 0.85f);
+            for (int i = 0; i < cachedInnerWaistRailPts.Length - 1; i++)
+            {
+                Vector3 p0 = cachedInnerWaistRailPts[i];
+                Vector3 p1 = cachedInnerWaistRailPts[i + 1];
+                Gizmos.DrawLine(p0, p1);
+                Gizmos.DrawLine(MirrorX(p0), MirrorX(p1));
+            }
+
+            Vector3 fwdOut = cachedWaistRailPts[0];
+            Vector3 fwdIn = cachedInnerWaistRailPts[0];
+            Gizmos.DrawLine(fwdOut, fwdIn);
+            Gizmos.DrawLine(MirrorX(fwdOut), MirrorX(fwdIn));
+
+            Vector3 aftOut = cachedWaistRailPts[cachedWaistRailPts.Length - 1];
+            Vector3 aftIn = cachedInnerWaistRailPts[cachedInnerWaistRailPts.Length - 1];
+            Gizmos.DrawLine(aftOut, aftIn);
+            Gizmos.DrawLine(MirrorX(aftOut), MirrorX(aftIn));
+        }
+
+        if (cachedWaistStanchions != null)
+        {
+            Gizmos.color = waistStanchionColor;
+            for (int j = 0; j < cachedWaistStanchions.Count; j++)
+            {
+                Vector3[] st = cachedWaistStanchions[j];
+                if (st != null && st.Length >= 2)
+                {
+                    Gizmos.DrawLine(st[0], st[1]);
+                    Gizmos.DrawLine(MirrorX(st[0]), MirrorX(st[1]));
+                }
+            }
+        }
+    }
 
     private void BuildTierBulwarks()
     {
+        int maxActiveTier = GetMaxActiveTierLevel();
+
         for (int t = 0; t < tiers.Count; t++)
         {
             UpperDeckTier tier = tiers[t];
@@ -1977,20 +2365,50 @@ public class UpperDeckCurves : MonoBehaviour
             }
             tier.cachedBulwarkStanchions.Clear();
 
-            // The Bulwark Cap Rail IS TopLineCurves
+            bool isSupremeTier = (tier.tierLevel >= maxActiveTier);
+
             for (int i = 0; i <= steps; i++)
             {
                 float frac = (float)i / steps;
                 float z = Mathf.Lerp(maxBowZ, minSternZ, frac);
 
-                Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : new Vector3(2f, 6.3f, z);
-                Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine) ? topLineCurves.GetInnerTopLinePointAtZ(z, true) : tlPt;
+                if (isSupremeTier)
+                {
+                    // Supreme tier rail conforms to TopLineCurves
+                    Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : new Vector3(2f, 6.3f, z);
+                    Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine) ? topLineCurves.GetInnerTopLinePointAtZ(z, true) : tlPt;
 
-                tier.cachedBulwarkRailPts[i] = tlPt;
-                tier.cachedInnerBulwarkRailPts[i] = inTlPt;
+                    tier.cachedBulwarkRailPts[i] = tlPt;
+                    tier.cachedInnerBulwarkRailPts[i] = inTlPt;
+                }
+                else
+                {
+                    // Intermediate tier rail: deck waterway Y + bulwarkHeight, sampled along transverse frames
+                    UpperDeckSegment seg = GetSegmentAtZ(tier, z);
+                    float deckEdgeY;
+                    if (seg != null)
+                    {
+                        float centerY = EvaluateCenterlineSheerYAtZ(tier, seg, t, z);
+                        float camber = EvaluateCamberAtZ(tier, seg, z);
+                        deckEdgeY = centerY - camber;
+                    }
+                    else
+                    {
+                        float mainY = (mainDeckCurves != null) ? mainDeckCurves.GetDeckSurfacePoint(0, z).y : 3f;
+                        deckEdgeY = mainY + tier.tierHeadroom;
+                    }
+
+                    float railY = deckEdgeY + tier.bulwarkHeight;
+                    float railX = GetInnerHullHalfBreadthAt(railY, z);
+                    float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
+                    float inRailX = Mathf.Max(0.01f, railX - spacing);
+
+                    tier.cachedBulwarkRailPts[i] = new Vector3(railX, railY, z);
+                    tier.cachedInnerBulwarkRailPts[i] = new Vector3(inRailX, railY, z);
+                }
             }
 
-            // Build vertical stanchions along active segments (from deck waterway up to TopLine Cap Rail)
+            // Build vertical stanchions along active segments
             int stanchionIdx = 0;
             if (tier.segments != null)
             {
@@ -2017,7 +2435,18 @@ public class UpperDeckCurves : MonoBehaviour
                         float deckEdgeX = GetInnerHullHalfBreadthAt(deckEdgeY, zStanchion);
 
                         Vector3 bottomPt = new Vector3(deckEdgeX, deckEdgeY, zStanchion);
-                        Vector3 topPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + 1.1f, zStanchion);
+                        Vector3 topPt;
+
+                        if (isSupremeTier)
+                        {
+                            topPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + tier.bulwarkHeight, zStanchion);
+                        }
+                        else
+                        {
+                            float railY = deckEdgeY + tier.bulwarkHeight;
+                            float railX = GetInnerHullHalfBreadthAt(railY, zStanchion);
+                            topPt = new Vector3(railX, railY, zStanchion);
+                        }
 
                         if (topPt.y - bottomPt.y < 0.15f) continue;
 
@@ -2067,6 +2496,8 @@ public class UpperDeckCurves : MonoBehaviour
                 DrawSegmentGizmos(tier, seg, t);
             }
         }
+
+        DrawWaistBulwark();
     }
 
     private Vector3 MirrorX(Vector3 v)
@@ -2078,71 +2509,78 @@ public class UpperDeckCurves : MonoBehaviour
     {
         if (!tier.showBulwark || tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length < 2) return;
 
+        int maxActiveTier = GetMaxActiveTierLevel();
+        bool isSupremeTier = (tier.tierLevel >= maxActiveTier);
+
         int count = tier.cachedBulwarkRailPts.Length;
         float bulwarkSternZ = tier.cachedBulwarkRailPts[count - 1].z;
         float bulwarkBowZ = tier.cachedBulwarkRailPts[0].z;
 
-        for (int i = 0; i < count - 1; i++)
+        // Supreme tier bulwark rail is drawn by TopLineCurves (solid over active deck, dashed over open air).
+        // Intermediate tiers draw their intermediate bulwark rail here.
+        bool shouldDrawRail = !isSupremeTier || (topLineCurves == null || !topLineCurves.gameObject.activeInHierarchy);
+
+        if (shouldDrawRail)
         {
-            Vector3 ptA = tier.cachedBulwarkRailPts[i];
-            Vector3 ptB = tier.cachedBulwarkRailPts[i + 1];
-            Vector3 inPtA = tier.cachedInnerBulwarkRailPts[i];
-            Vector3 inPtB = tier.cachedInnerBulwarkRailPts[i + 1];
-
-            float zMid = (ptA.z + ptB.z) * 0.5f;
-            bool isSolid = DoesSegmentSpanZ(tier, zMid, bulwarkBowZ, bulwarkSternZ);
-
-            if (isSolid)
+            for (int i = 0; i < count - 1; i++)
             {
-                // Solid Cap Rail for active deck spans (— in diagram)
-                Gizmos.color = tier.bulwarkRailColor;
-                Gizmos.DrawLine(ptA, ptB);
-                Gizmos.DrawLine(MirrorX(ptA), MirrorX(ptB));
+                Vector3 ptA = tier.cachedBulwarkRailPts[i];
+                Vector3 ptB = tier.cachedBulwarkRailPts[i + 1];
+                Vector3 inPtA = tier.cachedInnerBulwarkRailPts[i];
+                Vector3 inPtB = tier.cachedInnerBulwarkRailPts[i + 1];
 
-                // Inner Rail
-                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.85f);
-                Gizmos.DrawLine(inPtA, inPtB);
-                Gizmos.DrawLine(MirrorX(inPtA), MirrorX(inPtB));
-            }
-            else
-            {
-                // Dashed/dotted line for open waist (… in diagram)
+                float zMid = (ptA.z + ptB.z) * 0.5f;
+                bool isSolid = DoesSegmentSpanZ(tier, zMid, bulwarkBowZ, bulwarkSternZ);
+
+                if (isSolid)
+                {
+                    // Solid Cap Rail for active deck spans
+                    Gizmos.color = tier.bulwarkRailColor;
+                    Gizmos.DrawLine(ptA, ptB);
+                    Gizmos.DrawLine(MirrorX(ptA), MirrorX(ptB));
+
+                    // Inner Rail
+                    Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.85f);
+                    Gizmos.DrawLine(inPtA, inPtB);
+                    Gizmos.DrawLine(MirrorX(inPtA), MirrorX(inPtB));
+                }
+                else
+                {
+                    // Dashed line outside segment span
 #if UNITY_EDITOR
-                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.50f);
-                Handles.DrawDottedLine(ptA, ptB, 4f);
-                Handles.DrawDottedLine(MirrorX(ptA), MirrorX(ptB), 4f);
+                    Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                    Handles.DrawDottedLine(ptA, ptB, 4f);
+                    Handles.DrawDottedLine(MirrorX(ptA), MirrorX(ptB), 4f);
 
-                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.40f);
-                Handles.DrawDottedLine(inPtA, inPtB, 4f);
-                Handles.DrawDottedLine(MirrorX(inPtA), MirrorX(inPtB), 4f);
+                    Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                    Handles.DrawDottedLine(inPtA, inPtB, 4f);
+                    Handles.DrawDottedLine(MirrorX(inPtA), MirrorX(inPtB), 4f);
 #endif
+                }
+            }
+
+            // Draw Transom Closure for intermediate deck
+            int lastIdx = count - 1;
+            Vector3 lastOut = tier.cachedBulwarkRailPts[lastIdx];
+            Vector3 lastIn = tier.cachedInnerBulwarkRailPts[lastIdx];
+            float aftZMid = (lastOut.z + tier.cachedBulwarkRailPts[lastIdx - 1].z) * 0.5f;
+            bool spansTransom = DoesSegmentSpanZ(tier, lastOut.z, bulwarkBowZ, bulwarkSternZ) || DoesSegmentSpanZ(tier, aftZMid, bulwarkBowZ, bulwarkSternZ);
+
+            if (spansTransom)
+            {
+                Gizmos.color = tier.bulwarkRailColor;
+                Gizmos.DrawLine(lastOut, MirrorX(lastOut));
+
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.85f);
+                Gizmos.DrawLine(lastIn, MirrorX(lastIn));
+
+                Gizmos.color = tier.bulwarkRailColor;
+                Gizmos.DrawLine(lastOut, lastIn);
+                Gizmos.DrawLine(MirrorX(lastOut), MirrorX(lastIn));
             }
         }
 
-        // Draw Transom Closure (Transverse outer & inner crossbars, and end caps) when bulwark reaches transom
-        int lastIdx = count - 1;
-        Vector3 lastOut = tier.cachedBulwarkRailPts[lastIdx];
-        Vector3 lastIn = tier.cachedInnerBulwarkRailPts[lastIdx];
-        float aftZMid = (lastOut.z + tier.cachedBulwarkRailPts[lastIdx - 1].z) * 0.5f;
-        bool spansTransom = DoesSegmentSpanZ(tier, lastOut.z, bulwarkBowZ, bulwarkSternZ) || DoesSegmentSpanZ(tier, aftZMid, bulwarkBowZ, bulwarkSternZ);
-
-        if (spansTransom)
-        {
-            // Outer Transom Rail crossbar
-            Gizmos.color = tier.bulwarkRailColor;
-            Gizmos.DrawLine(lastOut, MirrorX(lastOut));
-
-            // Inner Transom Rail crossbar
-            Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.85f);
-            Gizmos.DrawLine(lastIn, MirrorX(lastIn));
-
-            // Transom Cap Rail End Caps (Outer to Inner)
-            Gizmos.color = tier.bulwarkRailColor;
-            Gizmos.DrawLine(lastOut, lastIn);
-            Gizmos.DrawLine(MirrorX(lastOut), MirrorX(lastIn));
-        }
-
-        // Draw vertical bulwark framing / stanchions along active spans
+        // Draw vertical bulwark framing / stanchions along active spans (connecting deck waterway to cap rail)
         if (tier.cachedBulwarkStanchions != null)
         {
             Gizmos.color = tier.bulwarkStanchionColor;
@@ -2445,6 +2883,20 @@ public class UpperDeckCurvesEditor : Editor
         }
 
         EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Main Deck Waist Bulwark", EditorStyles.boldLabel);
+        targetScript.showWaistBulwark = EditorGUILayout.Toggle("Show Waist Bulwark", targetScript.showWaistBulwark);
+        if (targetScript.showWaistBulwark)
+        {
+            EditorGUI.indentLevel++;
+            targetScript.waistBulwarkHeight = EditorGUILayout.Slider("Waist Bulwark Height", targetScript.waistBulwarkHeight, 0.40f, 2.50f);
+            targetScript.waistBulwarkThickness = EditorGUILayout.Slider("Waist Bulwark Thickness", targetScript.waistBulwarkThickness, 0.05f, 0.40f);
+            targetScript.waistStanchionCount = EditorGUILayout.IntSlider("Waist Stanchion Count", targetScript.waistStanchionCount, 2, 24);
+            targetScript.waistBulwarkColor = EditorGUILayout.ColorField("Waist Bulwark Color", targetScript.waistBulwarkColor);
+            targetScript.waistStanchionColor = EditorGUILayout.ColorField("Waist Stanchion Color", targetScript.waistStanchionColor);
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(8);
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Recalculate & Refresh Curves"))
         {
@@ -2587,6 +3039,33 @@ public class UpperDeckCurvesEditor : Editor
                     Handles.Label(seg.aftCenterTip + Vector3.up * 0.2f, aftLabel);
                     Handles.Label(seg.midshipCenter + Vector3.up * 0.25f, $"{seg.segmentName} Headroom: {seg.actualHeadroom:F2}m");
                 }
+            }
+        }
+
+        // 4. Interactive Scene Handle for Main Deck Waist Bulwark Height
+        if (targetScript.showWaistBulwark && targetScript.waistMidshipHandlePt != Vector3.zero && targetScript.GetWaistExtents(out float wFwdZ, out float wAftZ))
+        {
+            float wMidZ = (wFwdZ + wAftZ) * 0.5f;
+            Vector3 handlePos = targetScript.waistMidshipHandlePt;
+            float handleSize = HandleUtility.GetHandleSize(handlePos) * 0.12f;
+            Handles.color = targetScript.waistBulwarkColor;
+            EditorGUI.BeginChangeCheck();
+            Vector3 newPos = Handles.Slider(handlePos, Vector3.up, handleSize, Handles.DotHandleCap, 0.05f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(targetScript, "Change Waist Bulwark Height");
+                if (targetScript.mainDeckCurves != null)
+                {
+                    float floorY = targetScript.mainDeckCurves.GetDeckSurfacePoint(0, wMidZ).y;
+                    float camber = targetScript.mainDeckCurves.EvaluateDeckCamberAtZ(wMidZ);
+                    float edgeY = floorY - camber;
+                    targetScript.waistBulwarkHeight = Mathf.Clamp(newPos.y - edgeY, 0.40f, 2.50f);
+                    changed = true;
+                }
+            }
+            if (targetScript.showLabels)
+            {
+                Handles.Label(handlePos + Vector3.up * 0.2f, $"Waist Bulwark: {targetScript.waistBulwarkHeight:F2}m");
             }
         }
 

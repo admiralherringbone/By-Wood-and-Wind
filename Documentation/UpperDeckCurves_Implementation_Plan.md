@@ -190,5 +190,15 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 - [x] **Step 6.3**: **Scene View Interaction Polish** — Upgraded `OnSceneGUI` handle rendering with dynamic zoom scaling via `HandleUtility.GetHandleSize(pos)`, color feedback (green for flush boundary snaps, deck color for boundaries, yellow for elevation), and continuous `Undo.RecordObject` tracking.
 - [x] **Step 6.4**: **Git Version Control & Deployment** — Staged, committed, and pushed all validated scripts, architecture documents, and implementation plans cleanly to GitHub repository `origin/main`.
 
+---
+
+## 10. Execution Checklist (Phase 7: Classical Naval Draughting Architecture)
+
+- [x] **Step 7.1**: **TopLine Supreme Boundary & Dynamic Crown** — Implemented `SynchronizeTopLineElevation()` in `UpperDeckCurves.cs`. When higher-tier decks are active (e.g., Poop Deck at Tier 2), `SheerCurves.transomRakeHeight` automatically raises so `TopLineCurves` crowns the uppermost deck cap rail at the stern transom; returning to lower deck datum when superstructures are removed.
+- [x] **Step 7.2**: **Solid vs. Dashed Draughting Representation** — Implemented `IsHighestPhysicalDeckAtZ()` in `UpperDeckCurves.cs` and connected it to `TopLineCurves.cs`. `TopLineCurves` renders solid lines over physical upper deck bulwarks and dashed lines (`Vector3.Lerp(p0, p1, 0.5f)`) over open air spans (such as the waist or under elevated superstructures).
+- [x] **Step 7.3**: **Intermediate Tier Bulwarks & Framing Invariant** — Enforced that `BodyCurves` contains strictly two modifying control points in the upper works: $P_3$ (Breadth) and $P_4$ (TopLine). Intermediate upper decks (Tier 1 Quarterdeck under a Poop Deck) are non-modifying sampling points along the transverse frame arc, rendering their own bulwark rail and stanchions at tier height without perturbing master hull lofting.
+- [x] **Step 7.4**: **Independent Main Deck Waist Bulwark** — Implemented `showWaistBulwark`, `waistBulwarkHeight` ($0.40\text{m}\text{--}2.50\text{m}$), `waistBulwarkThickness`, and `waistStanchionCount` in `UpperDeckCurves.cs`. The waist bulwark only renders across the open waist, is editable independently from upper decks via Inspector sliders and an interactive 3D Scene View handle at midship, and feeds into `HasBulwarkAtZ()` for downstream `SectionModelCurves` transverse station cuts.
+- [x] **Step 7.5**: **Dual Compiler & Scene Verification** — Verified both `Assembly-CSharp` and `Assembly-CSharp-Editor` Roslyn compilations pass with 0 errors.
+
 
 
