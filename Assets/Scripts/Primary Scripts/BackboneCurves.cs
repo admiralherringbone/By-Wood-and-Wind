@@ -258,12 +258,31 @@ public class BackboneCurves : MonoBehaviour
 
         UpdateCachedCurves();
 
+        float physBowY = (sheerCurves != null) ? sheerCurves.GetPhysicalBowCapY() : stbdStemP3.y;
+        bool isCutBelowUpperStem = (stbdUpperStemTop.y > physBowY + 0.05f);
+
         // 1. Draw Starboard (+X) Backbone Profile Lines
         DrawCubicBezier(stbdStemP0, stbdStemP1, stbdStemP2, stbdStemP3, backboneColor);
         if (stbdUpperStemTop.y > stbdStemP3.y + 0.001f)
         {
-            Gizmos.color = backboneColor;
-            Gizmos.DrawLine(stbdStemP3, stbdUpperStemTop);
+            if (!isCutBelowUpperStem)
+            {
+                Gizmos.color = backboneColor;
+                Gizmos.DrawLine(stbdStemP3, stbdUpperStemTop);
+            }
+            else
+            {
+                Vector3 basePt = stbdStemP3;
+                if (physBowY > basePt.y + 0.001f)
+                {
+                    Gizmos.color = backboneColor;
+                    Vector3 physPt = new Vector3(basePt.x, physBowY, basePt.z);
+                    Gizmos.DrawLine(basePt, physPt);
+                    basePt = physPt;
+                }
+                Color dashStbd = new Color(backboneColor.r, backboneColor.g, backboneColor.b, 0.40f);
+                DrawDashedLine(basePt, stbdUpperStemTop, dashStbd);
+            }
         }
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(stbdKeelStart, stbdKeelEnd);
@@ -275,8 +294,24 @@ public class BackboneCurves : MonoBehaviour
         DrawCubicBezier(portStemP0, portStemP1, portStemP2, portStemP3, portColor);
         if (portUpperStemTop.y > portStemP3.y + 0.001f)
         {
-            Gizmos.color = portColor;
-            Gizmos.DrawLine(portStemP3, portUpperStemTop);
+            if (!isCutBelowUpperStem)
+            {
+                Gizmos.color = portColor;
+                Gizmos.DrawLine(portStemP3, portUpperStemTop);
+            }
+            else
+            {
+                Vector3 basePt = portStemP3;
+                if (physBowY > basePt.y + 0.001f)
+                {
+                    Gizmos.color = portColor;
+                    Vector3 physPt = new Vector3(basePt.x, physBowY, basePt.z);
+                    Gizmos.DrawLine(basePt, physPt);
+                    basePt = physPt;
+                }
+                Color dashPort = new Color(portColor.r, portColor.g, portColor.b, 0.40f);
+                DrawDashedLine(basePt, portUpperStemTop, dashPort);
+            }
         }
         Gizmos.color = new Color(0.8f, 0.8f, 0.1f);
         Gizmos.DrawLine(portKeelStart, portKeelEnd);
@@ -287,7 +322,30 @@ public class BackboneCurves : MonoBehaviour
         Gizmos.color = new Color(1f, 0.9f, 0.1f, 0.6f);
         Gizmos.DrawLine(stbdStemP0, portStemP0);
         Gizmos.DrawLine(stbdStemP3, portStemP3);
-        if (stbdUpperStemTop.y > stbdStemP3.y + 0.001f) Gizmos.DrawLine(stbdUpperStemTop, portUpperStemTop);
+
+        if (stbdUpperStemTop.y > stbdStemP3.y + 0.001f)
+        {
+            if (!isCutBelowUpperStem)
+            {
+                Gizmos.color = new Color(1f, 0.9f, 0.1f, 0.6f);
+                Gizmos.DrawLine(stbdUpperStemTop, portUpperStemTop);
+            }
+            else
+            {
+                // Physical crossbar capping the stem timbers at physicalBowY
+                if (physBowY > stbdStemP3.y + 0.001f)
+                {
+                    Vector3 stbdPhys = new Vector3(stbdStemP3.x, physBowY, stbdStemP3.z);
+                    Vector3 portPhys = new Vector3(portStemP3.x, physBowY, portStemP3.z);
+                    Gizmos.color = new Color(1f, 0.9f, 0.1f, 0.6f);
+                    Gizmos.DrawLine(stbdPhys, portPhys);
+                }
+
+                // Semi-transparent crossbar at upperStemTop datum
+                Gizmos.color = new Color(1f, 0.9f, 0.1f, 0.25f);
+                Gizmos.DrawLine(stbdUpperStemTop, portUpperStemTop);
+            }
+        }
         Gizmos.DrawLine(stbdSternP0, portSternP0);
         Gizmos.DrawLine(stbdSternP3, portSternP3);
 
@@ -297,6 +355,8 @@ public class BackboneCurves : MonoBehaviour
         Gizmos.DrawSphere(stbdStemP3, 0.13f); Gizmos.DrawSphere(portStemP3, 0.13f);
         if (stbdUpperStemTop.y > stbdStemP3.y + 0.001f)
         {
+            Color sphereCol = isCutBelowUpperStem ? new Color(1f, 0.9f, 0.1f, 0.40f) : Color.yellow;
+            Gizmos.color = sphereCol;
             Gizmos.DrawSphere(stbdUpperStemTop, 0.12f); Gizmos.DrawSphere(portUpperStemTop, 0.12f);
         }
 
@@ -312,6 +372,24 @@ public class BackboneCurves : MonoBehaviour
             Handles.Label(stbdSternP3 + Vector3.up * 0.2f, "Backbone Stern Post Top", labelStyle);
         }
 #endif
+    }
+
+    private void DrawDashedLine(Vector3 p0, Vector3 p1, Color color, float dashLength = 0.20f)
+    {
+        float totalDist = Vector3.Distance(p0, p1);
+        if (totalDist < 0.001f) return;
+
+        int segments = Mathf.Max(2, Mathf.RoundToInt(totalDist / dashLength));
+        Gizmos.color = color;
+        Vector3 prev = p0;
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = (float)i / segments;
+            Vector3 curr = Vector3.Lerp(p0, p1, t);
+            Vector3 half = Vector3.Lerp(prev, curr, 0.5f);
+            Gizmos.DrawLine(prev, half);
+            prev = curr;
+        }
     }
 
     private void DrawCubicBezier(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color color, int segments = 30)

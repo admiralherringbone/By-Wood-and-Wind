@@ -20,6 +20,8 @@ public class SheerCurves : MonoBehaviour
 {
     [Header("Linked Plans")]
     public BreadthCurves breadthCurves;
+    [Tooltip("Reference to UpperDeckCurves for upper deck elevations and physical cap rail queries.")]
+    public UpperDeckCurves upperDeckCurves;
 
 
     [Header("Gizmo Settings")]
@@ -142,7 +144,10 @@ public class SheerCurves : MonoBehaviour
         try
         {
             if (breadthCurves == null) breadthCurves = GetComponentInParent<BreadthCurves>();
-        if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
+            if (breadthCurves == null) breadthCurves = FindFirstObjectByType<BreadthCurves>();
+
+            if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
+            if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
 
 
         // Enforce Y-Axis Height Restriction: Stem Top (stemP3) and Stern Post Top (sternP3) Y cannot be lower than Midship Apex Y (BreadthCurves.fwdP3.y)
@@ -519,8 +524,31 @@ public class SheerCurves : MonoBehaviour
         DrawCubicBezier(stemP0, stemP1, stemP2, stemP3, profileColor);
         if (upperStemTop.y > stemP3.y + 0.001f)
         {
-            Gizmos.color = profileColor;
-            Gizmos.DrawLine(stemP3, upperStemTop);
+            float physBowY = GetPhysicalBowCapY();
+            Vector3 basePt = stemP3;
+            Vector3 topPt = upperStemTop;
+
+            if (physBowY >= topPt.y - 0.05f)
+            {
+                // Physical structure reaches upper stem top: 100% solid
+                Gizmos.color = profileColor;
+                Gizmos.DrawLine(basePt, topPt);
+            }
+            else
+            {
+                // Solid portion up to physicalBowY (if physicalBowY is above base stem)
+                if (physBowY > basePt.y + 0.001f)
+                {
+                    Gizmos.color = profileColor;
+                    Vector3 physCapPt = new Vector3(basePt.x, physBowY, basePt.z);
+                    Gizmos.DrawLine(basePt, physCapPt);
+                    basePt = physCapPt;
+                }
+
+                // Dashed portion from physicalBowY up to upperStemTop
+                Color dashCol = new Color(profileColor.r, profileColor.g, profileColor.b, 0.40f);
+                DrawDashedLine(basePt, topPt, dashCol);
+            }
         }
 
 
@@ -600,7 +628,13 @@ public class SheerCurves : MonoBehaviour
             Gizmos.DrawSphere(stemP1, 0.11f); // Stem Bottom Control Arm
             Gizmos.DrawSphere(stemP2, 0.11f); // Stem Top Control Arm
             Gizmos.DrawSphere(stemP3, 0.18f); // Stem Top (Bow Tip)
-            if (upperStemTop.y > stemP3.y + 0.001f) Gizmos.DrawSphere(upperStemTop, 0.16f); // Upper Stem Post Top
+            if (upperStemTop.y > stemP3.y + 0.001f)
+            {
+                float physBowY = GetPhysicalBowCapY();
+                bool isAbove = (upperStemTop.y > physBowY + 0.05f);
+                Gizmos.color = isAbove ? new Color(profileColor.r, profileColor.g, profileColor.b, 0.40f) : profileColor;
+                Gizmos.DrawSphere(upperStemTop, 0.16f); // Upper Stem Post Top
+            }
 
             Gizmos.color = Color.cyan;
             Gizmos.DrawSphere(sternP0, 0.14f);
@@ -632,6 +666,39 @@ public class SheerCurves : MonoBehaviour
 
         }
 #endif
+    }
+
+    /// <summary>
+    /// Returns the highest physical structural elevation of the hull/stem at the bow (station stemP3.z).
+    /// If an upper deck (e.g. Forecastle) exists at the bow, returns its cap rail or deck edge.
+    /// Otherwise returns stemP3.y (Main Deck sheer line).
+    /// </summary>
+    public float GetPhysicalBowCapY()
+    {
+        float physY = stemP3.y;
+        if (upperDeckCurves != null && upperDeckCurves.GetPhysicalHullCapAtZ(stemP3.z, out float pY, out _, out _, out _, out _))
+        {
+            physY = Mathf.Max(stemP3.y, pY);
+        }
+        return physY;
+    }
+
+    private void DrawDashedLine(Vector3 p0, Vector3 p1, Color color, float dashLength = 0.20f)
+    {
+        float totalDist = Vector3.Distance(p0, p1);
+        if (totalDist < 0.001f) return;
+
+        int segments = Mathf.Max(2, Mathf.RoundToInt(totalDist / dashLength));
+        Gizmos.color = color;
+        Vector3 prev = p0;
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = (float)i / segments;
+            Vector3 curr = Vector3.Lerp(p0, p1, t);
+            Vector3 half = Vector3.Lerp(prev, curr, 0.5f);
+            Gizmos.DrawLine(prev, half);
+            prev = curr;
+        }
     }
 
     private void DrawCubicBezier(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color col, int segs = 30)
