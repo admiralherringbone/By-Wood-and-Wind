@@ -36,8 +36,6 @@ public class FashionCurves : MonoBehaviour
     [Tooltip("Reference to BackboneCurves for keel width half-offset.")]
     public BackboneCurves backboneCurves;
 
-    [Tooltip("Reference to UpperDeckCurves for upper deck bulwark transom corners.")]
-    public UpperDeckCurves upperDeckCurves;
 
     [Header("Fashion Curve Proportional Settings")]
     [Tooltip("Relative height ratio of the Transom Bilge Point (P2) between Floor Stern Tip (0.0) and Fashion Breadth (1.0). Synced to BodyCurves.")]
@@ -91,18 +89,7 @@ public class FashionCurves : MonoBehaviour
     [HideInInspector] public Vector3 innerPortP3;
     [HideInInspector] public Vector3 innerPortP4;
 
-    // --- CACHED UPPER DECK BULWARK TRANSOM CORNERS ---
-    [HideInInspector] public Vector3 stbdBulwarkP5; // Tier 1 Bulwark Starboard Transom Corner
-    [HideInInspector] public Vector3 portBulwarkP5;
-    [HideInInspector] public Vector3 innerStbdBulwarkP5;
-    [HideInInspector] public Vector3 innerPortBulwarkP5;
-    [HideInInspector] public bool hasTier1BulwarkCorner = false;
 
-    [HideInInspector] public Vector3 stbdBulwarkP6; // Tier 2 Bulwark Starboard Transom Corner
-    [HideInInspector] public Vector3 portBulwarkP6;
-    [HideInInspector] public Vector3 innerStbdBulwarkP6;
-    [HideInInspector] public Vector3 innerPortBulwarkP6;
-    [HideInInspector] public bool hasTier2BulwarkCorner = false;
 
     private Vector3[] cachedStbdOuterPts;
     private Vector3[] cachedPortOuterPts;
@@ -153,8 +140,6 @@ public class FashionCurves : MonoBehaviour
         if (backboneCurves == null) backboneCurves = GetComponentInParent<BackboneCurves>();
         if (backboneCurves == null) backboneCurves = FindFirstObjectByType<BackboneCurves>();
 
-        if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
-        if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
     }
 
     [ContextMenu("Reset Fashion Curves Profile")]
@@ -255,14 +240,6 @@ public class FashionCurves : MonoBehaviour
             portP3 = MirrorX(stbdP3);
             portP4 = MirrorX(stbdP4);
 
-            // Update Upper Deck Bulwark Transom Corners
-            hasTier1BulwarkCorner = false;
-            hasTier2BulwarkCorner = false;
-            if (upperDeckCurves != null)
-            {
-                hasTier1BulwarkCorner = upperDeckCurves.GetBulwarkTransomCorners(0, out stbdBulwarkP5, out portBulwarkP5, out innerStbdBulwarkP5, out innerPortBulwarkP5);
-                hasTier2BulwarkCorner = upperDeckCurves.GetBulwarkTransomCorners(1, out stbdBulwarkP6, out portBulwarkP6, out innerStbdBulwarkP6, out innerPortBulwarkP6);
-            }
 
             // Update BilgeCurves so its aftP2 reflects stbdP2 and its inner curve is synchronized
             if (bilgeCurves != null)
@@ -467,23 +444,7 @@ public class FashionCurves : MonoBehaviour
         if (pts != null && pts.Length >= 2)
         {
             if (targetY <= pts[0].y) return pts[0];
-            if (targetY >= pts[pts.Length - 1].y)
-            {
-                if (hasTier1BulwarkCorner && targetY > stbdP4.y)
-                {
-                    Vector3 baseCorner = (sideSign > 0f) ? stbdP4 : portP4;
-                    Vector3 topCorner = (sideSign > 0f) ? stbdBulwarkP5 : portBulwarkP5;
-                    if (hasTier2BulwarkCorner && targetY > stbdBulwarkP5.y)
-                    {
-                        baseCorner = topCorner;
-                        topCorner = (sideSign > 0f) ? stbdBulwarkP6 : portBulwarkP6;
-                    }
-                    float bDy = topCorner.y - baseCorner.y;
-                    float bFrac = (Mathf.Abs(bDy) > 0.0001f) ? Mathf.Clamp01((targetY - baseCorner.y) / bDy) : 0f;
-                    return Vector3.Lerp(baseCorner, topCorner, bFrac);
-                }
-                return pts[pts.Length - 1];
-            }
+            if (targetY >= pts[pts.Length - 1].y) return pts[pts.Length - 1];
 
             int low = 0;
             int high = pts.Length - 1;
@@ -528,23 +489,7 @@ public class FashionCurves : MonoBehaviour
         {
             // Stern profile rakes aft: pts[0].z >= targetZ >= pts[last].z
             if (targetZ >= pts[0].z) return pts[0];
-            if (targetZ <= pts[pts.Length - 1].z)
-            {
-                if (hasTier1BulwarkCorner && targetZ < stbdP4.z)
-                {
-                    Vector3 baseCorner = (sideSign > 0f) ? stbdP4 : portP4;
-                    Vector3 topCorner = (sideSign > 0f) ? stbdBulwarkP5 : portBulwarkP5;
-                    if (hasTier2BulwarkCorner && targetZ < stbdBulwarkP5.z)
-                    {
-                        baseCorner = topCorner;
-                        topCorner = (sideSign > 0f) ? stbdBulwarkP6 : portBulwarkP6;
-                    }
-                    float bDz = topCorner.z - baseCorner.z;
-                    float bFrac = (Mathf.Abs(bDz) > 0.0001f) ? Mathf.Clamp01((targetZ - baseCorner.z) / bDz) : 0f;
-                    return Vector3.Lerp(baseCorner, topCorner, bFrac);
-                }
-                return pts[pts.Length - 1];
-            }
+            if (targetZ <= pts[pts.Length - 1].z) return pts[pts.Length - 1];
 
             int low = 0;
             int high = pts.Length - 1;
@@ -887,23 +832,7 @@ public class FashionCurves : MonoBehaviour
         if (pts != null && pts.Length >= 2)
         {
             if (targetY <= pts[0].y) return pts[0];
-            if (targetY >= pts[pts.Length - 1].y)
-            {
-                if (hasTier1BulwarkCorner && targetY > innerStbdP4.y)
-                {
-                    Vector3 baseCorner = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
-                    Vector3 topCorner = (sideSign > 0f) ? innerStbdBulwarkP5 : innerPortBulwarkP5;
-                    if (hasTier2BulwarkCorner && targetY > innerStbdBulwarkP5.y)
-                    {
-                        baseCorner = topCorner;
-                        topCorner = (sideSign > 0f) ? innerStbdBulwarkP6 : innerPortBulwarkP6;
-                    }
-                    float inBDy = topCorner.y - baseCorner.y;
-                    float inBFrac = (Mathf.Abs(inBDy) > 0.0001f) ? Mathf.Clamp01((targetY - baseCorner.y) / inBDy) : 0f;
-                    return Vector3.Lerp(baseCorner, topCorner, inBFrac);
-                }
-                return pts[pts.Length - 1];
-            }
+            if (targetY >= pts[pts.Length - 1].y) return pts[pts.Length - 1];
 
             int low = 0;
             int high = pts.Length - 1;
@@ -947,23 +876,7 @@ public class FashionCurves : MonoBehaviour
         if (pts != null && pts.Length >= 2)
         {
             if (targetZ >= pts[0].z) return pts[0];
-            if (targetZ <= pts[pts.Length - 1].z)
-            {
-                if (hasTier1BulwarkCorner && targetZ < innerStbdP4.z)
-                {
-                    Vector3 baseCorner = (sideSign > 0f) ? innerStbdP4 : innerPortP4;
-                    Vector3 topCorner = (sideSign > 0f) ? innerStbdBulwarkP5 : innerPortBulwarkP5;
-                    if (hasTier2BulwarkCorner && targetZ < innerStbdBulwarkP5.z)
-                    {
-                        baseCorner = topCorner;
-                        topCorner = (sideSign > 0f) ? innerStbdBulwarkP6 : innerPortBulwarkP6;
-                    }
-                    float inBDz = topCorner.z - baseCorner.z;
-                    float inBFrac = (Mathf.Abs(inBDz) > 0.0001f) ? Mathf.Clamp01((targetZ - baseCorner.z) / inBDz) : 0f;
-                    return Vector3.Lerp(baseCorner, topCorner, inBFrac);
-                }
-                return pts[pts.Length - 1];
-            }
+            if (targetZ <= pts[pts.Length - 1].z) return pts[pts.Length - 1];
 
             int low = 0;
             int high = pts.Length - 1;
@@ -1057,31 +970,7 @@ public class FashionCurves : MonoBehaviour
         Gizmos.DrawLine(stbdP3, portP3);
         Gizmos.DrawLine(stbdP4, portP4);
 
-        // 3b. Draw Upper Deck Bulwark Extensions & Transom Corners
-        if (hasTier1BulwarkCorner)
-        {
-            // Outer Bulwark Corner Pillars (Fashion Curve extensions upward from TopLine corners)
-            Gizmos.color = fashionCurveColor;
-            Gizmos.DrawLine(stbdP4, stbdBulwarkP5);
-            Gizmos.color = portColor;
-            Gizmos.DrawLine(portP4, portBulwarkP5);
 
-            if (hasTier2BulwarkCorner)
-            {
-                Gizmos.color = fashionCurveColor;
-                Gizmos.DrawLine(stbdBulwarkP5, stbdBulwarkP6);
-                Gizmos.color = portColor;
-                Gizmos.DrawLine(portBulwarkP5, portBulwarkP6);
-            }
-
-            // Transverse Crossbar connecting Starboard and Port at bulwark transom corner
-            Gizmos.color = new Color(fashionCurveColor.r, fashionCurveColor.g, fashionCurveColor.b, 0.75f);
-            Gizmos.DrawLine(stbdBulwarkP5, portBulwarkP5);
-            if (hasTier2BulwarkCorner)
-            {
-                Gizmos.DrawLine(stbdBulwarkP6, portBulwarkP6);
-            }
-        }
 
         // 4. Draw Structural Node Spheres (P1..P4 & Counter Top lie EXACTLY on the curve)
         if (showNodeSpheres)
@@ -1114,18 +1003,6 @@ public class FashionCurves : MonoBehaviour
             Gizmos.color = Color.magenta;
             Gizmos.DrawSphere(portP4, 0.14f);
 
-            // Bulwark Corner Spheres
-            if (hasTier1BulwarkCorner)
-            {
-                Gizmos.color = new Color(0.95f, 0.40f, 0.15f, 0.95f);
-                Gizmos.DrawSphere(stbdBulwarkP5, 0.14f);
-                Gizmos.DrawSphere(portBulwarkP5, 0.14f);
-                if (hasTier2BulwarkCorner)
-                {
-                    Gizmos.DrawSphere(stbdBulwarkP6, 0.14f);
-                    Gizmos.DrawSphere(portBulwarkP6, 0.14f);
-                }
-            }
         }
 
         // 5. Draw Inner Fashion Timber Curve (Zero GC heap allocations)
@@ -1157,41 +1034,6 @@ public class FashionCurves : MonoBehaviour
             Gizmos.DrawLine(innerStbdP3, innerPortP3);
             Gizmos.DrawLine(innerStbdP4, innerPortP4);
 
-            // Inner Bulwark Corner Extensions & Crossbars
-            if (hasTier1BulwarkCorner)
-            {
-                Gizmos.color = innerLineColor;
-                Gizmos.DrawLine(innerStbdP4, innerStbdBulwarkP5);
-                Gizmos.color = portInnerColor;
-                Gizmos.DrawLine(innerPortP4, innerPortBulwarkP5);
-
-                if (hasTier2BulwarkCorner)
-                {
-                    Gizmos.color = innerLineColor;
-                    Gizmos.DrawLine(innerStbdBulwarkP5, innerStbdBulwarkP6);
-                    Gizmos.color = portInnerColor;
-                    Gizmos.DrawLine(innerPortBulwarkP5, innerPortBulwarkP6);
-                }
-
-                // Inner Bulwark Transverse Crossbar
-                Gizmos.color = innerLineColor;
-                Gizmos.DrawLine(innerStbdBulwarkP5, innerPortBulwarkP5);
-                if (hasTier2BulwarkCorner)
-                {
-                    Gizmos.DrawLine(innerStbdBulwarkP6, innerPortBulwarkP6);
-                }
-
-                // Top Cap Lines across bulwark transom corners (Outer to Inner)
-                Vector3 topStbdCorner = hasTier2BulwarkCorner ? stbdBulwarkP6 : stbdBulwarkP5;
-                Vector3 topInnerStbdCorner = hasTier2BulwarkCorner ? innerStbdBulwarkP6 : innerStbdBulwarkP5;
-                Vector3 topPortCorner = hasTier2BulwarkCorner ? portBulwarkP6 : portBulwarkP5;
-                Vector3 topInnerPortCorner = hasTier2BulwarkCorner ? innerPortBulwarkP6 : innerPortBulwarkP5;
-
-                Gizmos.color = innerLineColor;
-                Gizmos.DrawLine(topStbdCorner, topInnerStbdCorner);
-                Gizmos.color = portInnerColor;
-                Gizmos.DrawLine(topPortCorner, topInnerPortCorner);
-            }
 
             // Inner Transom Corner Spheres (matching corner colors)
             if (showNodeSpheres)
@@ -1219,17 +1061,6 @@ public class FashionCurves : MonoBehaviour
                 Gizmos.DrawSphere(innerStbdP4, 0.09f);
                 Gizmos.DrawSphere(innerPortP4, 0.09f);
 
-                if (hasTier1BulwarkCorner)
-                {
-                    Gizmos.color = innerLineColor;
-                    Gizmos.DrawSphere(innerStbdBulwarkP5, 0.09f);
-                    Gizmos.DrawSphere(innerPortBulwarkP5, 0.09f);
-                    if (hasTier2BulwarkCorner)
-                    {
-                        Gizmos.DrawSphere(innerStbdBulwarkP6, 0.09f);
-                        Gizmos.DrawSphere(innerPortBulwarkP6, 0.09f);
-                    }
-                }
             }
         }
 
@@ -1238,11 +1069,7 @@ public class FashionCurves : MonoBehaviour
         {
             GUIStyle labelStyle = GetCachedLabelStyle();
             Handles.Label(stbdP4 + Vector3.up * 0.18f, "Fashion TopLine / Transom Rake Top (u=1.00)", labelStyle);
-            if (hasTier1BulwarkCorner)
-            {
-                Handles.Label(stbdBulwarkP5 + Vector3.up * 0.18f, "Fashion Tier 1 Bulwark Corner", labelStyle);
-                if (hasTier2BulwarkCorner) Handles.Label(stbdBulwarkP6 + Vector3.up * 0.18f, "Fashion Tier 2 Bulwark Corner", labelStyle);
-            }
+
             if (sheerCurves != null && sheerCurves.enableCounter)
             {
                 GUIStyle counterLabelStyle = new GUIStyle(labelStyle);
@@ -1257,11 +1084,7 @@ public class FashionCurves : MonoBehaviour
             {
                 GUIStyle innerLabelStyle = GetCachedInnerLabelStyle();
                 Handles.Label(innerStbdP4 + Vector3.up * 0.12f, "Inner Fashion TopLine", innerLabelStyle);
-                if (hasTier1BulwarkCorner)
-                {
-                    Handles.Label(innerStbdBulwarkP5 + Vector3.up * 0.12f, "Inner Fashion Tier 1 Bulwark Corner", innerLabelStyle);
-                    if (hasTier2BulwarkCorner) Handles.Label(innerStbdBulwarkP6 + Vector3.up * 0.12f, "Inner Fashion Tier 2 Bulwark Corner", innerLabelStyle);
-                }
+
                 if (sheerCurves != null && sheerCurves.enableCounter)
                 {
                     GUIStyle innerCounterStyle = new GUIStyle(innerLabelStyle);

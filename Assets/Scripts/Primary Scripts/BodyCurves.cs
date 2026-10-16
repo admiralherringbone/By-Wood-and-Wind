@@ -31,12 +31,7 @@ public class BodyCurves : MonoBehaviour
     [Tooltip("Reference to TopLineCurves for TopLine Body Point (p4) 3D spatial points.")]
     public TopLineCurves topLineCurves;
 
-    [Tooltip("Reference to UpperDeckCurves for upper deck bulwark extensions and inner line scanting.")]
-    public UpperDeckCurves upperDeckCurves;
 
-    [Header("Upper Deck Bulwark Extension")]
-    [Tooltip("Relative tumblehome ratio for upper deck bulwark extensions (1.0 = continue natural topsides slope, < 1.0 = more upright, > 1.0 = steeper inward slope).")]
-    [Range(0f, 2f)] public float bulwarkTumblehomeScale = 1.0f;
 
     [Header("Keel & Master Dimensions")]
     [Tooltip("Physical Keel half-width offset (starts at keelWidth / 2).")]
@@ -87,13 +82,7 @@ public class BodyCurves : MonoBehaviour
     [HideInInspector] public Vector3 cachedP2;
     [HideInInspector] public Vector3 cachedP3;
     [HideInInspector] public Vector3 cachedP4;
-    [HideInInspector] public Vector3 cachedP5; // Tier 1 Bulwark Top point at midships
-    [HideInInspector] public Vector3 cachedP6; // Tier 2 Bulwark Top point at midships
-    [HideInInspector] public Vector3 cachedInnerP5;
-    [HideInInspector] public Vector3 cachedInnerP6;
-    [HideInInspector] public bool hasUpperBulwark = false;
-    [HideInInspector] public bool hasUpperBulwarkAtMidships = false;
-    [HideInInspector] public bool hasTier2Bulwark = false;
+
     [HideInInspector] public int changeVersion = 0;
 
     private Vector3[] cachedStbdOuterPts;
@@ -161,8 +150,6 @@ public class BodyCurves : MonoBehaviour
         if (topLineCurves == null) topLineCurves = GetComponentInParent<TopLineCurves>();
         if (topLineCurves == null) topLineCurves = FindFirstObjectByType<TopLineCurves>();
 
-        if (upperDeckCurves == null) upperDeckCurves = GetComponentInParent<UpperDeckCurves>();
-        if (upperDeckCurves == null) upperDeckCurves = FindFirstObjectByType<UpperDeckCurves>();
     }
 
     public virtual void UpdateCachedCurves()
@@ -186,31 +173,7 @@ public class BodyCurves : MonoBehaviour
             cachedP3 = master.p3;
             cachedP4 = master.p4;
 
-            // Evaluate Upper Deck Bulwark Nodes at Midships (p5 for Tier 1, p6 for Tier 2)
-            hasUpperBulwark = (upperDeckCurves != null && upperDeckCurves.HasAnyActiveTier());
-            hasUpperBulwarkAtMidships = false;
-            hasTier2Bulwark = false;
 
-            if (hasUpperBulwark)
-            {
-                float dyTopsides = cachedP4.y - cachedP3.y;
-                float dxTopsides = cachedP4.x - cachedP3.x;
-                float slope = (dyTopsides > 0.001f) ? (dxTopsides / dyTopsides) * bulwarkTumblehomeScale : 0f;
-
-                float bH1 = upperDeckCurves.tiers[0].bulwarkHeight;
-                cachedP5 = new Vector3(cachedP4.x + bH1 * slope, cachedP4.y + bH1, midZ);
-                cachedInnerP5 = cachedP5 + new Vector3(-topInnerLineSpacing, 0f, 0f);
-
-                hasUpperBulwarkAtMidships = upperDeckCurves.DoesSegmentSpanZ(0, midZ);
-
-                if (upperDeckCurves.tiers.Count > 1 && upperDeckCurves.tiers[1] != null)
-                {
-                    hasTier2Bulwark = true;
-                    float bH2 = upperDeckCurves.tiers[1].bulwarkHeight;
-                    cachedP6 = new Vector3(cachedP5.x + bH2 * slope, cachedP5.y + bH2, midZ);
-                    cachedInnerP6 = cachedP6 + new Vector3(-topInnerLineSpacing, 0f, 0f);
-                }
-            }
 
             if (bilgeCurves != null)
             {
@@ -557,13 +520,7 @@ public class BodyCurves : MonoBehaviour
 
     public float GetMaxHullTopY(float z)
     {
-        if (upperDeckCurves != null && upperDeckCurves.HasAnyActiveTier())
-        {
-            float bulwarkH = upperDeckCurves.GetTotalBulwarkHeightAboveTopLine();
-            float topY = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z).y : cachedP4.y;
-            return topY + bulwarkH;
-        }
-        return (cachedP4.y > cachedP0.y) ? cachedP4.y : (cachedP0.y + 3f);
+        return (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z).y : ((cachedP4.y > cachedP0.y) ? cachedP4.y : (cachedP0.y + 3f));
     }
 
     /// <summary>
@@ -587,20 +544,7 @@ public class BodyCurves : MonoBehaviour
     /// </summary>
     public Vector3 GetInnerNodePosition(int nodeIndex, float z, float sideSign = 1f)
     {
-        if (nodeIndex == 5)
-        {
-            if (hasUpperBulwark)
-            {
-                return (sideSign >= 0f) ? cachedInnerP5 : new Vector3(-cachedInnerP5.x, cachedInnerP5.y, cachedInnerP5.z);
-            }
-        }
-        else if (nodeIndex == 6)
-        {
-            if (hasTier2Bulwark)
-            {
-                return (sideSign >= 0f) ? cachedInnerP6 : new Vector3(-cachedInnerP6.x, cachedInnerP6.y, cachedInnerP6.z);
-            }
-        }
+
 
         SectionNodes nodes = GetSectionNodesAtZ(z, sideSign);
         Vector3[] outerNodesArr = new Vector3[] { nodes.p0, nodes.p1, nodes.p2, nodes.p3, nodes.p4 };
@@ -796,87 +740,7 @@ public class BodyCurves : MonoBehaviour
             Handles.Label(nodes.p4 + new Vector3(0.08f, 0, 0), " p4: TopLine Body Point", labelStyle);
         }
 
-        // Draw Upper Deck Bulwark Extensions (p5 for Tier 1, p6 for Tier 2)
-        if (hasUpperBulwark)
-        {
-            Vector3 p4 = nodes.p4;
-            Vector3 p5 = (sideSign >= 0f) ? cachedP5 : new Vector3(-cachedP5.x, cachedP5.y, cachedP5.z);
-            Vector3 inP5 = (sideSign >= 0f) ? cachedInnerP5 : new Vector3(-cachedInnerP5.x, cachedInnerP5.y, cachedInnerP5.z);
 
-            if (hasUpperBulwarkAtMidships)
-            {
-                // Solid line when deck spans midships (e.g. 2-decker)
-                Gizmos.color = color;
-                Gizmos.DrawLine(p4, p5);
-
-                if (showInnerLine)
-                {
-                    Gizmos.color = innerLineColor;
-                    float p4Spacing = GetInnerLineSpacingAtY(p4.y);
-                    Vector3 inP4 = p4 + new Vector3(-sideSign * p4Spacing, 0f, 0f);
-                    Gizmos.DrawLine(inP4, inP5);
-                    Gizmos.DrawLine(p5, inP5);
-                }
-            }
-            else
-            {
-                // Dotted/dashed guide line when midships is an open waist (: in diagram)
-#if UNITY_EDITOR
-                Handles.color = new Color(color.r, color.g, color.b, 0.75f);
-                Handles.DrawDottedLine(p4, p5, 3f);
-
-                if (showInnerLine)
-                {
-                    Handles.color = new Color(innerLineColor.r, innerLineColor.g, innerLineColor.b, 0.60f);
-                    float p4Spacing = GetInnerLineSpacingAtY(p4.y);
-                    Vector3 inP4 = p4 + new Vector3(-sideSign * p4Spacing, 0f, 0f);
-                    Handles.DrawDottedLine(inP4, inP5, 3f);
-                    Handles.DrawDottedLine(p5, inP5, 3f);
-                }
-#endif
-            }
-
-            Gizmos.color = new Color(0.95f, 0.40f, 0.15f, 0.95f);
-            Gizmos.DrawSphere(p5, 0.14f);
-
-#if UNITY_EDITOR
-            if (showLabels && sideSign > 0)
-            {
-                GUIStyle bLabelStyle = new GUIStyle();
-                bLabelStyle.normal.textColor = new Color(0.95f, 0.40f, 0.15f);
-                bLabelStyle.fontSize = 11;
-                bLabelStyle.fontStyle = FontStyle.Bold;
-                Handles.Label(p5 + new Vector3(0.08f, 0, 0), " p5: Upper Deck Bulwark Top", bLabelStyle);
-            }
-#endif
-
-            if (hasTier2Bulwark)
-            {
-                Vector3 p6 = (sideSign >= 0f) ? cachedP6 : new Vector3(-cachedP6.x, cachedP6.y, cachedP6.z);
-                Vector3 inP6 = (sideSign >= 0f) ? cachedInnerP6 : new Vector3(-cachedInnerP6.x, cachedInnerP6.y, cachedInnerP6.z);
-
-                Gizmos.color = new Color(0.95f, 0.65f, 0.15f, 0.95f);
-                Gizmos.DrawLine(p5, p6);
-                Gizmos.DrawSphere(p6, 0.14f);
-
-                if (showInnerLine)
-                {
-                    Gizmos.color = innerLineColor;
-                    Gizmos.DrawLine(inP5, inP6);
-                }
-
-#if UNITY_EDITOR
-                if (showLabels && sideSign > 0)
-                {
-                    GUIStyle b2LabelStyle = new GUIStyle();
-                    b2LabelStyle.normal.textColor = new Color(0.95f, 0.65f, 0.15f);
-                    b2LabelStyle.fontSize = 11;
-                    b2LabelStyle.fontStyle = FontStyle.Bold;
-                    Handles.Label(p6 + new Vector3(0.08f, 0, 0), " p6: Tier 2 Bulwark Top", b2LabelStyle);
-                }
-#endif
-            }
-        }
 #endif
     }
 

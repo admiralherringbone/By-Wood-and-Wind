@@ -136,9 +136,10 @@ Before tuning upper deck geometry, we must strip away the redundant upward exten
 
 ## 4. Immediate Execution Checklist (Phase 1)
 
-- [ ] **Step 1.1**: Clean up `FashionCurves.cs` (remove $P_5/P_6$ bulwark corners, extension lines, transverse crossbars, and above-$P_4$ interpolation).
-- [ ] **Step 1.2**: Clean up `SheerCurves.cs` (remove transom rake extensions `transomBulwarkP1/P2` and stem extensions `stemBulwarkP1/P2`).
-- [ ] **Step 1.3**: Clean up `BodyCurves.cs` (remove $P_5/P_6$ bulwark nodes, restore $P_4$ as supreme top node).
-- [ ] **Step 1.4**: Clean up `UpperDeckCurves.cs` (remove above-TopLine transom extrapolation, align cap rail directly with `TopLineCurves`).
-- [ ] **Step 1.5**: Verify compilation in Unity and check Scene view.
-- [ ] **Step 1.6**: Commit Phase 1 cleanup to Git.
+- [x] **Step 1.1**: Clean up `FashionCurves.cs` (remove $P_5/P_6$ bulwark corners, extension lines, transverse crossbars, and above-$P_4$ interpolation).
+- [x] **Step 1.2**: Clean up `SheerCurves.cs` (remove transom rake extensions `transomBulwarkP1/P2` and stem extensions `stemBulwarkP1/P2`).
+- [x] **Step 1.3**: Clean up `BodyCurves.cs` (remove $P_5/P_6$ bulwark nodes, restore $P_4$ as supreme top node).
+- [x] **Step 1.4**: Clean up `UpperDeckCurves.cs` (remove above-TopLine transom extrapolation, align cap rail directly with `TopLineCurves`).
+- [x] **Step 1.5**: Verify compilation in Unity and check Scene view.
+- [x] **Step 1.6**: Commit Phase 1 cleanup to Git.
+

@@ -425,17 +425,7 @@ public class UpperDeckCurves : MonoBehaviour
         {
             Vector3 inFashionPt = fashionCurves.GetInnerFashionPointAtY(elevationY, 1f);
 
-            // If elevation is above TopLine / Fashion top corner (innerStbdP4), extrapolate along transom rake angle
-            if (topLineCurves != null && elevationY > fashionCurves.innerStbdP4.y)
-            {
-                float dyAbove = elevationY - fashionCurves.innerStbdP4.y;
-                float transomSlope = 0f;
-                if (sheerCurves != null && Mathf.Abs(sheerCurves.transomP1.y - sheerCurves.transomP0.y) > 0.001f)
-                {
-                    transomSlope = (sheerCurves.transomP1.z - sheerCurves.transomP0.z) / (sheerCurves.transomP1.y - sheerCurves.transomP0.y);
-                }
-                return fashionCurves.innerStbdP4.z + transomSlope * dyAbove;
-            }
+
 
             return inFashionPt.z;
         }
@@ -1397,72 +1387,23 @@ public class UpperDeckCurves : MonoBehaviour
 
     public float GetTotalBulwarkHeightAboveTopLine()
     {
-        if (tiers == null || tiers.Count == 0) return 0f;
-        float total = 0f;
-        for (int t = 0; t < tiers.Count; t++)
-        {
-            if (tiers[t] != null && tiers[t].segments != null)
-            {
-                bool hasActive = false;
-                for (int s = 0; s < tiers[t].segments.Count; s++)
-                {
-                    if (tiers[t].segments[s] != null && tiers[t].segments[s].isEnabled)
-                    {
-                        hasActive = true;
-                        break;
-                    }
-                }
-                if (hasActive)
-                {
-                    total += tiers[t].bulwarkHeight;
-                }
-            }
-        }
-        return total;
+        return 0f;
     }
 
     public float GetTotalBulwarkHeightAtTier(int maxTierIndex)
     {
-        if (tiers == null || tiers.Count == 0) return 0f;
-        float total = 0f;
-        for (int t = 0; t <= maxTierIndex && t < tiers.Count; t++)
-        {
-            if (tiers[t] != null) total += tiers[t].bulwarkHeight;
-        }
-        return total;
+        return 0f;
     }
 
     /// <summary>
     /// Gets the furthest aft Z boundary of the bulwark cap rail for specified tier.
-    /// This corresponds to the Tier 1 Bulwark Transom Top point on the raked transom profile.
+    /// This corresponds to the TopLineCurves aft extremity.
     /// </summary>
     public float GetBulwarkTransomLimitZ(int tierIndex)
     {
-        if (tiers != null && tierIndex >= 0 && tierIndex < tiers.Count)
-        {
-            UpperDeckTier tier = tiers[tierIndex];
-            if (tier != null && tier.cachedBulwarkRailPts != null && tier.cachedBulwarkRailPts.Length > 0)
-            {
-                return tier.cachedBulwarkRailPts[tier.cachedBulwarkRailPts.Length - 1].z;
-            }
-        }
-
-        float bH = GetTotalBulwarkHeightAtTier(tierIndex);
-        Vector3 tlSternTip = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3 : topLineCurves.cachedAftP2) : new Vector3(1.5f, 7.4f, -13.5f);
-        float topSternY = tlSternTip.y + bH;
-        float minSternZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(topSternY) : -13.5f;
-        if (topLineCurves != null && sheerCurves != null)
-        {
-            topSternY = topLineCurves.GetTopLinePointAtZ(minSternZ).y + bH;
-            minSternZ = sheerCurves.GetSternProfileZAtY(topSternY);
-        }
-        return minSternZ;
+        return (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
     }
 
-    /// <summary>
-    /// Gets the furthest forward Z boundary of the bulwark cap rail for specified tier.
-    /// This corresponds to the Upper Stem Post extension at the bow.
-    /// </summary>
     public float GetBulwarkStemLimitZ(int tierIndex)
     {
         if (tiers != null && tierIndex >= 0 && tierIndex < tiers.Count)
@@ -1588,21 +1529,10 @@ public class UpperDeckCurves : MonoBehaviour
                     {
                         found = true;
                         Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : Vector3.zero;
-                        float bH = GetTotalBulwarkHeightAtTier(t);
-                        float curRailY = tlPt.y + bH;
-
-                        if (curRailY > highestRailY)
-                        {
-                            highestRailY = curRailY;
-                            float dy = (bodyCurves != null) ? (bodyCurves.cachedP4.y - bodyCurves.cachedP3.y) : 1f;
-                            float dx = (bodyCurves != null) ? (bodyCurves.cachedP4.x - bodyCurves.cachedP3.x) : 0f;
-                            float tumbleScale = (bodyCurves != null) ? bodyCurves.bulwarkTumblehomeScale : 1.0f;
-                            float slope = (dy > 0.001f) ? (dx / dy) * tumbleScale : 0f;
-                            railX = tlPt.x + bH * slope;
-
-                            float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
-                            inRailX = Mathf.Max(0.01f, railX - spacing);
-                        }
+                        highestRailY = tlPt.y;
+                        railX = tlPt.x;
+                        float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
+                        inRailX = Mathf.Max(0.01f, railX - spacing);
                     }
                 }
             }
@@ -1620,80 +1550,7 @@ public class UpperDeckCurves : MonoBehaviour
         return false;
     }
 
-    /// <summary>
-    /// Gets the 3D centerline point of the Bulwark Cap Rail at the Upper Stem Post bow tip for specified tier.
-    /// Used by SheerCurves to draw the vertical bow profile extension.
-    /// </summary>
-    public bool GetBulwarkBowProfilePoint(int tierIndex, out Vector3 bowPt)
-    {
-        bowPt = Vector3.zero;
-        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
-        UpperDeckTier tier = tiers[tierIndex];
-        if (tier == null || !tier.showBulwark || tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length == 0) return false;
 
-        float bowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : tier.cachedBulwarkRailPts[0].z;
-        bowPt = new Vector3(0f, tier.cachedBulwarkRailPts[0].y, bowZ);
-        return true;
-    }
-
-    /// <summary>
-    /// Gets the 3D centerline point of the Bulwark Cap Rail on the angled Transom Rake profile at the stern for specified tier.
-    /// Used by SheerCurves to draw the angled stern rake profile extension.
-    /// </summary>
-    public bool GetBulwarkSternProfilePoint(int tierIndex, out Vector3 sternPt)
-    {
-        sternPt = Vector3.zero;
-        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
-        UpperDeckTier tier = tiers[tierIndex];
-        if (tier == null || !tier.showBulwark || tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length == 0) return false;
-
-        int last = tier.cachedBulwarkRailPts.Length - 1;
-        sternPt = new Vector3(0f, tier.cachedBulwarkRailPts[last].y, tier.cachedBulwarkRailPts[last].z);
-        return true;
-    }
-
-    /// <summary>
-    /// Gets the 3D Starboard, Port, Inner Starboard, and Inner Port transom corners of the Bulwark Cap Rail for specified tier.
-    /// Used by FashionCurves to draw the fashion timber extension lines up to the bulwark rail.
-    /// </summary>
-    public bool GetBulwarkTransomCorners(int tierIndex, out Vector3 stbdCorner, out Vector3 portCorner, out Vector3 inStbdCorner, out Vector3 inPortCorner)
-    {
-        stbdCorner = Vector3.zero;
-        portCorner = Vector3.zero;
-        inStbdCorner = Vector3.zero;
-        inPortCorner = Vector3.zero;
-
-        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
-        UpperDeckTier tier = tiers[tierIndex];
-        if (tier == null || !tier.showBulwark) return false;
-
-        if (tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length == 0)
-        {
-            if (!isUpdatingCurves && !isInitialized)
-            {
-                EnsureInitialized();
-            }
-        }
-
-        if (tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length == 0) return false;
-
-        int last = tier.cachedBulwarkRailPts.Length - 1;
-        stbdCorner = tier.cachedBulwarkRailPts[last];
-        portCorner = MirrorX(stbdCorner);
-
-        if (tier.cachedInnerBulwarkRailPts != null && tier.cachedInnerBulwarkRailPts.Length > last)
-        {
-            inStbdCorner = tier.cachedInnerBulwarkRailPts[last];
-            inPortCorner = MirrorX(inStbdCorner);
-        }
-        else
-        {
-            inStbdCorner = stbdCorner;
-            inPortCorner = portCorner;
-        }
-
-        return true;
-    }
 
     private void BuildTierBulwarks()
     {
@@ -1702,18 +1559,8 @@ public class UpperDeckCurves : MonoBehaviour
             UpperDeckTier tier = tiers[t];
             if (tier == null) continue;
 
-            float maxBowZ = (sheerCurves != null) ? sheerCurves.stemP3.z : ((topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f);
-            float bH = GetTotalBulwarkHeightAtTier(t);
-
-            // Furthest aft limit follows the angled Transom Rake trajectory at rail elevation Y
-            Vector3 tlSternTip = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3 : topLineCurves.cachedAftP2) : new Vector3(1.5f, 7.4f, -13.5f);
-            float topSternY = tlSternTip.y + bH;
-            float minSternZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(topSternY) : -13.5f;
-            if (topLineCurves != null && sheerCurves != null)
-            {
-                topSternY = topLineCurves.GetTopLinePointAtZ(minSternZ).y + bH;
-                minSternZ = sheerCurves.GetSternProfileZAtY(topSternY);
-            }
+            float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f;
+            float minSternZ = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
 
             const int steps = 64;
             int totalPts = steps + 1;
@@ -1728,148 +1575,47 @@ public class UpperDeckCurves : MonoBehaviour
             }
             tier.cachedBulwarkStanchions.Clear();
 
-            float tumbleScale = (bodyCurves != null) ? bodyCurves.bulwarkTumblehomeScale : 1.0f;
-            float midDy = (bodyCurves != null) ? (bodyCurves.cachedP4.y - bodyCurves.cachedP3.y) : 1f;
-            float midDx = (bodyCurves != null) ? (bodyCurves.cachedP4.x - bodyCurves.cachedP3.x) : 0f;
-            float midSlope = (midDy > 0.001f) ? (midDx / midDy) * tumbleScale : 0f;
-
-            // 1. Pass 1: Build the complete, continuous Outer Bulwark Cap Rail curve
+            // The Bulwark Cap Rail IS TopLineCurves
             for (int i = 0; i <= steps; i++)
             {
                 float frac = (float)i / steps;
                 float z = Mathf.Lerp(maxBowZ, minSternZ, frac);
 
                 Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : new Vector3(2f, 6.3f, z);
-                float railY = tlPt.y + bH;
-                float railX = tlPt.x + bH * midSlope;
+                Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine) ? topLineCurves.GetInnerTopLinePointAtZ(z, true) : tlPt;
 
-                if (railX < 0.05f) railX = 0.05f;
-
-                // Fashion Curves boundary rule: Cap rail cannot drop below Fashion Curves
-                if (fashionCurves != null && z <= fashionCurves.stbdP1.z + 0.001f)
-                {
-                    Vector3 fashionPt = fashionCurves.GetFashionPointAtZ(z, 1f);
-                    if (railY < fashionPt.y) railY = fashionPt.y;
-                }
-
-                tier.cachedBulwarkRailPts[i] = new Vector3(railX, railY, z);
+                tier.cachedBulwarkRailPts[i] = tlPt;
+                tier.cachedInnerBulwarkRailPts[i] = inTlPt;
             }
 
-            // 2. Pass 2: Build the true unified Inner Bulwark Cap Rail parallel curve
-            // Anchored directly to BodyCurves at its respective bulwark height (node 5 for Tier 1, node 6 for Tier 2)
-            float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
-            int bulwarkNodeIndex = (t == 0) ? 5 : 6;
-            float absDeltaX = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
-            float deltaY = 0f;
-
-            if (bodyCurves != null && bodyCurves.showInnerLine)
-            {
-                Vector3 pOuter = (t == 0) ? bodyCurves.cachedP5 : bodyCurves.cachedP6;
-                Vector3 pInner = bodyCurves.GetInnerNodePosition(bulwarkNodeIndex, midZ, 1f);
-                float dX = pInner.x - pOuter.x;
-                if (Mathf.Abs(dX) > 0.001f)
-                {
-                    absDeltaX = Mathf.Abs(dX);
-                    deltaY = pInner.y - pOuter.y;
-                }
-            }
-
-            for (int i = 0; i <= steps; i++)
-            {
-                Vector3 outerPt = tier.cachedBulwarkRailPts[i];
-                Vector3 deriv;
-
-                if (i == 0)
-                {
-                    deriv = tier.cachedBulwarkRailPts[1] - outerPt;
-                }
-                else if (i == steps)
-                {
-                    deriv = outerPt - tier.cachedBulwarkRailPts[steps - 1];
-                }
-                else
-                {
-                    deriv = tier.cachedBulwarkRailPts[i + 1] - tier.cachedBulwarkRailPts[i - 1];
-                }
-
-                float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
-                Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
-
-                Vector3 normalOffset = new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
-
-                // At the transom (stern extremity), the inner rail must terminate on the inner transom plane
-                // (Z = minSternZ + absDeltaX) with exact uniform thickness absDeltaX, matching TopLineCurves and BreadthCurves.
-                Vector3 inPt;
-                const int blendSteps = 3;
-                if (i >= steps - blendSteps)
-                {
-                    float blend = (float)(i - (steps - blendSteps)) / blendSteps;
-                    Vector3 transomOffset = new Vector3(-absDeltaX, deltaY, absDeltaX);
-                    Vector3 blendedOffset = Vector3.Lerp(normalOffset, transomOffset, blend);
-                    inPt = outerPt + blendedOffset;
-                }
-                else
-                {
-                    inPt = outerPt + normalOffset;
-                }
-
-                // Fashion Curves boundary rule: Inner cap rail cannot drop below Fashion Curves
-                if (fashionCurves != null && outerPt.z <= fashionCurves.stbdP1.z + 0.001f)
-                {
-                    Vector3 inFashionPt = fashionCurves.GetInnerFashionPointAtZ(outerPt.z, 1f);
-                    if (inPt.y < inFashionPt.y) inPt.y = inFashionPt.y;
-                }
-
-                if (inPt.x < 0.01f) inPt.x = 0.01f;
-
-                tier.cachedInnerBulwarkRailPts[i] = inPt;
-            }
-
-            // Build vertical stanchions along active segments
+            // Build vertical stanchions along active segments (from deck waterway up to TopLine Cap Rail)
             if (tier.segments != null)
             {
-                float deckAftLimit = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
-                float deckFwdLimit = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f;
-
                 for (int s = 0; s < tier.segments.Count; s++)
                 {
                     UpperDeckSegment seg = tier.segments[s];
                     if (seg == null || !seg.isEnabled) continue;
 
-                    // Stanchions stand on the physical deck waterway. They cannot extend beyond the deck boundary.
-                    float segFwd = Mathf.Min(seg.forwardZ, deckFwdLimit);
-                    float segAft = Mathf.Max(seg.aftZ, deckAftLimit);
+                    float segFwd = seg.forwardZ;
+                    float segAft = seg.aftZ;
 
                     int count = Mathf.Max(2, tier.bulwarkStanchionCount);
                     for (int j = 0; j <= count; j++)
                     {
-                        // If segment is flush to transom, the transom corner is already
-                        // framed by FashionCurves (stbdP4 to stbdBulwarkP5). Do not place a redundant
-                        // vertical stanchion right on the transom rake corner.
                         if (seg.flushToTransom && j == count) continue;
-
-                        // If segment is flush to stem, the stem post frames the bow corner.
                         if (seg.flushToStem && j == 0) continue;
 
                         float frac = (float)j / count;
                         float zStanchion = Mathf.Lerp(segFwd, segAft, frac);
 
-                        Vector3 bottomPt = (t == 0)
-                            ? ((topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(2f, 6.3f, zStanchion))
-                            : ((GetBulwarkRailPointsAtZ(t - 1, zStanchion, out Vector3 lowerOuter, out _)) ? lowerOuter : new Vector3(2f, 6.3f, zStanchion));
+                        float deckCenterY = EvaluateCenterlineSheerYAtZ(tier, seg, t, zStanchion);
+                        float camber = EvaluateCamberAtZ(tier, seg, zStanchion);
+                        float deckEdgeY = deckCenterY - camber;
+                        float deckEdgeX = GetInnerHullHalfBreadthAt(deckEdgeY, zStanchion);
 
-                        GetBulwarkRailPointsAtZ(t, zStanchion, out Vector3 topPt, out _);
+                        Vector3 bottomPt = new Vector3(deckEdgeX, deckEdgeY, zStanchion);
+                        Vector3 topPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + 1.1f, zStanchion);
 
-                        // Strict Fashion Curves boundary rule:
-                        // No stanchion or upper deck line may ever drop below the Fashion Curves!
-                        if (fashionCurves != null && zStanchion <= fashionCurves.stbdP1.z + 0.001f)
-                        {
-                            Vector3 fashionPt = fashionCurves.GetFashionPointAtZ(zStanchion, 1f);
-                            if (bottomPt.y < fashionPt.y) bottomPt.y = fashionPt.y;
-                            if (bottomPt.z < fashionPt.z) bottomPt.z = fashionPt.z;
-                        }
-
-                        // Stanchion must have meaningful height (above floor / not degenerate)
                         if (topPt.y - bottomPt.y < 0.15f) continue;
 
                         tier.cachedBulwarkStanchions.Add(new Vector3[] { bottomPt, topPt });
