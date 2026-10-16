@@ -659,28 +659,6 @@ public class BreadthCurves : MonoBehaviour
         Vector3 pt = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                       : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
 
-        // For extrapolated projection line aft of transom corner (t >= 1.0), smoothly taper offset
-        // from Breadth Curves inner transom corner (waterline spacing) to TopLine Curves appropriate inner transom corner (topsides spacing)
-        if (t >= 1.0f && topLineCurves != null)
-        {
-            Vector3 innerBreadthTip = GetInnerBreadthSternTip(true);
-            Vector3 outerBreadthTip = cachedIsAftCubic ? cachedAftP3 : cachedAftP2;
-            Vector3 offsetStart = innerBreadthTip - outerBreadthTip;
-
-            Vector3 innerTopLineTip = topLineCurves.GetInnerTopLineSternTip(true);
-            float tTarget = GetAftBezierTAtExtrapolatedZ(innerTopLineTip.z);
-            Vector3 outerAtTarget = cachedIsAftCubic ? CalculateCubicBezierPoint(tTarget, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
-                                                    : CalculateQuadraticBezierPoint(tTarget, cachedAftP0, cachedAftP1, cachedAftP2);
-            Vector3 offsetEnd = innerTopLineTip - outerAtTarget;
-
-            float dt = tTarget - 1.0f;
-            float frac = (dt > 0.0001f) ? Mathf.Clamp01((t - 1.0f) / dt) : 1f;
-            Vector3 curOffset = Vector3.Lerp(offsetStart, offsetEnd, frac);
-            Vector3 innerProjPt = pt + curOffset;
-            if (innerProjPt.x < 0f) innerProjPt.x = 0f;
-
-            return starboard ? innerProjPt : MirrorX(innerProjPt);
-        }
 
         Vector3 deriv = cachedIsAftCubic ? CalculateCubicBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                          : CalculateQuadraticBezierDerivative(t, cachedAftP0, cachedAftP1, cachedAftP2);
@@ -1042,7 +1020,13 @@ public class BreadthCurves : MonoBehaviour
             innerLastStbd = innerPrevStbd;
             Vector3 innerLastPort = innerPrevPort;
 
-            float innerTargetZ = (topLineCurves != null) ? topLineCurves.GetInnerTopLineSternTip(true).z : targetZ;
+            Vector3 pOuter = cachedFwdP3;
+            Vector3 pInner = (bodyCurves != null && bodyCurves.showInnerLine)
+                ? bodyCurves.GetInnerNodePosition(3, cachedFwdP3.z, 1f)
+                : (pOuter + new Vector3(-innerLineSpacing, 0f, 0f));
+            float absDeltaX = Mathf.Abs(pInner.x - pOuter.x);
+
+            float innerTargetZ = targetZ + absDeltaX;
             float tInnerTarget = GetAftBezierTAtExtrapolatedZ(innerTargetZ);
 
             for (int i = 1; i <= steps; i++)
