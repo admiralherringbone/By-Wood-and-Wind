@@ -220,6 +220,7 @@ public class UpperDeckCurves : MonoBehaviour
     [System.NonSerialized] public Vector3[] cachedWaistRailPts;
     [System.NonSerialized] public Vector3[] cachedInnerWaistRailPts;
     [System.NonSerialized] public List<Vector3[]> cachedWaistStanchions = new List<Vector3[]>();
+    private readonly List<float> cachedTierZKnots = new List<float>(80);
 
     [Header("Interactive Scene Handles")]
     [Tooltip("Enable interactive 3D position handles in Scene view to move deck endpoints and boundaries.")]
@@ -1522,6 +1523,57 @@ public class UpperDeckCurves : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Computes continuous effective headroom for a tier at station Z, smoothly interpolating
+    /// across open breaks between segments if individual segments have custom headroom overrides.
+    /// </summary>
+    public float GetTierEffectiveHeadroomAtZ(UpperDeckTier tier, float z)
+    {
+        if (tier == null) return 2.05f;
+        if (tier.segments == null || tier.segments.Count == 0) return tier.tierHeadroom;
+
+        UpperDeckSegment fwdSeg = null;
+        UpperDeckSegment aftSeg = null;
+
+        for (int s = 0; s < tier.segments.Count; s++)
+        {
+            UpperDeckSegment seg = tier.segments[s];
+            if (seg == null || !seg.isEnabled) continue;
+
+            // Direct inclusion inside segment
+            if (z <= seg.forwardZ + 0.001f && z >= seg.aftZ - 0.001f)
+            {
+                return seg.overrideTierHeight ? seg.customHeadroom : tier.tierHeadroom;
+            }
+
+            if (seg.aftZ > z)
+            {
+                if (fwdSeg == null || seg.aftZ < fwdSeg.aftZ) fwdSeg = seg;
+            }
+            if (seg.forwardZ < z)
+            {
+                if (aftSeg == null || seg.forwardZ > aftSeg.forwardZ) aftSeg = seg;
+            }
+        }
+
+        float fwdH = (fwdSeg != null && fwdSeg.overrideTierHeight) ? fwdSeg.customHeadroom : tier.tierHeadroom;
+        float aftH = (aftSeg != null && aftSeg.overrideTierHeight) ? aftSeg.customHeadroom : tier.tierHeadroom;
+
+        if (fwdSeg != null && aftSeg != null)
+        {
+            float gapSpan = fwdSeg.aftZ - aftSeg.forwardZ;
+            if (gapSpan > 0.001f)
+            {
+                float t = Mathf.Clamp01((fwdSeg.aftZ - z) / gapSpan);
+                return Mathf.Lerp(fwdH, aftH, t);
+            }
+        }
+
+        if (fwdSeg != null) return fwdH;
+        if (aftSeg != null) return aftH;
+        return tier.tierHeadroom;
+    }
+
     public float EvaluateCenterlineSheerYAtZ(UpperDeckTier tier, UpperDeckSegment segment, int tierIndex, float z)
     {
         if (tier.snapToCeilingBoundary)
@@ -1533,7 +1585,7 @@ public class UpperDeckCurves : MonoBehaviour
             }
             else
             {
-                UpperDeckSegment supporting = GetSupportingSegment(segment);
+                UpperDeckSegment supporting = (segment != null) ? GetSupportingSegment(segment) : null;
                 if (supporting != null && tiers != null && tiers.Count > 0)
                 {
                     UpperDeckTier supTier = tiers[0];
@@ -1543,7 +1595,9 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
-        float headroom = segment.overrideTierHeight ? segment.customHeadroom : tier.tierHeadroom;
+        float headroom = (segment != null && segment.overrideTierHeight)
+            ? segment.customHeadroom
+            : GetTierEffectiveHeadroomAtZ(tier, z);
 
         // Base midship floor elevation
         float midFloorY = 3.5f;
@@ -1553,11 +1607,20 @@ public class UpperDeckCurves : MonoBehaviour
         }
         else
         {
-            UpperDeckSegment supporting = GetSupportingSegment(segment);
+            UpperDeckSegment supporting = (segment != null) ? GetSupportingSegment(segment) : null;
             if (supporting != null && tiers != null && tiers.Count > 0)
             {
                 float midZ = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.z : 0f;
                 midFloorY = EvaluateCenterlineSheerYAtZ(tiers[0], supporting, 0, midZ);
+            }
+            else if (tiers != null && tierIndex > 0 && tiers.Count >= tierIndex)
+            {
+                float accumMidY = (mainDeckCurves != null) ? mainDeckCurves.midshipCenter.y : 3.5f;
+                for (int prev = 0; prev < tierIndex; prev++)
+                {
+                    accumMidY += tiers[prev].tierHeadroom;
+                }
+                midFloorY = accumMidY;
             }
             else
             {
@@ -1904,11 +1967,33 @@ public class UpperDeckCurves : MonoBehaviour
         float spanZ = maxBowZ - minSternZ;
         if (spanZ < 0.001f) return false;
 
-        float tNorm = Mathf.Clamp01((maxBowZ - z) / spanZ);
-        float fIndex = tNorm * (outerPts.Length - 1);
-        int i0 = Mathf.Clamp(Mathf.FloorToInt(fIndex), 0, outerPts.Length - 2);
-        int i1 = i0 + 1;
-        float u = fIndex - i0;
+        if (z >= maxBowZ)
+        {
+            stbdRail = outerPts[0];
+            innerStbdRail = (innerPts != null && innerPts.Length > 0) ? innerPts[0] : stbdRail;
+            return true;
+        }
+        if (z <= minSternZ)
+        {
+            stbdRail = outerPts[outerPts.Length - 1];
+            innerStbdRail = (innerPts != null && innerPts.Length == outerPts.Length) ? innerPts[innerPts.Length - 1] : stbdRail;
+            return true;
+        }
+
+        // Binary search for knot interval [i0, i1] containing z (outerPts is sorted descending by Z)
+        int i0 = 0;
+        int i1 = outerPts.Length - 1;
+        while (i1 - i0 > 1)
+        {
+            int mid = (i0 + i1) / 2;
+            if (outerPts[mid].z >= z)
+                i0 = mid;
+            else
+                i1 = mid;
+        }
+
+        float dz = outerPts[i0].z - outerPts[i1].z;
+        float u = (dz > 0.0001f) ? Mathf.Clamp01((outerPts[i0].z - z) / dz) : 0f;
 
         stbdRail = Vector3.Lerp(outerPts[i0], outerPts[i1], u);
         innerStbdRail = (innerPts != null && innerPts.Length == outerPts.Length)
@@ -2505,8 +2590,42 @@ public class UpperDeckCurves : MonoBehaviour
             float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f;
             float minSternZ = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
 
-            const int steps = 64;
-            int totalPts = steps + 1;
+            cachedTierZKnots.Clear();
+            const int baseSteps = 64;
+            for (int i = 0; i <= baseSteps; i++)
+            {
+                float z = Mathf.Lerp(maxBowZ, minSternZ, (float)i / baseSteps);
+                cachedTierZKnots.Add(z);
+            }
+
+            // Insert exact boundary knots for active segments on this tier to prevent slanted step interpolation at breaks
+            if (tier.segments != null)
+            {
+                for (int s = 0; s < tier.segments.Count; s++)
+                {
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg == null || !seg.isEnabled) continue;
+
+                    if (seg.forwardZ < maxBowZ - 0.01f && seg.forwardZ > minSternZ + 0.01f)
+                        cachedTierZKnots.Add(seg.forwardZ);
+                    if (seg.aftZ < maxBowZ - 0.01f && seg.aftZ > minSternZ + 0.01f)
+                        cachedTierZKnots.Add(seg.aftZ);
+                }
+            }
+
+            // Sort descending (bow to stern)
+            cachedTierZKnots.Sort((a, b) => b.CompareTo(a));
+
+            // Deduplicate knots closer than 0.005m
+            for (int k = cachedTierZKnots.Count - 1; k > 0; k--)
+            {
+                if (Mathf.Abs(cachedTierZKnots[k] - cachedTierZKnots[k - 1]) < 0.005f)
+                {
+                    cachedTierZKnots.RemoveAt(k);
+                }
+            }
+
+            int totalPts = cachedTierZKnots.Count;
             if (tier.cachedBulwarkRailPts == null || tier.cachedBulwarkRailPts.Length != totalPts)
             {
                 tier.cachedBulwarkRailPts = new Vector3[totalPts];
@@ -2520,10 +2639,9 @@ public class UpperDeckCurves : MonoBehaviour
 
             bool isSupremeTier = (tier.tierLevel >= maxActiveTier);
 
-            for (int i = 0; i <= steps; i++)
+            for (int i = 0; i < totalPts; i++)
             {
-                float frac = (float)i / steps;
-                float z = Mathf.Lerp(maxBowZ, minSternZ, frac);
+                float z = cachedTierZKnots[i];
 
                 if (isSupremeTier)
                 {
@@ -2536,20 +2654,12 @@ public class UpperDeckCurves : MonoBehaviour
                 }
                 else
                 {
-                    // Intermediate tier rail: deck waterway Y + bulwarkHeight, sampled along transverse frames
-                    UpperDeckSegment seg = GetSegmentAtZ(tier, z);
-                    float deckEdgeY;
-                    if (seg != null)
-                    {
-                        float centerY = EvaluateCenterlineSheerYAtZ(tier, seg, t, z);
-                        float camber = EvaluateCamberAtZ(tier, seg, z);
-                        deckEdgeY = centerY - camber;
-                    }
-                    else
-                    {
-                        float mainY = (mainDeckCurves != null) ? mainDeckCurves.GetDeckSurfacePoint(0, z).y : 3f;
-                        deckEdgeY = mainY + tier.tierHeadroom;
-                    }
+                    // Unified continuous intermediate tier rail across the entire vessel:
+                    // Both active deck spans and open-air spans share the exact same fair centerline sheer,
+                    // proportional deck camber, and bulwark height, completely eliminating elevation and transverse kinks.
+                    float centerY = EvaluateCenterlineSheerYAtZ(tier, null, t, z);
+                    float camber = EvaluateCamberAtZ(tier, null, z);
+                    float deckEdgeY = centerY - camber;
 
                     float railY = deckEdgeY + tier.bulwarkHeight;
                     float railX = GetInnerHullHalfBreadthAt(railY, z);
@@ -2708,6 +2818,14 @@ public class UpperDeckCurves : MonoBehaviour
                     Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
                     Handles.DrawDottedLine(inPtA, inPtB, 4f);
                     Handles.DrawDottedLine(MirrorX(inPtA), MirrorX(inPtB), 4f);
+#else
+                    Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                    Gizmos.DrawLine(ptA, Vector3.Lerp(ptA, ptB, 0.5f));
+                    Gizmos.DrawLine(MirrorX(ptA), MirrorX(Vector3.Lerp(ptA, ptB, 0.5f)));
+
+                    Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                    Gizmos.DrawLine(inPtA, Vector3.Lerp(inPtA, inPtB, 0.5f));
+                    Gizmos.DrawLine(MirrorX(inPtA), MirrorX(Vector3.Lerp(inPtA, inPtB, 0.5f)));
 #endif
                 }
             }

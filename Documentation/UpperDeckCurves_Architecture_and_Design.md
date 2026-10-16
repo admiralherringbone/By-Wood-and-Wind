@@ -186,6 +186,18 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 - **Interactive Scene Handle**: An interactive 3D slider handle at midship allows immediate clicking and dragging of waist bulwark height directly in the Scene View.
 - **Downstream Conformance**: Integrated into `HasBulwarkAtZ()`, ensuring `SectionModelCurves` transverse frame cuts across the waist automatically conform to the waist bulwark rail.
 
+### 5. Seamless Intermediate Bulwark Rail Continuity & Knot Snapping
+- **Unified Sheer & Camber Formulation**:
+  Intermediate tier bulwark rails evaluate along a single, smooth mathematical sheer and camber surface across the entire length of the vessel:
+  $$Y_{\text{edge}}(z) = Y_{\text{centerlineSheer}}(z) - \text{camber}(z)$$
+  $$Y_{\text{rail}}(z) = Y_{\text{edge}}(z) + \text{tier.bulwarkHeight}$$
+  By evaluating this continuous formulation across both active segments and open spans, the rail avoids dropping camber or resetting sheer scaling at transitions, achieving $0.00\text{m}$ vertical ($\Delta Y$) and transverse ($\Delta X$) displacement between solid and dashed segments.
+- **Exact Boundary Knot Snapping**:
+  Segment transition coordinates (`seg.forwardZ`, `seg.aftZ`) are explicitly injected into the longitudinal knot polyline (`cachedTierZKnots`) and sorted descending. This ensures the solid rail terminates precisely at the breastwork bulkhead rather than slanting across discrete grid steps.
+- **Binary Search Polyline Interpolation**:
+  `GetBulwarkRailPointsAtZ()` utilizes a binary search across `cachedBulwarkRailPts` to locate the enclosing interval `[i0, i1]`, ensuring exact piecewise-linear interpolation regardless of non-uniform knot spacing.
+
+
 ---
 
 ## 8. Current Implementation Status & Integration
