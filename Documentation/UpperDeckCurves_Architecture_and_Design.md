@@ -171,7 +171,7 @@ Following classical 18th-century naval draughting principles, upper decks and bu
   - **Over Active Upper Decks (Forecastle, Poop Deck)**: `TopLineCurves` is drawn as a **solid line** representing the physical bulwark cap rail.
   - **Over Open Spans (Open Waist, lower deck gaps)**: `TopLineCurves` is drawn as a **dashed line** representing the continuing sheer profile through open air.
 - Evaluated via `upperDeckCurves.IsHighestPhysicalDeckAtZ(zMid)`: TopLine curves and inner offsets render solid where physical structure exists, and dashed (`Vector3.Lerp(p0, p1, 0.5f)`) where open to the air.
-- In `SectionModelCurves`, transverse frame cuts at stations across open air (where `IsHighestPhysicalDeckAtZ` is false) cleanly terminate at the physical bulwark rail (e.g. Main Deck waist bulwark at $4.60\text{m}$) rather than extending into thin air.
+- In `SectionModelCurves`, transverse frame cuts at all stations loft continuously from Keel ($P_0$) to TopLine Curves ($P_4$), mirroring the master `BodyCurves` section across the entire ship. Intermediate upper decks, waterways, and waist bulwarks sit cleanly between Breadth ($P_3$) and TopLine ($P_4$) as internal features, leaving the harmonic framing skeleton pure and unbroken.
 
 ### 3. Master Frame Invariant on `BodyCurves`
 - On `BodyCurves`, only **two curve-modifying control points** exist in the upper hull: $P_3$ (Breadth / Maximum Beam) and $P_4$ (TopLine / Rail).
@@ -184,7 +184,7 @@ Following classical 18th-century naval draughting principles, upper decks and bu
 - **`waistBulwarkHeight`**: Fully independent height adjustment ($0.40\text{m}\text{--}2.50\text{m}$, default $1.10\text{m}$), completely decoupled from Forecastle or Quarterdeck sheer and headroom.
 - **Visuals & Framing**: Renders solid cap rail, inner rail, and vertical framing stanchions (`waistStanchionCount`) across the waist span.
 - **Interactive Scene Handle**: An interactive 3D slider handle at midship allows immediate clicking and dragging of waist bulwark height directly in the Scene View.
-- **Downstream Conformance**: Integrated into `HasBulwarkAtZ()`, ensuring `SectionModelCurves` transverse frame cuts across the waist automatically conform to the waist bulwark rail.
+- **Downstream Conformance**: Positioned cleanly along the inner face of the hull framing between Main Deck and TopLine, providing safety railings without disrupting continuous frame lofting.
 
 ### 5. Seamless Intermediate Bulwark Rail Continuity & Knot Snapping
 - **Unified Sheer & Camber Formulation**:
