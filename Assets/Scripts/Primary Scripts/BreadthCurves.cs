@@ -355,7 +355,30 @@ public class BreadthCurves : MonoBehaviour
             float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
             Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
 
-            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            Vector3 innerPt;
+            if (i == 0)
+            {
+                // Unified Bow Corner Miter with Stem Face (inward normal = (0, -1)):
+                Vector2 nStem = new Vector2(0f, -1f);
+                Vector2 bisector = nStem + nXZ;
+                float bisectorLen = bisector.magnitude;
+                if (bisectorLen > 0.0001f)
+                {
+                    Vector2 uB = bisector / bisectorLen;
+                    float dotStem = -uB.y;
+                    float m = (dotStem > 0.15f) ? Mathf.Min(1.8f, 1.0f / dotStem) : 1.0f;
+                    innerPt = pt + new Vector3(absDeltaX * m * uB.x, deltaY, absDeltaX * m * uB.y);
+                }
+                else
+                {
+                    innerPt = pt + new Vector3(-absDeltaX, deltaY, -absDeltaX);
+                }
+            }
+            else
+            {
+                innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            }
+
             float minStemInnerX = (backboneCurves != null) ? Mathf.Max(0.05f, backboneCurves.keelWidth * 0.5f - absDeltaX) : 0.10f;
             if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
             else if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
@@ -868,6 +891,10 @@ public class BreadthCurves : MonoBehaviour
         if (cachedIsAftCubic) DrawCubicBezierCurve(MirrorX(cachedAftP0), MirrorX(cachedAftP1), MirrorX(cachedAftP2), MirrorX(cachedAftP3), portColor);
         else DrawQuadraticBezierCurve(MirrorX(cachedAftP0), MirrorX(cachedAftP1), MirrorX(cachedAftP2), portColor);
 
+        // Draw Stem Line connecting Starboard Bow Tip and Port Bow Tip
+        Gizmos.color = breadthCurveColor;
+        Gizmos.DrawLine(cachedFwdP0, MirrorX(cachedFwdP0));
+
         // Draw Transom Line connecting Starboard Transom Corner and Port Transom Corner
         if (!cachedIsAftCubic)
         {
@@ -891,13 +918,26 @@ public class BreadthCurves : MonoBehaviour
                 Gizmos.DrawLine(cachedPortInnerPts[i], cachedPortInnerPts[i + 1]);
             }
 
-            // Draw Inner Transom Connection Line
+            // Draw Inner Transom Connection Line and End Caps
             if (!cachedIsAftCubic)
             {
                 int last = cachedStbdInnerPts.Length - 1;
                 Gizmos.color = innerLineColor;
                 Gizmos.DrawLine(cachedStbdInnerPts[last], cachedPortInnerPts[last]);
+
+                // Transom timber end caps
+                Gizmos.DrawLine(cachedAftP2, cachedStbdInnerPts[last]);
+                Gizmos.color = portInnerColor;
+                Gizmos.DrawLine(MirrorX(cachedAftP2), cachedPortInnerPts[last]);
             }
+
+            // Draw Inner Stem Connection Line and End Caps
+            Gizmos.color = innerLineColor;
+            Gizmos.DrawLine(cachedStbdInnerPts[0], cachedPortInnerPts[0]);
+
+            Gizmos.DrawLine(cachedFwdP0, cachedStbdInnerPts[0]);
+            Gizmos.color = portInnerColor;
+            Gizmos.DrawLine(MirrorX(cachedFwdP0), cachedPortInnerPts[0]);
 
             // Inner Midship Point Sphere
             Gizmos.color = innerLineColor;

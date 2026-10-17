@@ -1935,11 +1935,59 @@ public class UpperDeckCurves : MonoBehaviour
     }
 
     /// <summary>
+    /// Computes the authoritative aft Z limit for a given tier's bulwark cap rail.
+    /// For supreme tiers (matching TopLineCurves), terminates at the supreme Transom Rake Top (cachedAftP2.z).
+    /// For intermediate tiers, terminates cleanly on the Fashion Curve at the tier's bulwark rail elevation.
+    /// </summary>
+    public float GetTierSternRailZ(UpperDeckTier tier, int tierIndex)
+    {
+        int maxActiveTier = GetMaxActiveTierLevel();
+        bool isSupremeTier = (tier != null && tier.tierLevel >= maxActiveTier);
+
+        if (isSupremeTier)
+        {
+            return (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
+        }
+
+        // Intermediate tier: iteratively solve for the exact intersection of the bulwark rail with the raked transom / fashion curve
+        float zStern = (fashionCurves != null) ? fashionCurves.stbdP1.z : -12f;
+        for (int iter = 0; iter < 4; iter++)
+        {
+            float centerY = EvaluateCenterlineSheerYAtZ(tier, null, tierIndex, zStern);
+            float camber = EvaluateCamberAtZ(tier, null, zStern);
+            float railY = centerY - camber + tier.bulwarkHeight;
+
+            if (fashionCurves != null)
+            {
+                zStern = fashionCurves.GetFashionPointAtY(railY, 1f).z;
+            }
+            else if (sheerCurves != null)
+            {
+                zStern = sheerCurves.GetSternProfileZAtY(railY);
+            }
+        }
+        return zStern;
+    }
+
+    /// <summary>
     /// Gets the furthest aft Z boundary of the bulwark cap rail for specified tier.
-    /// This corresponds to the TopLineCurves aft extremity.
+    /// Returns the exact station on TopLineCurves (for supreme tiers) or FashionCurves (for intermediate tiers).
     /// </summary>
     public float GetBulwarkTransomLimitZ(int tierIndex)
     {
+        if (tiers != null && tierIndex >= 0 && tierIndex < tiers.Count)
+        {
+            UpperDeckTier tier = tiers[tierIndex];
+            if (tier != null && tier.cachedBulwarkRailPts != null && tier.cachedBulwarkRailPts.Length > 0)
+            {
+                return tier.cachedBulwarkRailPts[tier.cachedBulwarkRailPts.Length - 1].z;
+            }
+            if (tier != null)
+            {
+                return GetTierSternRailZ(tier, tierIndex);
+            }
+        }
+
         return (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
     }
 
@@ -2668,7 +2716,7 @@ public class UpperDeckCurves : MonoBehaviour
             if (tier == null) continue;
 
             float maxBowZ = (topLineCurves != null) ? topLineCurves.cachedFwdP0.z : 14f;
-            float minSternZ = (topLineCurves != null) ? (topLineCurves.cachedIsAftCubic ? topLineCurves.cachedAftP3.z : topLineCurves.cachedAftP2.z) : -13.5f;
+            float minSternZ = GetTierSternRailZ(tier, t);
 
             cachedTierZKnots.Clear();
             const int baseSteps = 64;
@@ -2718,6 +2766,7 @@ public class UpperDeckCurves : MonoBehaviour
             tier.cachedBulwarkStanchions.Clear();
 
             bool isSupremeTier = (tier.tierLevel >= maxActiveTier);
+            float hw = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : ((bodyCurves != null) ? (bodyCurves.keelWidth * 0.5f) : 0.25f);
 
             // 1. Build Outer Bulwark Cap Rail
             for (int i = 0; i < totalPts; i++)
@@ -2740,14 +2789,28 @@ public class UpperDeckCurves : MonoBehaviour
                     float deckEdgeY = centerY - camber;
 
                     float railY = deckEdgeY + tier.bulwarkHeight;
-                    float railX = GetOuterHullHalfBreadthAt(railY, z);
+                    float railX;
+
+                    if (i == 0)
+                    {
+                        railX = hw;
+                    }
+                    else if (i == totalPts - 1 && fashionCurves != null)
+                    {
+                        // Cleanly terminate exactly on the Fashion Curve boundary
+                        Vector3 fPt = fashionCurves.GetFashionPointAtY(railY, 1f);
+                        railX = Mathf.Abs(fPt.x);
+                    }
+                    else
+                    {
+                        railX = GetOuterHullHalfBreadthAt(railY, z);
+                    }
 
                     tier.cachedBulwarkRailPts[i] = new Vector3(railX, railY, z);
                 }
             }
 
-            // 2. Build True 2D Parallel Inner Bulwark Cap Rail (strictly uniform inward thickness)
-            float hw = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : ((bodyCurves != null) ? (bodyCurves.keelWidth * 0.5f) : 0.25f);
+            // 2. Build True 2D Parallel Inner Bulwark Cap Rail as a unified closed loop
             float thick = (tier.bulwarkThickness > 0.001f)
                 ? tier.bulwarkThickness
                 : ((bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.15f);
@@ -2756,22 +2819,99 @@ public class UpperDeckCurves : MonoBehaviour
             for (int i = 0; i < totalPts; i++)
             {
                 Vector3 pt = tier.cachedBulwarkRailPts[i];
-                Vector3 deriv;
+
                 if (i == 0)
-                    deriv = tier.cachedBulwarkRailPts[1] - tier.cachedBulwarkRailPts[0];
+                {
+                    // Bow Corner Miter:
+                    // Incoming edge = Stem Face from Port (-hw) to Starboard (+hw), inward normal = (0, -1) [pointing aft].
+                    // Outgoing edge = Starboard Rail from P0 to P1, inward normal = (dRail.z / len, -dRail.x / len).
+                    Vector3 dRail = tier.cachedBulwarkRailPts[1] - tier.cachedBulwarkRailPts[0];
+                    float lenR = Mathf.Sqrt(dRail.z * dRail.z + dRail.x * dRail.x);
+                    Vector2 nRail = (lenR > 0.0001f) ? new Vector2(dRail.z / lenR, -dRail.x / lenR) : new Vector2(-1f, 0f);
+
+                    Vector2 nStem = new Vector2(0f, -1f);
+                    Vector2 bisector = nStem + nRail;
+                    float bisectorLen = bisector.magnitude;
+
+                    Vector3 innerPt;
+                    if (bisectorLen > 0.0001f)
+                    {
+                        Vector2 uB = bisector / bisectorLen;
+                        // Miter factor so that innerPt.z = pt.z - thick exactly (dot with nStem: -uB.y)
+                        float dotStem = -uB.y;
+                        float m = (dotStem > 0.15f) ? Mathf.Min(1.8f, 1.0f / dotStem) : 1.0f;
+                        innerPt = pt + new Vector3(thick * m * uB.x, 0f, thick * m * uB.y);
+                    }
+                    else
+                    {
+                        innerPt = pt + new Vector3(-thick, 0f, -thick);
+                    }
+
+                    if (innerPt.x < minStemInnerX) innerPt.x = minStemInnerX;
+                    tier.cachedInnerBulwarkRailPts[0] = innerPt;
+                }
                 else if (i == totalPts - 1)
-                    deriv = tier.cachedBulwarkRailPts[totalPts - 1] - tier.cachedBulwarkRailPts[totalPts - 2];
+                {
+                    // Stern Corner Miter:
+                    // Incoming edge = Starboard Rail from P[N-2] to P[N-1], inward normal = (dRail.z / len, -dRail.x / len).
+                    // Outgoing edge = Transom Line from Starboard (+X) to Port (-X), inward normal = (0, 1) [pointing forward].
+                    Vector3 dRail = tier.cachedBulwarkRailPts[totalPts - 1] - tier.cachedBulwarkRailPts[totalPts - 2];
+                    float lenR = Mathf.Sqrt(dRail.z * dRail.z + dRail.x * dRail.x);
+                    Vector2 nRail = (lenR > 0.0001f) ? new Vector2(dRail.z / lenR, -dRail.x / lenR) : new Vector2(-1f, 0f);
+
+                    Vector2 nTransom = new Vector2(0f, 1f);
+                    Vector2 bisector = nRail + nTransom;
+                    float bisectorLen = bisector.magnitude;
+
+                    Vector3 innerPt;
+                    if (bisectorLen > 0.0001f)
+                    {
+                        Vector2 uB = bisector / bisectorLen;
+                        // Miter factor so that innerPt.z = pt.z + thick exactly (dot with nTransom: uB.y)
+                        float dotTransom = uB.y;
+                        float m = (dotTransom > 0.15f) ? Mathf.Min(1.8f, 1.0f / dotTransom) : 1.0f;
+                        innerPt = pt + new Vector3(thick * m * uB.x, 0f, thick * m * uB.y);
+                    }
+                    else
+                    {
+                        innerPt = pt + new Vector3(-thick, 0f, thick);
+                    }
+
+                    if (innerPt.x < 0f) innerPt.x = 0f;
+                    tier.cachedInnerBulwarkRailPts[totalPts - 1] = innerPt;
+                }
                 else
-                    deriv = tier.cachedBulwarkRailPts[i + 1] - tier.cachedBulwarkRailPts[i - 1];
+                {
+                    // Interior Rail Vertex Bisector Miter:
+                    Vector3 dIn = tier.cachedBulwarkRailPts[i] - tier.cachedBulwarkRailPts[i - 1];
+                    float lenIn = Mathf.Sqrt(dIn.z * dIn.z + dIn.x * dIn.x);
+                    Vector2 nIn = (lenIn > 0.0001f) ? new Vector2(dIn.z / lenIn, -dIn.x / lenIn) : new Vector2(-1f, 0f);
 
-                float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
-                Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+                    Vector3 dOut = tier.cachedBulwarkRailPts[i + 1] - tier.cachedBulwarkRailPts[i];
+                    float lenOut = Mathf.Sqrt(dOut.z * dOut.z + dOut.x * dOut.x);
+                    Vector2 nOut = (lenOut > 0.0001f) ? new Vector2(dOut.z / lenOut, -dOut.x / lenOut) : new Vector2(-1f, 0f);
 
-                Vector3 innerPt = pt + new Vector3(thick * nXZ.x, 0f, thick * nXZ.y);
-                if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
-                else if (innerPt.x < 0f) innerPt.x = 0f;
+                    Vector2 bisector = nIn + nOut;
+                    float bisectorLen = bisector.magnitude;
 
-                tier.cachedInnerBulwarkRailPts[i] = innerPt;
+                    Vector3 innerPt;
+                    if (bisectorLen > 0.0001f)
+                    {
+                        Vector2 uB = bisector / bisectorLen;
+                        float dot = uB.x * nIn.x + uB.y * nIn.y;
+                        float m = (dot > 0.15f) ? Mathf.Min(1.5f, 1.0f / dot) : 1.0f;
+                        innerPt = pt + new Vector3(thick * m * uB.x, 0f, thick * m * uB.y);
+                    }
+                    else
+                    {
+                        innerPt = pt + new Vector3(thick * nIn.x, 0f, thick * nIn.y);
+                    }
+
+                    if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
+                    else if (innerPt.x < 0f) innerPt.x = 0f;
+
+                    tier.cachedInnerBulwarkRailPts[i] = innerPt;
+                }
             }
 
             // Build vertical stanchions along active segments
@@ -2933,6 +3073,7 @@ public class UpperDeckCurves : MonoBehaviour
 
             if (spansTransom)
             {
+                // Solid Transom Outer and Inner Rail + End Timber Caps
                 Gizmos.color = tier.bulwarkRailColor;
                 Gizmos.DrawLine(lastOut, MirrorX(lastOut));
 
@@ -2943,6 +3084,22 @@ public class UpperDeckCurves : MonoBehaviour
                 Gizmos.DrawLine(lastOut, lastIn);
                 Gizmos.DrawLine(MirrorX(lastOut), MirrorX(lastIn));
             }
+            else
+            {
+#if UNITY_EDITOR
+                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                Handles.DrawDottedLine(lastOut, MirrorX(lastOut), 4f);
+
+                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                Handles.DrawDottedLine(lastIn, MirrorX(lastIn), 4f);
+#else
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                Gizmos.DrawLine(lastOut, Vector3.Lerp(lastOut, MirrorX(lastOut), 0.5f));
+
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                Gizmos.DrawLine(lastIn, Vector3.Lerp(lastIn, MirrorX(lastIn), 0.5f));
+#endif
+            }
 
             // Draw Stem Closure for intermediate deck
             Vector3 firstOut = tier.cachedBulwarkRailPts[0];
@@ -2952,9 +3109,64 @@ public class UpperDeckCurves : MonoBehaviour
 
             if (spansStem)
             {
+                // Solid Stem Outer and Inner Crossbars + End Timber Caps
+                Gizmos.color = tier.bulwarkRailColor;
+                Gizmos.DrawLine(firstOut, MirrorX(firstOut));
+
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.85f);
+                Gizmos.DrawLine(firstIn, MirrorX(firstIn));
+
                 Gizmos.color = tier.bulwarkRailColor;
                 Gizmos.DrawLine(firstOut, firstIn);
                 Gizmos.DrawLine(MirrorX(firstOut), MirrorX(firstIn));
+            }
+            else
+            {
+#if UNITY_EDITOR
+                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                Handles.DrawDottedLine(firstOut, MirrorX(firstOut), 4f);
+
+                Handles.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                Handles.DrawDottedLine(firstIn, MirrorX(firstIn), 4f);
+#else
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g, tier.bulwarkRailColor.b, 0.40f);
+                Gizmos.DrawLine(firstOut, Vector3.Lerp(firstOut, MirrorX(firstOut), 0.5f));
+
+                Gizmos.color = new Color(tier.bulwarkRailColor.r, tier.bulwarkRailColor.g * 0.8f, tier.bulwarkRailColor.b, 0.35f);
+                Gizmos.DrawLine(firstIn, Vector3.Lerp(firstIn, MirrorX(firstIn), 0.5f));
+#endif
+            }
+
+            // Draw timber caps at active segment boundaries (forward and aft breaks)
+            if (tier.segments != null)
+            {
+                for (int s = 0; s < tier.segments.Count; s++)
+                {
+                    UpperDeckSegment seg = tier.segments[s];
+                    if (seg == null || !seg.isEnabled) continue;
+
+                    // Forward break cap (if not flush to stem)
+                    if (seg.forwardZ < bulwarkBowZ - 0.05f)
+                    {
+                        if (GetBulwarkRailPointsAtZ(tierIndex, seg.forwardZ, out Vector3 fwdOut, out Vector3 fwdIn))
+                        {
+                            Gizmos.color = tier.bulwarkRailColor;
+                            Gizmos.DrawLine(fwdOut, fwdIn);
+                            Gizmos.DrawLine(MirrorX(fwdOut), MirrorX(fwdIn));
+                        }
+                    }
+
+                    // Aft break cap (if not flush to transom)
+                    if (seg.aftZ > bulwarkSternZ + 0.05f)
+                    {
+                        if (GetBulwarkRailPointsAtZ(tierIndex, seg.aftZ, out Vector3 aftOut, out Vector3 aftIn))
+                        {
+                            Gizmos.color = tier.bulwarkRailColor;
+                            Gizmos.DrawLine(aftOut, aftIn);
+                            Gizmos.DrawLine(MirrorX(aftOut), MirrorX(aftIn));
+                        }
+                    }
+                }
             }
         }
 

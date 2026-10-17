@@ -407,7 +407,30 @@ public class TopLineCurves : MonoBehaviour
             float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
             Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
 
-            Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            Vector3 innerPt;
+            if (i == 0)
+            {
+                // Unified Bow Corner Miter with Stem Face (inward normal = (0, -1)):
+                Vector2 nStem = new Vector2(0f, -1f);
+                Vector2 bisector = nStem + nXZ;
+                float bisectorLen = bisector.magnitude;
+                if (bisectorLen > 0.0001f)
+                {
+                    Vector2 uB = bisector / bisectorLen;
+                    float dotStem = -uB.y;
+                    float m = (dotStem > 0.15f) ? Mathf.Min(1.8f, 1.0f / dotStem) : 1.0f;
+                    innerPt = pt + new Vector3(absDeltaX * m * uB.x, deltaY, absDeltaX * m * uB.y);
+                }
+                else
+                {
+                    innerPt = pt + new Vector3(-absDeltaX, deltaY, -absDeltaX);
+                }
+            }
+            else
+            {
+                innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
+            }
+
             float minStemInnerX = (backboneCurves != null) ? Mathf.Max(0.05f, backboneCurves.keelWidth * 0.5f - absDeltaX) : 0.10f;
             if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
             else if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
@@ -840,10 +863,16 @@ public class TopLineCurves : MonoBehaviour
         if (cachedIsAftCubic) DrawCubicBezierCurve(MirrorX(cachedAftP0), MirrorX(cachedAftP1), MirrorX(cachedAftP2), MirrorX(cachedAftP3), portColor);
         else DrawQuadraticBezierCurve(MirrorX(cachedAftP0), MirrorX(cachedAftP1), MirrorX(cachedAftP2), portColor);
 
+        // Draw Stem Line connecting Starboard Bow Tip and Port Bow Tip
+        bool isPhysicalBow = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(cachedFwdP0.z);
+        Gizmos.color = isPhysicalBow ? topLineCurveColor : new Color(topLineCurveColor.r, topLineCurveColor.g, topLineCurveColor.b, 0.40f);
+        Gizmos.DrawLine(cachedFwdP0, MirrorX(cachedFwdP0));
+
         // Draw Transom Line connecting Starboard Transom Corner and Port Transom Corner
+        bool isPhysicalStern = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(cachedAftP2.z);
         if (!cachedIsAftCubic)
         {
-            Gizmos.color = topLineCurveColor;
+            Gizmos.color = isPhysicalStern ? topLineCurveColor : new Color(topLineCurveColor.r, topLineCurveColor.g, topLineCurveColor.b, 0.40f);
             Gizmos.DrawLine(cachedAftP2, MirrorX(cachedAftP2));
         }
 
@@ -892,16 +921,27 @@ public class TopLineCurves : MonoBehaviour
                 }
             }
 
-            // Draw Inner Transom Connection Line
+            // Draw Inner Transom Connection Line and End Caps
             if (!cachedIsAftCubic)
             {
                 int last = cachedStbdInnerPts.Length - 1;
-                Gizmos.color = innerLineColor;
+                Gizmos.color = isPhysicalStern ? innerLineColor : dashStbdColor;
                 Gizmos.DrawLine(cachedStbdInnerPts[last], cachedPortInnerPts[last]);
+
+                // Transom timber end caps
+                if (isPhysicalStern)
+                {
+                    Gizmos.color = innerLineColor;
+                    Gizmos.DrawLine(cachedAftP2, cachedStbdInnerPts[last]);
+                    Gizmos.color = portInnerColor;
+                    Gizmos.DrawLine(MirrorX(cachedAftP2), cachedPortInnerPts[last]);
+                }
             }
 
-            // Draw Stem Cap Rail Connection Lines
-            bool isPhysicalBow = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(cachedFwdP0.z);
+            // Draw Inner Stem Connection Line and End Caps
+            Gizmos.color = isPhysicalBow ? innerLineColor : dashStbdColor;
+            Gizmos.DrawLine(cachedStbdInnerPts[0], cachedPortInnerPts[0]);
+
             if (isPhysicalBow)
             {
                 Gizmos.color = innerLineColor;
