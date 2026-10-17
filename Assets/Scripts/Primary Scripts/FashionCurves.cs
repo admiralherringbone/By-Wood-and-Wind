@@ -344,8 +344,8 @@ public class FashionCurves : MonoBehaviour
         // 2. Lock Z to the Stern Profile at evaluated height Y
         float z = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(ptXY.y) : Mathf.Lerp(p1.z, p4.z, clampedT);
 
-        // 3. Restriction: Fashion Curve half-breadth must remain under the restriction of Breadth Curves and its Aft Projection Line
-        if (breadthCurves != null)
+        // 3. Restriction: Below Breadth (t <= 2/3), Fashion Curve half-breadth must remain under the restriction of Breadth Curves and its Aft Projection Line
+        if (breadthCurves != null && clampedT <= (2f / 3f))
         {
             float maxBreadthX = (z <= stbdP3.z)
                 ? breadthCurves.GetAftProjectionPointAtZ(z).x
@@ -599,17 +599,9 @@ public class FashionCurves : MonoBehaviour
         innerStbdP1 = (floorCurves != null) ? floorCurves.GetInnerFloorSternTip(true) : stbdP1;
         innerStbdP2 = (bilgeCurves != null) ? bilgeCurves.GetInnerBilgeSternTip(true) : stbdP2;
         innerStbdP3 = (breadthCurves != null) ? breadthCurves.GetInnerBreadthSternTip(true) : stbdP3;
-        innerStbdP4 = (topLineCurves != null) ? topLineCurves.GetInnerTopLineSternTip(true) : stbdP4;
+        innerStbdP4 = (topLineCurves != null && topLineCurves.showInnerLine) ? topLineCurves.GetInnerTopLineSternTip(true) : stbdP4;
 
-        // Restrict innerStbdP4 under Inner Breadth Projection Line and outer stbdP4
-        if (breadthCurves != null)
-        {
-            float maxInnerP4X = breadthCurves.GetInnerAftProjectionPointAtZ(innerStbdP4.z, true).x;
-            if (innerStbdP4.x > maxInnerP4X)
-            {
-                innerStbdP4.x = maxInnerP4X;
-            }
-        }
+        // Ensure innerStbdP4 remains inside outer stbdP4
         if (innerStbdP4.x > stbdP4.x)
         {
             innerStbdP4.x = stbdP4.x;
@@ -795,8 +787,8 @@ public class FashionCurves : MonoBehaviour
         float zStern = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(ptXY.y) : Mathf.Lerp(p1.z, p4.z, clampedT);
         float finalZ = zStern + deltaZ;
 
-        // 4. Restriction: Inner Fashion Curve half-breadth must remain under the restriction of the Inner Breadth Curves Projection Line
-        if (breadthCurves != null)
+        // 4. Restriction: Below Breadth (t <= 2/3), Inner Fashion Curve half-breadth must remain under the restriction of the Inner Breadth Curves Projection Line
+        if (breadthCurves != null && clampedT <= (2f / 3f))
         {
             float maxInnerBreadthX = (finalZ <= innerStbdP3.z)
                 ? breadthCurves.GetInnerAftProjectionPointAtZ(finalZ, true).x
