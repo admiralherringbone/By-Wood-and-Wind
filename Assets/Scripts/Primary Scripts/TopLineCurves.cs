@@ -408,7 +408,9 @@ public class TopLineCurves : MonoBehaviour
             Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
 
             Vector3 innerPt = pt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
-            if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
+            float minStemInnerX = (backboneCurves != null) ? Mathf.Max(0.05f, backboneCurves.keelWidth * 0.5f - absDeltaX) : 0.10f;
+            if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
+            else if (innerPt.x < 0f) innerPt.x = 0f; // Clip at centerline so it never crosses port
 
             cachedStbdInnerPts[i] = innerPt;
             cachedPortInnerPts[i] = MirrorX(innerPt);
@@ -572,7 +574,9 @@ public class TopLineCurves : MonoBehaviour
         Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
 
         Vector3 innerPt = outerPt + new Vector3(absDeltaX * nXZ.x, deltaY, absDeltaX * nXZ.y);
-        if (innerPt.x < 0f) innerPt.x = 0f;
+        float minStemInnerX = (backboneCurves != null) ? Mathf.Max(0.05f, backboneCurves.keelWidth * 0.5f - absDeltaX) : 0.10f;
+        if (innerPt.x < minStemInnerX && z >= cachedFwdP0.z - 0.2f) innerPt.x = minStemInnerX;
+        else if (innerPt.x < 0f) innerPt.x = 0f;
         return starboard ? innerPt : MirrorX(innerPt);
     }
 
@@ -894,6 +898,16 @@ public class TopLineCurves : MonoBehaviour
                 int last = cachedStbdInnerPts.Length - 1;
                 Gizmos.color = innerLineColor;
                 Gizmos.DrawLine(cachedStbdInnerPts[last], cachedPortInnerPts[last]);
+            }
+
+            // Draw Stem Cap Rail Connection Lines
+            bool isPhysicalBow = (upperDeckCurves == null) || upperDeckCurves.IsHighestPhysicalDeckAtZ(cachedFwdP0.z);
+            if (isPhysicalBow)
+            {
+                Gizmos.color = innerLineColor;
+                Gizmos.DrawLine(cachedFwdP0, cachedStbdInnerPts[0]);
+                Gizmos.color = portInnerColor;
+                Gizmos.DrawLine(MirrorX(cachedFwdP0), cachedPortInnerPts[0]);
             }
 
             // Inner Midship Point Sphere

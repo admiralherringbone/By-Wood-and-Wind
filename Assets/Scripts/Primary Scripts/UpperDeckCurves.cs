@@ -147,6 +147,9 @@ public class UpperDeckTier
     [Tooltip("Bulwark height extending upward from this tier's deck surface.")]
     [Range(0.3f, 2.5f)] public float bulwarkHeight = 1.10f;
 
+    [Tooltip("Bulwark rail thickness / inward spacing (in meters).")]
+    [Range(0.05f, 0.40f)] public float bulwarkThickness = 0.15f;
+
     [Header("Master Sheer & Camber")]
     [Tooltip("Ratio of Main Deck sheer curvature applied to this tier (0 = flat, 1 = same rise as Main Deck).")]
     [Range(0f, 1.5f)] public float sheerScale = 0.8f;
@@ -1151,9 +1154,13 @@ public class UpperDeckCurves : MonoBehaviour
             if (i == RESOLUTION && isAtStem)
             {
                 // Bow tip flush convergence hugging inner stem post
+                float hw = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : 0.25f;
+                float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
+                float minStemInnerX = Mathf.Max(0.05f, hw - spacing);
+
                 float innerStemX = (topLineCurves != null && topLineCurves.showInnerLine)
-                    ? Mathf.Abs(topLineCurves.GetInnerTopLineBowTip(true).x)
-                    : ((backboneCurves != null) ? backboneCurves.keelWidth * 0.5f : 0.15f);
+                    ? Mathf.Max(minStemInnerX, Mathf.Abs(topLineCurves.GetInnerTopLineBowTip(true).x))
+                    : minStemInnerX;
 
                 segment.cachedCenterlinePts[i] = new Vector3(0f, centerY, fwdZ);
                 segment.cachedStbdEdgePts[i] = new Vector3(innerStemX, edgeY, fwdZ);
@@ -2541,10 +2548,34 @@ public class UpperDeckCurves : MonoBehaviour
 
             float railY = edgeY + waistBulwarkHeight;
             float railX = GetOuterHullHalfBreadthAt(railY, z);
-            float inRailX = GetInnerHullHalfBreadthAt(railY, z);
 
             cachedWaistRailPts[i] = new Vector3(railX, railY, z);
-            cachedInnerWaistRailPts[i] = new Vector3(inRailX, railY, z);
+        }
+
+        // True 2D parallel inner waist rail (strictly uniform inward thickness)
+        float hwWaist = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : ((bodyCurves != null) ? (bodyCurves.keelWidth * 0.5f) : 0.25f);
+        float waistThick = Mathf.Max(0.05f, waistBulwarkThickness);
+        float minWaistInnerX = Mathf.Max(0.02f, hwWaist - waistThick);
+
+        for (int i = 0; i <= steps; i++)
+        {
+            Vector3 pt = cachedWaistRailPts[i];
+            Vector3 deriv;
+            if (i == 0)
+                deriv = cachedWaistRailPts[1] - cachedWaistRailPts[0];
+            else if (i == steps)
+                deriv = cachedWaistRailPts[steps] - cachedWaistRailPts[steps - 1];
+            else
+                deriv = cachedWaistRailPts[i + 1] - cachedWaistRailPts[i - 1];
+
+            float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+            Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+            Vector3 innerPt = pt + new Vector3(waistThick * nXZ.x, 0f, waistThick * nXZ.y);
+            if (innerPt.x < minWaistInnerX && i <= 1) innerPt.x = minWaistInnerX;
+            else if (innerPt.x < 0f) innerPt.x = 0f;
+
+            cachedInnerWaistRailPts[i] = innerPt;
         }
 
         float waistMidZ = (waistFwdZ + waistAftZ) * 0.5f;
@@ -2566,11 +2597,12 @@ public class UpperDeckCurves : MonoBehaviour
             float edgeY = floorY - camber;
             float edgeX = GetInnerHullHalfBreadthAt(edgeY, zSt);
 
-            float railY = edgeY + waistBulwarkHeight;
-            float inRailX = GetInnerHullHalfBreadthAt(railY, zSt);
-
             Vector3 botPt = new Vector3(edgeX, edgeY, zSt);
-            Vector3 topPt = new Vector3(inRailX, railY, zSt);
+
+            int idx0 = Mathf.Clamp(Mathf.FloorToInt(frac * steps), 0, steps - 1);
+            int idx1 = idx0 + 1;
+            float subFrac = (frac * steps) - idx0;
+            Vector3 topPt = Vector3.Lerp(cachedInnerWaistRailPts[idx0], cachedInnerWaistRailPts[idx1], subFrac);
 
             cachedWaistStanchions.Add(new Vector3[] { botPt, topPt });
         }
@@ -2687,6 +2719,7 @@ public class UpperDeckCurves : MonoBehaviour
 
             bool isSupremeTier = (tier.tierLevel >= maxActiveTier);
 
+            // 1. Build Outer Bulwark Cap Rail
             for (int i = 0; i < totalPts; i++)
             {
                 float z = cachedTierZKnots[i];
@@ -2695,10 +2728,7 @@ public class UpperDeckCurves : MonoBehaviour
                 {
                     // Supreme tier rail conforms to TopLineCurves
                     Vector3 tlPt = (topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(z) : new Vector3(2f, 6.3f, z);
-                    Vector3 inTlPt = (topLineCurves != null && topLineCurves.showInnerLine) ? topLineCurves.GetInnerTopLinePointAtZ(z, true) : tlPt;
-
                     tier.cachedBulwarkRailPts[i] = tlPt;
-                    tier.cachedInnerBulwarkRailPts[i] = inTlPt;
                 }
                 else
                 {
@@ -2711,11 +2741,37 @@ public class UpperDeckCurves : MonoBehaviour
 
                     float railY = deckEdgeY + tier.bulwarkHeight;
                     float railX = GetOuterHullHalfBreadthAt(railY, z);
-                    float inRailX = GetInnerHullHalfBreadthAt(railY, z);
 
                     tier.cachedBulwarkRailPts[i] = new Vector3(railX, railY, z);
-                    tier.cachedInnerBulwarkRailPts[i] = new Vector3(inRailX, railY, z);
                 }
+            }
+
+            // 2. Build True 2D Parallel Inner Bulwark Cap Rail (strictly uniform inward thickness)
+            float hw = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : ((bodyCurves != null) ? (bodyCurves.keelWidth * 0.5f) : 0.25f);
+            float thick = (tier.bulwarkThickness > 0.001f)
+                ? tier.bulwarkThickness
+                : ((bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.15f);
+            float minStemInnerX = Mathf.Max(0.02f, hw - thick);
+
+            for (int i = 0; i < totalPts; i++)
+            {
+                Vector3 pt = tier.cachedBulwarkRailPts[i];
+                Vector3 deriv;
+                if (i == 0)
+                    deriv = tier.cachedBulwarkRailPts[1] - tier.cachedBulwarkRailPts[0];
+                else if (i == totalPts - 1)
+                    deriv = tier.cachedBulwarkRailPts[totalPts - 1] - tier.cachedBulwarkRailPts[totalPts - 2];
+                else
+                    deriv = tier.cachedBulwarkRailPts[i + 1] - tier.cachedBulwarkRailPts[i - 1];
+
+                float len = Mathf.Sqrt(deriv.z * deriv.z + deriv.x * deriv.x);
+                Vector2 nXZ = (len > 0.0001f) ? new Vector2(deriv.z / len, -deriv.x / len) : new Vector2(-1f, 0f);
+
+                Vector3 innerPt = pt + new Vector3(thick * nXZ.x, 0f, thick * nXZ.y);
+                if (innerPt.x < minStemInnerX && i <= 2) innerPt.x = minStemInnerX;
+                else if (innerPt.x < 0f) innerPt.x = 0f;
+
+                tier.cachedInnerBulwarkRailPts[i] = innerPt;
             }
 
             // Build vertical stanchions along active segments
@@ -2747,18 +2803,7 @@ public class UpperDeckCurves : MonoBehaviour
                         Vector3 bottomPt = new Vector3(deckEdgeX, deckEdgeY, zStanchion);
                         Vector3 topPt;
 
-                        if (isSupremeTier)
-                        {
-                            topPt = (topLineCurves != null && topLineCurves.showInnerLine)
-                                ? topLineCurves.GetInnerTopLinePointAtZ(zStanchion, true)
-                                : ((topLineCurves != null) ? topLineCurves.GetTopLinePointAtZ(zStanchion) : new Vector3(deckEdgeX, deckEdgeY + tier.bulwarkHeight, zStanchion));
-                        }
-                        else
-                        {
-                            float railY = deckEdgeY + tier.bulwarkHeight;
-                            float inRailX = GetInnerHullHalfBreadthAt(railY, zStanchion);
-                            topPt = new Vector3(inRailX, railY, zStanchion);
-                        }
+                        GetBulwarkRailPointsAtZ(t, zStanchion, out _, out topPt);
 
                         if (topPt.y - bottomPt.y < 0.15f) continue;
 
@@ -2897,6 +2942,19 @@ public class UpperDeckCurves : MonoBehaviour
                 Gizmos.color = tier.bulwarkRailColor;
                 Gizmos.DrawLine(lastOut, lastIn);
                 Gizmos.DrawLine(MirrorX(lastOut), MirrorX(lastIn));
+            }
+
+            // Draw Stem Closure for intermediate deck
+            Vector3 firstOut = tier.cachedBulwarkRailPts[0];
+            Vector3 firstIn = tier.cachedInnerBulwarkRailPts[0];
+            float fwdZMid = (firstOut.z + tier.cachedBulwarkRailPts[1].z) * 0.5f;
+            bool spansStem = DoesSegmentSpanZ(tier, firstOut.z, bulwarkBowZ, bulwarkSternZ) || DoesSegmentSpanZ(tier, fwdZMid, bulwarkBowZ, bulwarkSternZ);
+
+            if (spansStem)
+            {
+                Gizmos.color = tier.bulwarkRailColor;
+                Gizmos.DrawLine(firstOut, firstIn);
+                Gizmos.DrawLine(MirrorX(firstOut), MirrorX(firstIn));
             }
         }
 
