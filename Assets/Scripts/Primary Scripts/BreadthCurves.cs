@@ -703,6 +703,24 @@ public class BreadthCurves : MonoBehaviour
         float deltaY = pInner.y - pOuter.y;
         float absDeltaX = Mathf.Abs(deltaX);
 
+        if (t > 1.0f && topLineCurves != null && topLineCurves.showInnerLine)
+        {
+            float targetZ = (sheerCurves != null)
+                ? Mathf.Min(sheerCurves.transomP1.z, sheerCurves.counterP3.z, sheerCurves.sternP3.z)
+                : ((topLineCurves != null) ? topLineCurves.aftP2.z : cachedAftP2.z);
+            float tTarget = GetAftBezierTAtExtrapolatedZ(targetZ);
+            if (tTarget > 1.0001f)
+            {
+                float frac = Mathf.Clamp01((t - 1.0f) / (tTarget - 1.0f));
+                float topSpacing = topLineCurves.innerLineSpacing;
+                if (bodyCurves != null && bodyCurves.showInnerLine)
+                {
+                    topSpacing = Mathf.Abs(bodyCurves.GetInnerNodePosition(4, cachedFwdP3.z, 1f).x - topLineCurves.fwdP3.x);
+                }
+                absDeltaX = Mathf.Lerp(absDeltaX, topSpacing, frac);
+            }
+        }
+
         Vector3 pt = cachedIsAftCubic ? CalculateCubicBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2, cachedAftP3)
                                       : CalculateQuadraticBezierPoint(t, cachedAftP0, cachedAftP1, cachedAftP2);
 
@@ -725,6 +743,14 @@ public class BreadthCurves : MonoBehaviour
     public virtual Vector3 GetInnerAftProjectionPointAtZ(float z, bool starboard = true)
     {
         UpdateCachedCurves();
+        if (topLineCurves != null && topLineCurves.showInnerLine)
+        {
+            Vector3 topTip = topLineCurves.GetInnerTopLineSternTip(true);
+            if (z <= topTip.z + 0.001f)
+            {
+                return starboard ? topTip : MirrorX(topTip);
+            }
+        }
         float t = GetAftBezierTAtExtrapolatedZ(z);
         return EvaluateInnerPointAtT(t, starboard);
     }
@@ -1091,12 +1117,18 @@ public class BreadthCurves : MonoBehaviour
             float absDeltaX = Mathf.Abs(pInner.x - pOuter.x);
 
             float innerTargetZ = targetZ + absDeltaX;
+            if (topLineCurves != null && topLineCurves.showInnerLine)
+            {
+                innerTargetZ = topLineCurves.GetInnerTopLineSternTip(true).z;
+            }
             float tInnerTarget = GetAftBezierTAtExtrapolatedZ(innerTargetZ);
 
             for (int i = 1; i <= steps; i++)
             {
                 float t = Mathf.Lerp(1.0f, tInnerTarget, i / (float)steps);
-                Vector3 currInnerStbd = EvaluateInnerPointAtT(t, true);
+                Vector3 currInnerStbd = (i == steps && topLineCurves != null && topLineCurves.showInnerLine)
+                    ? topLineCurves.GetInnerTopLineSternTip(true)
+                    : EvaluateInnerPointAtT(t, true);
                 Vector3 currInnerPort = MirrorX(currInnerStbd);
 
                 if (i % 2 != 0)
