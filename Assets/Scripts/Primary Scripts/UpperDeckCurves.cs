@@ -67,6 +67,8 @@ public class UpperDeckSegment
     [Header("Visualization Settings")]
     public bool showCenterline = true;
     public bool showEdges = true;
+    [Tooltip("Render the outer hull boundary edges (exterior hull siding) for this deck segment.")]
+    public bool showOuterEdges = true;
     public bool showBeams = true;
     public bool showEndMargins = true;
     public bool showNodeSpheres = true;
@@ -75,6 +77,7 @@ public class UpperDeckSegment
     [Header("Gizmo Colors")]
     public Color deckColor = new Color(0.95f, 0.65f, 0.25f, 0.95f);     // Warm Amber / Oak
     public Color deckEdgeColor = new Color(0.85f, 0.50f, 0.15f, 0.95f); // Rich Chestnut
+    public Color deckOuterEdgeColor = new Color(0.98f, 0.42f, 0.12f, 0.95f); // Bright Coral / Amber Outer Siding
     public Color beamColor = new Color(0.95f, 0.80f, 0.40f, 0.60f);     // Translucent Gold
     public Color bottomColor = new Color(0.65f, 0.40f, 0.15f, 0.75f);   // Dark Walnut
     public Color breastworkColor = new Color(0.90f, 0.85f, 0.55f, 0.90f);// Light Sand Bulkhead
@@ -83,12 +86,16 @@ public class UpperDeckSegment
     [HideInInspector] public Vector3 midshipCenter;
     [HideInInspector] public Vector3 stbdMidshipEdge;
     [HideInInspector] public Vector3 portMidshipEdge;
+    [HideInInspector] public Vector3 stbdOuterMidshipEdge;
+    [HideInInspector] public Vector3 portOuterMidshipEdge;
     [HideInInspector] public Vector3 fwdCenterTip;
     [HideInInspector] public Vector3 aftCenterTip;
 
     [HideInInspector] public Vector3 midshipBottomCenter;
     [HideInInspector] public Vector3 stbdMidshipBottomEdge;
     [HideInInspector] public Vector3 portMidshipBottomEdge;
+    [HideInInspector] public Vector3 stbdBottomOuterMidshipEdge;
+    [HideInInspector] public Vector3 portBottomOuterMidshipEdge;
     [HideInInspector] public Vector3 fwdBottomCenterTip;
     [HideInInspector] public Vector3 aftBottomCenterTip;
 
@@ -101,11 +108,15 @@ public class UpperDeckSegment
     [System.NonSerialized] public Vector3[] cachedCenterlinePts;
     [System.NonSerialized] public Vector3[] cachedStbdEdgePts;
     [System.NonSerialized] public Vector3[] cachedPortEdgePts;
+    [System.NonSerialized] public Vector3[] cachedStbdOuterEdgePts;
+    [System.NonSerialized] public Vector3[] cachedPortOuterEdgePts;
     [System.NonSerialized] public List<Vector3[]> cachedDeckBeams = new List<Vector3[]>();
 
     [System.NonSerialized] public Vector3[] cachedBottomCenterlinePts;
     [System.NonSerialized] public Vector3[] cachedStbdBottomEdgePts;
     [System.NonSerialized] public Vector3[] cachedPortBottomEdgePts;
+    [System.NonSerialized] public Vector3[] cachedStbdBottomOuterEdgePts;
+    [System.NonSerialized] public Vector3[] cachedPortBottomOuterEdgePts;
     [System.NonSerialized] public List<Vector3[]> cachedBottomDeckBeams = new List<Vector3[]>();
 
     // Transverse end cap arcs at forwardZ and aftZ
@@ -924,12 +935,15 @@ public class UpperDeckCurves : MonoBehaviour
                     float aftCenterY = EvaluateCenterlineSheerYAtZ(tier, segment, t, segment.aftZ);
                     segment.aftCenterTip = new Vector3(0f, aftCenterY, segment.aftZ);
 
-                    // 3. Camber & Waterway Deck Edges
+                    // 3. Camber, Waterway, and Outer Hull Deck Edges
                     float camberMid = EvaluateCamberAtZ(tier, segment, segMidZ);
                     float edgeMidY = segMidY - camberMid;
                     float edgeMidX = GetInnerHullHalfBreadthAt(edgeMidY, segMidZ);
+                    float outerEdgeMidX = GetOuterHullHalfBreadthAt(edgeMidY, segMidZ);
                     segment.stbdMidshipEdge = new Vector3(edgeMidX, edgeMidY, segMidZ);
                     segment.portMidshipEdge = new Vector3(-edgeMidX, edgeMidY, segMidZ);
+                    segment.stbdOuterMidshipEdge = new Vector3(outerEdgeMidX, edgeMidY, segMidZ);
+                    segment.portOuterMidshipEdge = new Vector3(-outerEdgeMidX, edgeMidY, segMidZ);
                     segment.midshipBeamWidth = edgeMidX * 2f;
 
                     // Readouts
@@ -943,8 +957,11 @@ public class UpperDeckCurves : MonoBehaviour
                     segment.midshipBottomCenter = new Vector3(0f, segMidY - segment.deckThickness, segMidZ);
                     float botEdgeMidY = edgeMidY - segment.deckThickness;
                     float botEdgeMidX = GetInnerHullHalfBreadthAt(botEdgeMidY, segMidZ);
+                    float botOuterEdgeMidX = GetOuterHullHalfBreadthAt(botEdgeMidY, segMidZ);
                     segment.stbdMidshipBottomEdge = new Vector3(botEdgeMidX, botEdgeMidY, segMidZ);
                     segment.portMidshipBottomEdge = new Vector3(-botEdgeMidX, botEdgeMidY, segMidZ);
+                    segment.stbdBottomOuterMidshipEdge = new Vector3(botOuterEdgeMidX, botEdgeMidY, segMidZ);
+                    segment.portBottomOuterMidshipEdge = new Vector3(-botOuterEdgeMidX, botEdgeMidY, segMidZ);
 
                     segment.fwdBottomCenterTip = new Vector3(0f, fwdCenterY - segment.deckThickness, segment.forwardZ);
                     segment.aftBottomCenterTip = new Vector3(0f, aftCenterY - segment.deckThickness, segment.aftZ);
@@ -1090,6 +1107,10 @@ public class UpperDeckCurves : MonoBehaviour
             segment.cachedStbdEdgePts = new Vector3[RESOLUTION + 1];
         if (segment.cachedPortEdgePts == null || segment.cachedPortEdgePts.Length != RESOLUTION + 1)
             segment.cachedPortEdgePts = new Vector3[RESOLUTION + 1];
+        if (segment.cachedStbdOuterEdgePts == null || segment.cachedStbdOuterEdgePts.Length != RESOLUTION + 1)
+            segment.cachedStbdOuterEdgePts = new Vector3[RESOLUTION + 1];
+        if (segment.cachedPortOuterEdgePts == null || segment.cachedPortOuterEdgePts.Length != RESOLUTION + 1)
+            segment.cachedPortOuterEdgePts = new Vector3[RESOLUTION + 1];
 
         if (segment.cachedBottomCenterlinePts == null || segment.cachedBottomCenterlinePts.Length != RESOLUTION + 1)
             segment.cachedBottomCenterlinePts = new Vector3[RESOLUTION + 1];
@@ -1097,6 +1118,10 @@ public class UpperDeckCurves : MonoBehaviour
             segment.cachedStbdBottomEdgePts = new Vector3[RESOLUTION + 1];
         if (segment.cachedPortBottomEdgePts == null || segment.cachedPortBottomEdgePts.Length != RESOLUTION + 1)
             segment.cachedPortBottomEdgePts = new Vector3[RESOLUTION + 1];
+        if (segment.cachedStbdBottomOuterEdgePts == null || segment.cachedStbdBottomOuterEdgePts.Length != RESOLUTION + 1)
+            segment.cachedStbdBottomOuterEdgePts = new Vector3[RESOLUTION + 1];
+        if (segment.cachedPortBottomOuterEdgePts == null || segment.cachedPortBottomOuterEdgePts.Length != RESOLUTION + 1)
+            segment.cachedPortBottomOuterEdgePts = new Vector3[RESOLUTION + 1];
 
         if (segment.cachedDeckBeams == null) segment.cachedDeckBeams = new List<Vector3[]>();
         if (segment.cachedBottomDeckBeams == null) segment.cachedBottomDeckBeams = new List<Vector3[]>();
@@ -1146,14 +1171,16 @@ public class UpperDeckCurves : MonoBehaviour
             float camber = EvaluateCamberAtZ(tier, segment, z);
             float edgeY = centerY - camber;
             float edgeX = GetInnerHullHalfBreadthAt(edgeY, z);
+            float outerEdgeX = GetOuterHullHalfBreadthAt(edgeY, z);
 
             float bottomCenterY = centerY - segment.deckThickness;
             float bottomEdgeY = bottomCenterY - camber;
             float bottomEdgeX = GetInnerHullHalfBreadthAt(bottomEdgeY, z);
+            float bottomOuterEdgeX = GetOuterHullHalfBreadthAt(bottomEdgeY, z);
 
             if (i == RESOLUTION && isAtStem)
             {
-                // Bow tip flush convergence hugging inner stem post
+                // Bow tip flush convergence hugging inner and outer stem post
                 float hw = (backboneCurves != null) ? (backboneCurves.keelWidth * 0.5f) : 0.25f;
                 float spacing = (bodyCurves != null) ? bodyCurves.topInnerLineSpacing : 0.10f;
                 float minStemInnerX = Mathf.Max(0.05f, hw - spacing);
@@ -1162,21 +1189,33 @@ public class UpperDeckCurves : MonoBehaviour
                     ? Mathf.Max(minStemInnerX, Mathf.Abs(topLineCurves.GetInnerTopLineBowTip(true).x))
                     : minStemInnerX;
 
+                float outerStemX = (topLineCurves != null)
+                    ? Mathf.Max(hw, Mathf.Abs(topLineCurves.GetTopLinePointAtZ(fwdZ).x))
+                    : hw;
+
                 segment.cachedCenterlinePts[i] = new Vector3(0f, centerY, fwdZ);
                 segment.cachedStbdEdgePts[i] = new Vector3(innerStemX, edgeY, fwdZ);
                 segment.cachedPortEdgePts[i] = new Vector3(-innerStemX, edgeY, fwdZ);
+                segment.cachedStbdOuterEdgePts[i] = new Vector3(outerStemX, edgeY, fwdZ);
+                segment.cachedPortOuterEdgePts[i] = new Vector3(-outerStemX, edgeY, fwdZ);
 
                 segment.cachedBottomCenterlinePts[i] = new Vector3(0f, bottomCenterY, fwdZ);
                 segment.cachedStbdBottomEdgePts[i] = new Vector3(innerStemX, bottomEdgeY, fwdZ);
                 segment.cachedPortBottomEdgePts[i] = new Vector3(-innerStemX, bottomEdgeY, fwdZ);
+                segment.cachedStbdBottomOuterEdgePts[i] = new Vector3(outerStemX, bottomEdgeY, fwdZ);
+                segment.cachedPortBottomOuterEdgePts[i] = new Vector3(-outerStemX, bottomEdgeY, fwdZ);
             }
             else if (i == 0 && isAtTransom && fashionCurves != null)
             {
-                // Stern transom flush cut hugging inner fashion timbers at edges and transom profile at centerline
+                // Stern transom flush cut hugging inner/outer fashion timbers at edges and transom profile at centerline
                 Vector3 inFashionPt = fashionCurves.GetInnerFashionPointAtY(edgeY, 1f);
                 float transomCornerX = Mathf.Abs(inFashionPt.x);
                 float transomCornerZ = inFashionPt.z;
                 float centerTransomZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(centerY) : transomCornerZ;
+
+                Vector3 outFashionPt = fashionCurves.GetFashionPointAtY(edgeY, 1f);
+                float outTransomCornerX = Mathf.Abs(outFashionPt.x);
+                float outTransomCornerZ = outFashionPt.z;
 
                 // Re-evaluate centerline height at the exact longitudinal station of the transom profile (centerTransomZ)
                 float transomCenterY = EvaluateCenterlineSheerYAtZ(tier, segment, tierIndex, centerTransomZ);
@@ -1185,25 +1224,37 @@ public class UpperDeckCurves : MonoBehaviour
                 segment.cachedCenterlinePts[0] = new Vector3(0f, transomCenterY, centerTransomZ);
                 segment.cachedStbdEdgePts[0] = new Vector3(transomCornerX, edgeY, transomCornerZ);
                 segment.cachedPortEdgePts[0] = new Vector3(-transomCornerX, edgeY, transomCornerZ);
+                segment.cachedStbdOuterEdgePts[0] = new Vector3(outTransomCornerX, edgeY, outTransomCornerZ);
+                segment.cachedPortOuterEdgePts[0] = new Vector3(-outTransomCornerX, edgeY, outTransomCornerZ);
 
                 Vector3 inBotFashionPt = fashionCurves.GetInnerFashionPointAtY(bottomEdgeY, 1f);
                 float botTransomCornerX = Mathf.Abs(inBotFashionPt.x);
                 float botTransomCornerZ = inBotFashionPt.z;
                 float botCenterTransomZ = (sheerCurves != null) ? sheerCurves.GetSternProfileZAtY(bottomCenterY) : botTransomCornerZ;
 
+                Vector3 outBotFashionPt = fashionCurves.GetFashionPointAtY(bottomEdgeY, 1f);
+                float outBotTransomCornerX = Mathf.Abs(outBotFashionPt.x);
+                float outBotTransomCornerZ = outBotFashionPt.z;
+
                 segment.cachedBottomCenterlinePts[0] = new Vector3(0f, botTransomCenterY, botCenterTransomZ);
                 segment.cachedStbdBottomEdgePts[0] = new Vector3(botTransomCornerX, bottomEdgeY, botTransomCornerZ);
                 segment.cachedPortBottomEdgePts[0] = new Vector3(-botTransomCornerX, bottomEdgeY, botTransomCornerZ);
+                segment.cachedStbdBottomOuterEdgePts[0] = new Vector3(outBotTransomCornerX, bottomEdgeY, outBotTransomCornerZ);
+                segment.cachedPortBottomOuterEdgePts[0] = new Vector3(-outBotTransomCornerX, bottomEdgeY, outBotTransomCornerZ);
             }
             else
             {
                 segment.cachedCenterlinePts[i] = new Vector3(0f, centerY, z);
                 segment.cachedStbdEdgePts[i] = new Vector3(edgeX, edgeY, z);
                 segment.cachedPortEdgePts[i] = new Vector3(-edgeX, edgeY, z);
+                segment.cachedStbdOuterEdgePts[i] = new Vector3(outerEdgeX, edgeY, z);
+                segment.cachedPortOuterEdgePts[i] = new Vector3(-outerEdgeX, edgeY, z);
 
                 segment.cachedBottomCenterlinePts[i] = new Vector3(0f, bottomCenterY, z);
                 segment.cachedStbdBottomEdgePts[i] = new Vector3(bottomEdgeX, bottomEdgeY, z);
                 segment.cachedPortBottomEdgePts[i] = new Vector3(-bottomEdgeX, bottomEdgeY, z);
+                segment.cachedStbdBottomOuterEdgePts[i] = new Vector3(bottomOuterEdgeX, bottomEdgeY, z);
+                segment.cachedPortBottomOuterEdgePts[i] = new Vector3(-bottomOuterEdgeX, bottomEdgeY, z);
             }
         }
 
@@ -1903,6 +1954,115 @@ public class UpperDeckCurves : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Evaluates the 3D Upper Deck Outer Edge points (exterior hull siding and bottom outer edge) at station Z.
+    /// Returns true if an active upper deck segment spans station Z.
+    /// If multiple tiers span station Z, evaluates the highest active deck tier.
+    /// </summary>
+    public bool GetDeckOuterEdgePointsAtZ(float z, out Vector3 stbdOuterEdge, out Vector3 portOuterEdge, out Vector3 stbdBottomOuterEdge, out Vector3 portBottomOuterEdge)
+    {
+        stbdOuterEdge = Vector3.zero;
+        portOuterEdge = Vector3.zero;
+        stbdBottomOuterEdge = Vector3.zero;
+        portBottomOuterEdge = Vector3.zero;
+
+        EnsureInitialized();
+        if (tiers == null || tiers.Count == 0) return false;
+
+        // Search from highest tier downwards for active deck at station Z
+        for (int t = tiers.Count - 1; t >= 0; t--)
+        {
+            if (GetDeckOuterEdgePointsAtZ(t, z, out stbdOuterEdge, out portOuterEdge, out stbdBottomOuterEdge, out portBottomOuterEdge))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Evaluates the 3D Upper Deck Outer Edge points (exterior hull siding and bottom outer edge) at station Z for a specific tier.
+    /// Returns true if an active segment on this tier spans station Z.
+    /// </summary>
+    public bool GetDeckOuterEdgePointsAtZ(int tierIndex, float z, out Vector3 stbdOuterEdge, out Vector3 portOuterEdge, out Vector3 stbdBottomOuterEdge, out Vector3 portBottomOuterEdge)
+    {
+        stbdOuterEdge = Vector3.zero;
+        portOuterEdge = Vector3.zero;
+        stbdBottomOuterEdge = Vector3.zero;
+        portBottomOuterEdge = Vector3.zero;
+
+        EnsureInitialized();
+        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
+        UpperDeckTier tier = tiers[tierIndex];
+        if (tier == null || tier.segments == null) return false;
+
+        float bulwarkSternZ = GetBulwarkTransomLimitZ(tierIndex);
+        float bulwarkBowZ = GetBulwarkStemLimitZ(tierIndex);
+
+        for (int s = 0; s < tier.segments.Count; s++)
+        {
+            UpperDeckSegment seg = tier.segments[s];
+            if (seg == null || !seg.isEnabled) continue;
+
+            float fwdLimit = seg.flushToStem ? Mathf.Max(seg.forwardZ, bulwarkBowZ) : seg.forwardZ;
+            float aftLimit = seg.flushToTransom ? Mathf.Min(seg.aftZ, bulwarkSternZ) : seg.aftZ;
+
+            if (z <= fwdLimit + 0.001f && z >= aftLimit - 0.001f)
+            {
+                float centerY = EvaluateCenterlineSheerYAtZ(tier, seg, tierIndex, z);
+                float camber = EvaluateCamberAtZ(tier, seg, z);
+                float edgeY = centerY - camber;
+                float halfWidth = GetOuterHullHalfBreadthAt(edgeY, z);
+
+                stbdOuterEdge = new Vector3(halfWidth, edgeY, z);
+                portOuterEdge = new Vector3(-halfWidth, edgeY, z);
+
+                float bottomCenterY = centerY - seg.deckThickness;
+                float bottomEdgeY = bottomCenterY - camber;
+                float bottomHalfWidth = GetOuterHullHalfBreadthAt(bottomEdgeY, z);
+
+                stbdBottomOuterEdge = new Vector3(bottomHalfWidth, bottomEdgeY, z);
+                portBottomOuterEdge = new Vector3(-bottomHalfWidth, bottomEdgeY, z);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the cached inner edge polylines (waterway on inner frame) for a specific segment.
+    /// </summary>
+    public bool GetSegmentEdgePoints(int tierIndex, int segmentIndex, out Vector3[] stbdInner, out Vector3[] portInner)
+    {
+        stbdInner = null;
+        portInner = null;
+        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
+        UpperDeckTier tier = tiers[tierIndex];
+        if (tier == null || tier.segments == null || segmentIndex < 0 || segmentIndex >= tier.segments.Count) return false;
+        UpperDeckSegment seg = tier.segments[segmentIndex];
+        if (seg == null || seg.cachedStbdEdgePts == null) return false;
+        stbdInner = seg.cachedStbdEdgePts;
+        portInner = seg.cachedPortEdgePts;
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the cached outer edge polylines (exterior hull siding) for a specific segment.
+    /// </summary>
+    public bool GetSegmentOuterEdgePoints(int tierIndex, int segmentIndex, out Vector3[] stbdOuter, out Vector3[] portOuter)
+    {
+        stbdOuter = null;
+        portOuter = null;
+        if (tiers == null || tierIndex < 0 || tierIndex >= tiers.Count) return false;
+        UpperDeckTier tier = tiers[tierIndex];
+        if (tier == null || tier.segments == null || segmentIndex < 0 || segmentIndex >= tier.segments.Count) return false;
+        UpperDeckSegment seg = tier.segments[segmentIndex];
+        if (seg == null || seg.cachedStbdOuterEdgePts == null) return false;
+        stbdOuter = seg.cachedStbdOuterEdgePts;
+        portOuter = seg.cachedPortOuterEdgePts;
+        return true;
     }
 
     // --- BULWARK CAP RAIL GEOMETRY & QUERY API ---
@@ -3136,38 +3296,6 @@ public class UpperDeckCurves : MonoBehaviour
                 Gizmos.DrawLine(firstIn, Vector3.Lerp(firstIn, MirrorX(firstIn), 0.5f));
 #endif
             }
-
-            // Draw timber caps at active segment boundaries (forward and aft breaks)
-            if (tier.segments != null)
-            {
-                for (int s = 0; s < tier.segments.Count; s++)
-                {
-                    UpperDeckSegment seg = tier.segments[s];
-                    if (seg == null || !seg.isEnabled) continue;
-
-                    // Forward break cap (if not flush to stem)
-                    if (seg.forwardZ < bulwarkBowZ - 0.05f)
-                    {
-                        if (GetBulwarkRailPointsAtZ(tierIndex, seg.forwardZ, out Vector3 fwdOut, out Vector3 fwdIn))
-                        {
-                            Gizmos.color = tier.bulwarkRailColor;
-                            Gizmos.DrawLine(fwdOut, fwdIn);
-                            Gizmos.DrawLine(MirrorX(fwdOut), MirrorX(fwdIn));
-                        }
-                    }
-
-                    // Aft break cap (if not flush to transom)
-                    if (seg.aftZ > bulwarkSternZ + 0.05f)
-                    {
-                        if (GetBulwarkRailPointsAtZ(tierIndex, seg.aftZ, out Vector3 aftOut, out Vector3 aftIn))
-                        {
-                            Gizmos.color = tier.bulwarkRailColor;
-                            Gizmos.DrawLine(aftOut, aftIn);
-                            Gizmos.DrawLine(MirrorX(aftOut), MirrorX(aftIn));
-                        }
-                    }
-                }
-            }
         }
 
         // Draw vertical bulwark framing / stanchions along active spans (connecting deck waterway to cap rail)
@@ -3224,6 +3352,27 @@ public class UpperDeckCurves : MonoBehaviour
                 {
                     Gizmos.DrawLine(seg.cachedStbdBottomEdgePts[i], seg.cachedStbdBottomEdgePts[i + 1]);
                     Gizmos.DrawLine(seg.cachedPortBottomEdgePts[i], seg.cachedPortBottomEdgePts[i + 1]);
+                }
+            }
+        }
+
+        // 2b. Outer Hull Boundary Edges (Exterior Hull Siding at Deck Level)
+        if (seg.showOuterEdges && seg.cachedStbdOuterEdgePts != null)
+        {
+            Gizmos.color = seg.deckOuterEdgeColor;
+            for (int i = 0; i < seg.cachedStbdOuterEdgePts.Length - 1; i++)
+            {
+                Gizmos.DrawLine(seg.cachedStbdOuterEdgePts[i], seg.cachedStbdOuterEdgePts[i + 1]);
+                Gizmos.DrawLine(seg.cachedPortOuterEdgePts[i], seg.cachedPortOuterEdgePts[i + 1]);
+            }
+
+            if (seg.showBottomDeck && seg.cachedStbdBottomOuterEdgePts != null)
+            {
+                Gizmos.color = new Color(seg.deckOuterEdgeColor.r * 0.75f, seg.deckOuterEdgeColor.g * 0.75f, seg.deckOuterEdgeColor.b * 0.75f, 0.80f);
+                for (int i = 0; i < seg.cachedStbdBottomOuterEdgePts.Length - 1; i++)
+                {
+                    Gizmos.DrawLine(seg.cachedStbdBottomOuterEdgePts[i], seg.cachedStbdBottomOuterEdgePts[i + 1]);
+                    Gizmos.DrawLine(seg.cachedPortBottomOuterEdgePts[i], seg.cachedPortBottomOuterEdgePts[i + 1]);
                 }
             }
         }
@@ -3298,6 +3447,125 @@ public class UpperDeckCurves : MonoBehaviour
             }
         }
 
+        // 4b. 3D Transverse Break Closures (Deck Margin Caps, Vertical Siding, Inner Stanchions, and Cap Rail Timber Caps)
+        float fwdLimitZ = GetInnerStemZAtElevation(seg.fwdCenterTip.y);
+        bool isAtStem = (seg.flushToStem || seg.forwardZ >= fwdLimitZ - 0.05f);
+
+        float aftLimitZ = GetInnerSternZAtElevation(seg.aftCenterTip.y);
+        bool isAtTransom = (seg.flushToTransom || seg.aftZ <= aftLimitZ + 0.05f);
+
+        // Forward Break Closure
+        if (seg.cachedStbdEdgePts != null && seg.cachedStbdOuterEdgePts != null && seg.cachedStbdEdgePts.Length > RESOLUTION)
+        {
+            Vector3 fwdInStbd = seg.cachedStbdEdgePts[RESOLUTION];
+            Vector3 fwdOutStbd = seg.cachedStbdOuterEdgePts[RESOLUTION];
+            Vector3 fwdInPort = seg.cachedPortEdgePts[RESOLUTION];
+            Vector3 fwdOutPort = seg.cachedPortOuterEdgePts[RESOLUTION];
+
+            // Horizontal deck covering cap connecting inner waterway to outer siding
+            Gizmos.color = seg.deckEdgeColor;
+            Gizmos.DrawLine(fwdInStbd, fwdOutStbd);
+            Gizmos.DrawLine(fwdInPort, fwdOutPort);
+
+            if (seg.showBottomDeck && seg.cachedStbdBottomEdgePts != null && seg.cachedStbdBottomOuterEdgePts != null)
+            {
+                Vector3 fwdBotInStbd = seg.cachedStbdBottomEdgePts[RESOLUTION];
+                Vector3 fwdBotOutStbd = seg.cachedStbdBottomOuterEdgePts[RESOLUTION];
+                Vector3 fwdBotInPort = seg.cachedPortBottomEdgePts[RESOLUTION];
+                Vector3 fwdBotOutPort = seg.cachedPortBottomOuterEdgePts[RESOLUTION];
+
+                Gizmos.color = seg.bottomColor;
+                Gizmos.DrawLine(fwdBotInStbd, fwdBotOutStbd);
+                Gizmos.DrawLine(fwdBotInPort, fwdBotOutPort);
+
+                if (seg.showThicknessEdgeCaps)
+                {
+                    Gizmos.DrawLine(fwdOutStbd, fwdBotOutStbd);
+                    Gizmos.DrawLine(fwdOutPort, fwdBotOutPort);
+                    Gizmos.DrawLine(fwdInStbd, fwdBotInStbd);
+                    Gizmos.DrawLine(fwdInPort, fwdBotInPort);
+                }
+            }
+
+            // Bulwark Break Closure (connecting deck to cap rail at forward break)
+            if (tier.showBulwark && GetBulwarkRailPointsAtZ(tierIndex, seg.forwardZ, out Vector3 fwdRailOut, out Vector3 fwdRailIn))
+            {
+                // Cap rail timber cap (if not at stem)
+                if (!isAtStem)
+                {
+                    Gizmos.color = tier.bulwarkRailColor;
+                    Gizmos.DrawLine(fwdRailOut, fwdRailIn);
+                    Gizmos.DrawLine(MirrorX(fwdRailOut), MirrorX(fwdRailIn));
+                }
+
+                // Vertical outer siding line connecting outer deck edge to outer cap rail
+                Gizmos.color = seg.deckOuterEdgeColor;
+                Gizmos.DrawLine(fwdOutStbd, fwdRailOut);
+                Gizmos.DrawLine(fwdOutPort, MirrorX(fwdRailOut));
+
+                // Vertical inner bulwark stanchion line connecting inner waterway to inner cap rail
+                Gizmos.color = tier.bulwarkStanchionColor;
+                Gizmos.DrawLine(fwdInStbd, fwdRailIn);
+                Gizmos.DrawLine(fwdInPort, MirrorX(fwdRailIn));
+            }
+        }
+
+        // Aft Break Closure
+        if (seg.cachedStbdEdgePts != null && seg.cachedStbdOuterEdgePts != null && seg.cachedStbdEdgePts.Length > 0)
+        {
+            Vector3 aftInStbd = seg.cachedStbdEdgePts[0];
+            Vector3 aftOutStbd = seg.cachedStbdOuterEdgePts[0];
+            Vector3 aftInPort = seg.cachedPortEdgePts[0];
+            Vector3 aftOutPort = seg.cachedPortOuterEdgePts[0];
+
+            // Horizontal deck covering cap connecting inner waterway to outer siding
+            Gizmos.color = seg.deckEdgeColor;
+            Gizmos.DrawLine(aftInStbd, aftOutStbd);
+            Gizmos.DrawLine(aftInPort, aftOutPort);
+
+            if (seg.showBottomDeck && seg.cachedStbdBottomEdgePts != null && seg.cachedStbdBottomOuterEdgePts != null)
+            {
+                Vector3 aftBotInStbd = seg.cachedStbdBottomEdgePts[0];
+                Vector3 aftBotOutStbd = seg.cachedStbdBottomOuterEdgePts[0];
+                Vector3 aftBotInPort = seg.cachedPortBottomEdgePts[0];
+                Vector3 aftBotOutPort = seg.cachedPortBottomOuterEdgePts[0];
+
+                Gizmos.color = seg.bottomColor;
+                Gizmos.DrawLine(aftBotInStbd, aftBotOutStbd);
+                Gizmos.DrawLine(aftBotInPort, aftBotOutPort);
+
+                if (seg.showThicknessEdgeCaps)
+                {
+                    Gizmos.DrawLine(aftOutStbd, aftBotOutStbd);
+                    Gizmos.DrawLine(aftOutPort, aftBotOutPort);
+                    Gizmos.DrawLine(aftInStbd, aftBotInStbd);
+                    Gizmos.DrawLine(aftInPort, aftBotInPort);
+                }
+            }
+
+            // Bulwark Break Closure (connecting deck to cap rail at aft break)
+            if (tier.showBulwark && GetBulwarkRailPointsAtZ(tierIndex, seg.aftZ, out Vector3 aftRailOut, out Vector3 aftRailIn))
+            {
+                // Cap rail timber cap (if not at transom, where transom crossbars draw across beam)
+                if (!isAtTransom)
+                {
+                    Gizmos.color = tier.bulwarkRailColor;
+                    Gizmos.DrawLine(aftRailOut, aftRailIn);
+                    Gizmos.DrawLine(MirrorX(aftRailOut), MirrorX(aftRailIn));
+                }
+
+                // Vertical outer siding line connecting outer deck edge to outer cap rail
+                Gizmos.color = seg.deckOuterEdgeColor;
+                Gizmos.DrawLine(aftOutStbd, aftRailOut);
+                Gizmos.DrawLine(aftOutPort, MirrorX(aftRailOut));
+
+                // Vertical inner bulwark stanchion line connecting inner waterway to inner cap rail
+                Gizmos.color = tier.bulwarkStanchionColor;
+                Gizmos.DrawLine(aftInStbd, aftRailIn);
+                Gizmos.DrawLine(aftInPort, MirrorX(aftRailIn));
+            }
+        }
+
         // 5. Transverse Breastwork Bulkheads (Facing the open waist)
         if (seg.showForwardBreastwork && seg.forwardBreastworkTopArc != null)
         {
@@ -3344,6 +3612,13 @@ public class UpperDeckCurves : MonoBehaviour
             Gizmos.DrawSphere(seg.midshipCenter, nodeSphereRadius);
             Gizmos.DrawSphere(seg.stbdMidshipEdge, nodeSphereRadius * 0.8f);
             Gizmos.DrawSphere(seg.portMidshipEdge, nodeSphereRadius * 0.8f);
+
+            if (seg.showOuterEdges)
+            {
+                Gizmos.color = seg.deckOuterEdgeColor;
+                Gizmos.DrawSphere(seg.stbdOuterMidshipEdge, nodeSphereRadius * 0.7f);
+                Gizmos.DrawSphere(seg.portOuterMidshipEdge, nodeSphereRadius * 0.7f);
+            }
         }
     }
 }
